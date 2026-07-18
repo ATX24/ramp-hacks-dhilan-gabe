@@ -1,0 +1,12 @@
+{
+  "max_length": 4096,
+  "max_completion": 1024,
+  "seed": 17,
+  "teacher_model_id": "Qwen/Qwen2.5-72B-Instruct",
+  "teacher_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "student_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+  "student_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "trajectory_corpus_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "mask_tool_results": true,
+  "specialist_task": "generalist"
+}

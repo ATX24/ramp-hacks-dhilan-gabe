@@ -172,6 +172,14 @@ _recipe_catalog: dict[RecipeId, RecipeCapability] = {
 }
 
 for _rid in CATALOG_ONLY_RECIPES:
+    if _rid is RecipeId.AGENT_TRAJECTORY:
+        summary = (
+            "Catalog stub for Finance Agent trajectory distillation. "
+            "Implemented technique id is agent_trajectory.v1 (isolated adapter; "
+            "not sequence.v1/logit.v1). BYODT registry integration pending review."
+        )
+    else:
+        summary = f"Cataloged capability {_rid.value}; not implemented in MVP."
     _recipe_catalog[_rid] = RecipeCapability(
         recipe_id=_rid,
         status=RecipeStatus.CATALOG_ONLY,
@@ -183,7 +191,7 @@ for _rid in CATALOG_ONLY_RECIPES:
         schedule="catalog",
         objective="catalog",
         adaptation="catalog",
-        summary=f"Cataloged capability {_rid.value}; not implemented in MVP.",
+        summary=summary,
         hard_gates=("returns_RECIPE_NOT_IMPLEMENTED",),
     )
 RECIPE_CATALOG: Mapping[RecipeId, RecipeCapability] = MappingProxyType(_recipe_catalog)

@@ -1,0 +1,32 @@
+{
+  "schema_version": "finance_agent.chat_demo.v1",
+  "mode_id": "finance_agent",
+  "display_name": "Finance Agent",
+  "description": "Conversational finance Q&A with sandboxed synthetic tools. Not live ERP/bank access.",
+  "technique_id": "agent_trajectory.v1",
+  "envelope_schema_version": "finance_agent.v1",
+  "ui_hints": {
+    "show_tool_calls": true,
+    "show_provenance": true,
+    "allow_live_tools": false,
+    "default_model_arm": "finance_agent_generalist"
+  },
+  "tools": [
+    "chart_of_accounts_lookup",
+    "policy_lookup",
+    "ledger_query",
+    "calculator",
+    "transaction_matching",
+    "variance_drill_down"
+  ],
+  "sample_user_messages": [
+    "What is the current meal expense policy action?",
+    "Which GL account should I use for travel meals?",
+    "Reconcile the open book entry to the bank deposit."
+  ],
+  "integration_status": "contract_only",
+  "notes": [
+    "Do not wire into active DemoStage until inference/API review.",
+    "Scoring uses finance_agent.metrics.v1, not finance-proof.v1 primary index."
+  ]
+}
