@@ -133,7 +133,7 @@ function servingForArm(
       availability: "fixture_preview" satisfies DemoServingAvailability,
       endpoint_id: null,
       artifact_id: null,
-      reason: "Base student is available as a labeled fixture preview only.",
+      reason: "Original model is available as saved demo data only.",
     };
   }
 
@@ -147,6 +147,14 @@ function servingForArm(
   }
 
   if (!hasPriorArtifact) {
+    if (armId === "sequence_kd") {
+      return {
+        availability: "fixture_preview",
+        endpoint_id: null,
+        artifact_id: null,
+        reason: "Taught model is available as saved demo data only.",
+      };
+    }
     return {
       availability: "unavailable",
       endpoint_id: null,
@@ -220,6 +228,7 @@ function shouldIncludeArm(
   bundle: StageBundle,
 ): boolean {
   if (armId === "student_base") return true;
+  if (armId === "sequence_kd") return true;
   if (armId === "promoted_winner") {
     return bundle.proof?.proof_status === "proved";
   }

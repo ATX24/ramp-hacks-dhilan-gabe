@@ -1,8 +1,7 @@
 "use client";
 
-import { Suspense, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ModeBanner } from "@/components/ModeBanner";
-import { ModeSwitcher } from "@/components/ModeSwitcher";
 import {
   RunReferenceBar,
   type RunReferenceStatus,
@@ -37,7 +36,9 @@ export function AppShell({
             <div className="brand">
               Distillery <span>· TinyFable</span>
             </div>
-            <p className="tagline">Smaller models. Proven economics.</p>
+            <p className="tagline">
+              Bring examples, teach a smaller model, and verify it works.
+            </p>
           </div>
           <div
             className="rounded-full border border-border bg-card px-3 py-2 text-sm"
@@ -46,6 +47,9 @@ export function AppShell({
             Finance generalist <strong className="font-serif">TinyFable</strong>
           </div>
         </div>
+      </header>
+      <main id="main">{children}</main>
+      <aside className="mt-6 grid gap-3 border-t border-border pt-4">
         <StageNav
           mode={mode}
           runId={
@@ -57,21 +61,17 @@ export function AppShell({
         <ModeBanner mode={mode} />
         <details className="rounded-xl border border-border bg-card/70 px-3 py-2">
           <summary className="cursor-pointer text-sm font-medium">
-            Session details · fixture mode & run reference
+            Session details and run reference
           </summary>
-          <div className="mt-3 grid gap-3">
+          <div className="mt-3">
             <RunReferenceBar
               runId={runId}
               datasetId={datasetId}
               status={runReferenceStatus}
             />
-            <Suspense fallback={null}>
-              <ModeSwitcher current={mode} />
-            </Suspense>
           </div>
         </details>
-      </header>
-      <main id="main">{children}</main>
+      </aside>
     </div>
   );
 }
