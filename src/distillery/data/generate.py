@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from distillery.contracts.dataset import FinanceWorldVersion, TaskDifficultyCounts
 from distillery.contracts.hashing import content_sha256, sha256_hex
 from distillery.contracts.tasks import (
     SCHEMA_VERSION_FINANCE_WORLD,
@@ -57,21 +56,11 @@ class CorpusSpec:
     name: CorpusName
     seed: int
     splits: tuple[SplitSpec, ...]
-    schema_version: FinanceWorldVersion = SCHEMA_VERSION_FINANCE_WORLD
+    schema_version: str = SCHEMA_VERSION_FINANCE_WORLD
     generator_revision: str = GENERATOR_REVISION_V1
     task_mixture: Mapping[TaskId, float] = field(default_factory=lambda: dict(TASK_MIXTURE))
     task_order: tuple[TaskId, ...] = TASK_ORDER
     corpus_manifest_schema: str = "finance_world.v1.corpus_manifest"
-
-    def __post_init__(self) -> None:
-        if len(set(self.task_order)) != len(self.task_order):
-            raise ValueError("task_order must contain each task exactly once")
-        if set(self.task_mixture) != set(self.task_order):
-            raise ValueError("task_mixture and task_order must contain the same tasks")
-        TaskDifficultyCounts(
-            by_task={task: 0 for task in self.task_order},
-            by_difficulty={difficulty: 0 for difficulty in Difficulty},
-        ).require_finance_world(self.schema_version)
 
     @property
     def total_examples(self) -> int:

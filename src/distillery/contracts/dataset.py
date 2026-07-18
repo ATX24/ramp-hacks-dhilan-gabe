@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Mapping
+from typing import Any, Literal
 
 from pydantic import (
     Field,
+    SerializerFunctionWrapHandler,
     StrictStr,
+    model_serializer,
     model_validator,
 )
 
@@ -20,7 +23,7 @@ from distillery.contracts.hashing import (
 from distillery.contracts.ids import DatasetId
 from distillery.contracts.tasks import Difficulty, TaskId
 
-FinanceWorldVersion = Literal["finance_world.v1", "finance_world.v2"]
+TaskSetVersion = Literal["finance_world.v1", "finance_world.v2"]
 FINANCE_WORLD_V1_TASK_IDS: frozenset[TaskId] = frozenset(
     {
         TaskId.TRANSACTION_REVIEW,
@@ -31,11 +34,6 @@ FINANCE_WORLD_V1_TASK_IDS: frozenset[TaskId] = frozenset(
 FINANCE_WORLD_V2_TASK_IDS: frozenset[TaskId] = frozenset(
     {*FINANCE_WORLD_V1_TASK_IDS, TaskId.MERCHANT_TAGGING}
 )
-_SUPPORTED_TASK_SETS = (FINANCE_WORLD_V1_TASK_IDS, FINANCE_WORLD_V2_TASK_IDS)
-_TASK_IDS_BY_FINANCE_WORLD: dict[FinanceWorldVersion, frozenset[TaskId]] = {
-    "finance_world.v1": FINANCE_WORLD_V1_TASK_IDS,
-    "finance_world.v2": FINANCE_WORLD_V2_TASK_IDS,
-}
 
 
 class SplitHashes(FrozenModel):
@@ -47,15 +45,40 @@ class SplitHashes(FrozenModel):
 
 
 class TaskDifficultyCounts(FrozenModel):
+    task_set_version: TaskSetVersion = "finance_world.v1"
     by_task: FrozenDict[TaskId, NonNegativeSafeInt]
     by_difficulty: FrozenDict[Difficulty, NonNegativeSafeInt]
 
+    @model_validator(mode="before")
+    @classmethod
+    def _infer_v2_for_legacy_unversioned_input(cls, value: Any) -> Any:
+        """Infer v2 only when an unversioned wire already contains Merchant Tagging."""
+        if not isinstance(value, Mapping) or "task_set_version" in value:
+            return value
+        by_task = value.get("by_task")
+        if not isinstance(by_task, Mapping):
+            return value
+        task_values = {
+            key.value if isinstance(key, TaskId) else str(key) for key in by_task
+        }
+        if TaskId.MERCHANT_TAGGING.value not in task_values:
+            return value
+        return {**value, "task_set_version": "finance_world.v2"}
+
     @model_validator(mode="after")
     def _complete_consistent_totals(self) -> TaskDifficultyCounts:
-        if set(self.by_task) not in _SUPPORTED_TASK_SETS:
+        required_tasks = (
+            FINANCE_WORLD_V1_TASK_IDS
+            if self.task_set_version == "finance_world.v1"
+            else FINANCE_WORLD_V2_TASK_IDS
+        )
+        actual_tasks = set(self.by_task)
+        if actual_tasks != required_tasks:
+            missing = sorted(task.value for task in required_tasks - actual_tasks)
+            extra = sorted(task.value for task in actual_tasks - required_tasks)
             raise ValueError(
-                "by_task must contain exactly one complete supported task set "
-                "(finance_world.v1 or finance_world.v2)"
+                "by_task must contain every executable TaskId for "
+                f"{self.task_set_version} exactly once; missing={missing}, extra={extra}"
             )
         if set(self.by_difficulty) != set(Difficulty):
             raise ValueError("by_difficulty must contain every Difficulty exactly once")
@@ -63,21 +86,15 @@ class TaskDifficultyCounts(FrozenModel):
             raise ValueError("task and difficulty count totals must match")
         return self
 
-    def require_finance_world(
+    @model_serializer(mode="wrap")
+    def _serialize_versioned(
         self,
-        finance_world: FinanceWorldVersion,
-    ) -> TaskDifficultyCounts:
-        """Require the task set selected by an explicit finance-world version."""
-        expected = _TASK_IDS_BY_FINANCE_WORLD[finance_world]
-        actual = set(self.by_task)
-        if actual != expected:
-            missing = sorted(task.value for task in expected - actual)
-            extra = sorted(task.value for task in actual - expected)
-            raise ValueError(
-                f"by_task must contain exactly the {finance_world} task set; "
-                f"missing={missing}, extra={extra}"
-            )
-        return self
+        handler: SerializerFunctionWrapHandler,
+    ) -> dict[str, Any]:
+        payload = handler(self)
+        if self.task_set_version == "finance_world.v1":
+            payload.pop("task_set_version", None)
+        return payload
 
 
 class Dataset(FrozenModel):
