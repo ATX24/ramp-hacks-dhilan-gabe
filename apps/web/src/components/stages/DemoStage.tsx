@@ -1,25 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { DemoExamplePicker } from "@/components/DemoExamplePicker";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { defaultExampleForTask } from "@/lib/demo/examples";
+import {
+  DEMO_EXAMPLE_CATALOG,
+  getDemoExamplePreset,
+  getPresetExample,
+  type DemoExamplePresetId,
+} from "@/lib/demo/exampleCatalog";
 import { createDemoGateway } from "@/lib/demo/gateway";
 import { buildDemoModelRegistry, findRegistryModel } from "@/lib/demo/registry";
-import {
-  FINANCE_TASKS,
-  type DemoInferenceResponse,
-  type DemoModelEntry,
-  type FinanceTaskId,
-} from "@/lib/demo/types";
+import type { DemoInferenceResponse, DemoModelEntry } from "@/lib/demo/types";
 import {
   formatLatencyPlain,
   formatQualityPlain,
   plainModelLabel,
-  TASK_PLAIN,
 } from "@/lib/plainLanguage";
 import type { StageBundle } from "@/lib/types";
 
@@ -31,35 +31,17 @@ function comparePair(models: DemoModelEntry[]): DemoModelEntry[] {
   );
 }
 
-function describeExample(
-  task: FinanceTaskId,
-  input: Record<string, unknown>,
-): string {
-  if (task === "transaction_review") {
-    const amount =
-      typeof input.amount_minor === "number"
-        ? new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD",
-            maximumFractionDigits: 0,
-          }).format(input.amount_minor / 100)
-        : "this";
-    const vendor = typeof input.vendor === "string" ? input.vendor : "the vendor";
-    return `Review a ${amount} charge from ${vendor}. Decide whether finance should approve, flag, or escalate it.`;
-  }
-  if (task === "variance_analysis") {
-    const period = typeof input.period === "string" ? input.period : "this period";
-    return `Explain why ${period} missed its budget and what finance should check next.`;
-  }
-  return "Match the bank movements to the books and flag anything that does not line up.";
-}
-
 export function DemoStage({ bundle }: { bundle: StageBundle }) {
   const registry = useMemo(() => buildDemoModelRegistry(bundle), [bundle]);
   const models = useMemo(() => comparePair(registry.models), [registry.models]);
   const gateway = useMemo(() => createDemoGateway(), []);
-  const [task, setTask] = useState<FinanceTaskId>("transaction_review");
-  const example = useMemo(() => defaultExampleForTask(task), [task]);
+  const [selectedPresetId, setSelectedPresetId] =
+    useState<DemoExamplePresetId>("server-purchase");
+  const selectedPreset = getDemoExamplePreset(selectedPresetId);
+  const example = getPresetExample(selectedPreset);
+  const [plainInput, setPlainInput] = useState<string>(
+    DEMO_EXAMPLE_CATALOG[0].inferenceInput,
+  );
   const [rawInput, setRawInput] = useState(() =>
     JSON.stringify(example.input, null, 2),
   );
@@ -67,11 +49,15 @@ export function DemoStage({ bundle }: { bundle: StageBundle }) {
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
-  useEffect(() => {
-    setRawInput(JSON.stringify(example.input, null, 2));
+  function selectExample(id: DemoExamplePresetId) {
+    const nextPreset = getDemoExamplePreset(id);
+    const nextExample = getPresetExample(nextPreset);
+    setSelectedPresetId(id);
+    setPlainInput(nextPreset.inferenceInput);
+    setRawInput(JSON.stringify(nextExample.input, null, 2));
     setResults([]);
     setError(null);
-  }, [example]);
+  }
 
   async function runComparison() {
     let input: Record<string, unknown>;
@@ -80,7 +66,10 @@ export function DemoStage({ bundle }: { bundle: StageBundle }) {
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         throw new Error("The raw example must be a JSON object.");
       }
-      input = parsed as Record<string, unknown>;
+      input = {
+        ...(parsed as Record<string, unknown>),
+        plain_language_request: plainInput,
+      };
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "The raw example is not valid JSON.",
@@ -101,7 +90,7 @@ export function DemoStage({ bundle }: { bundle: StageBundle }) {
           models.map((model) =>
             gateway.infer(registry, {
               model_id: model.model_id,
-              task,
+              task: selectedPreset.task,
               example_id: example.example_id,
               input,
               mode: "fixture_preview",
@@ -138,28 +127,22 @@ export function DemoStage({ bundle }: { bundle: StageBundle }) {
             </p>
           </div>
 
-          <fieldset>
-            <legend className="mb-2 text-sm font-medium">Choose a task</legend>
-            <div className="flex flex-wrap gap-2">
-              {FINANCE_TASKS.map((item) => (
-                <Button
-                  key={item.id}
-                  type="button"
-                  size="sm"
-                  variant={task === item.id ? "default" : "outline"}
-                  aria-pressed={task === item.id}
-                  onClick={() => setTask(item.id)}
-                >
-                  {TASK_PLAIN[item.id].title}
-                </Button>
-              ))}
-            </div>
-          </fieldset>
+          <DemoExamplePicker
+            selectedId={selectedPresetId}
+            onSelect={selectExample}
+          />
 
-          <div className="rounded-xl border border-border bg-background/60 p-3">
-            <p className="text-kicker text-muted-foreground">Example</p>
-            <p className="mt-1 text-sm leading-relaxed sm:text-base">
-              {describeExample(task, example.input)}
+          <div className="grid gap-2">
+            <Label htmlFor="demo-plain-input">Review or edit the input</Label>
+            <Textarea
+              id="demo-plain-input"
+              data-testid="demo-plain-input"
+              className="min-h-20 bg-background/60 text-sm sm:text-base"
+              value={plainInput}
+              onChange={(event) => setPlainInput(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Your edits stay here until you choose another example.
             </p>
           </div>
 

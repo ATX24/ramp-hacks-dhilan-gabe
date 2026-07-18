@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { DemoExamplePicker } from "@/components/DemoExamplePicker";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { GateList } from "@/components/GateList";
 import { LiveTrainingCard } from "@/components/LiveTrainingCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TrainingTelemetryPanel } from "@/components/TrainingTelemetryPanel";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { createApiClient } from "@/lib/api";
+import {
+  DEMO_EXAMPLE_CATALOG,
+  getDemoExamplePreset,
+  type DemoExamplePresetId,
+} from "@/lib/demo/exampleCatalog";
 import { STAGE_PLAIN } from "@/lib/plainLanguage";
 import {
   deriveTrainPresentation,
@@ -38,6 +48,12 @@ export function TrainStage({
 }) {
   const [cancelRequested, setCancelRequested] = useState(run.cancel_requested);
   const [cancelNote, setCancelNote] = useState<string | null>(null);
+  const [selectedPresetId, setSelectedPresetId] =
+    useState<DemoExamplePresetId>("server-purchase");
+  const [trainingInput, setTrainingInput] = useState<string>(
+    DEMO_EXAMPLE_CATALOG[0].trainingInput,
+  );
+  const [previewedInput, setPreviewedInput] = useState<string | null>(null);
 
   const presentation = deriveTrainPresentation(run, artifact);
   const cancellable = isRunCancellable(run, plan);
@@ -48,11 +64,92 @@ export function TrainStage({
         ? "banner-warn"
         : "banner-info";
 
+  function selectExample(id: DemoExamplePresetId) {
+    const preset = getDemoExamplePreset(id);
+    setSelectedPresetId(id);
+    setTrainingInput(preset.trainingInput);
+    setPreviewedInput(null);
+  }
+
   return (
     <section aria-labelledby="train-heading" className="grid gap-4">
+      <Card className="border-border/80 bg-card/90 shadow-none" data-testid="train-demo">
+        <CardContent className="grid gap-3 pt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge tone="precomputed">Saved demo plan</StatusBadge>
+            <span className="text-sm text-muted-foreground">
+              No training job starts from this preview
+            </span>
+          </div>
+
+          <div>
+            <h1
+              id="train-heading"
+              className="font-serif text-3xl tracking-tight sm:text-4xl"
+            >
+              {previewedInput
+                ? "Teaching preview is ready"
+                : "Choose an example to teach"}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+              Pick a finance example, review the request, then preview the plan.
+            </p>
+          </div>
+
+          <DemoExamplePicker
+            selectedId={selectedPresetId}
+            onSelect={selectExample}
+          />
+
+          <div className="grid gap-2">
+            <Label htmlFor="train-plain-input">Review or edit the input</Label>
+            <Textarea
+              id="train-plain-input"
+              data-testid="train-plain-input"
+              className="min-h-20 bg-background/60 text-sm sm:text-base"
+              value={trainingInput}
+              onChange={(event) => setTrainingInput(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Your edits stay here until you choose another example.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            size="lg"
+            className="w-full sm:w-fit sm:min-w-44"
+            data-testid="train-demo-run"
+            disabled={trainingInput.trim().length === 0}
+            onClick={() => setPreviewedInput(trainingInput.trim())}
+          >
+            Preview teaching plan
+          </Button>
+
+          {previewedInput ? (
+            <div
+              className="rounded-xl border border-border bg-background/60 p-3"
+              data-testid="train-demo-result"
+              role="status"
+            >
+              <h2 className="font-serif text-lg">Teaching preview</h2>
+              <p className="mt-1 text-sm">{previewedInput}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Saved demo data only. No training job was launched.
+              </p>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <details className="panel">
+        <summary className="cursor-pointer font-serif text-lg">
+          Saved run status
+        </summary>
+        <div className="mt-4 grid gap-4">
       <div className="panel">
         <p className="text-kicker">{STAGE_PLAIN.train.plain}</p>
-        <h2 id="train-heading">Train</h2>
+        <h2>Run status</h2>
         <p>{STAGE_PLAIN.train.description}</p>
         <p className="text-sm text-muted-foreground">
           Why this matters: {STAGE_PLAIN.train.why} Technical preflight still
@@ -103,6 +200,8 @@ export function TrainStage({
       />
 
       <TrainingTelemetryPanel telemetry={telemetry} />
+        </div>
+      </details>
 
       <details className="panel">
         <summary className="cursor-pointer font-serif text-lg">
