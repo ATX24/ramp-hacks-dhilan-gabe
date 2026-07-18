@@ -1,7 +1,9 @@
-"""Deterministic latent finance world state."""
+"""Deterministic latent finance world state and policy semantics."""
 
 from __future__ import annotations
 
+import hashlib
+import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
@@ -9,6 +11,68 @@ from typing import Any, Literal
 
 from distillery.contracts.hashing import content_sha256
 from distillery.contracts.tasks import Difficulty, TaskId
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+_NAME_LEFT = (
+    "Alder",
+    "Amber",
+    "Birch",
+    "Cedar",
+    "Cobalt",
+    "Coral",
+    "Elm",
+    "Ember",
+    "Fern",
+    "Flint",
+    "Harbor",
+    "Hazel",
+    "Indigo",
+    "Juniper",
+    "Linden",
+    "Maple",
+    "Marble",
+    "Navy",
+    "Oak",
+    "Olive",
+    "Onyx",
+    "Pearl",
+    "Pine",
+    "Quartz",
+    "Reed",
+    "River",
+    "Sable",
+    "Silver",
+    "Spruce",
+    "Stone",
+    "Willow",
+    "Wren",
+)
+_NAME_RIGHT = (
+    "Analytics",
+    "Collective",
+    "Commerce",
+    "Company",
+    "Consulting",
+    "Digital",
+    "Exchange",
+    "Foundry",
+    "Goods",
+    "Group",
+    "Holdings",
+    "Labs",
+    "Logistics",
+    "Market",
+    "Networks",
+    "Partners",
+    "Platform",
+    "Services",
+    "Solutions",
+    "Systems",
+    "Technologies",
+    "Travel",
+    "Ventures",
+    "Works",
+)
 
 
 class PolicyAction(StrEnum):
@@ -33,15 +97,19 @@ class CashRegime(StrEnum):
     STALE_CHECK = "stale_check"
     DUPLICATE = "duplicate"
     ONE_TO_MANY = "one_to_many"
+    MANY_TO_ONE = "many_to_one"
     PARTIAL = "partial"
+    SAME_AMOUNT_COLLISION = "same_amount_collision"
 
 
 class TxnHardNegative(StrEnum):
     NONE = "none"
     NEAR_SYNONYM_GL = "near_synonym_gl"
     REFUND = "refund"
+    CHARGEBACK = "chargeback"
     CAPEX_OPEX = "capex_opex"
     SPLIT_ALLOCATION = "split_allocation"
+    REFUND_SPLIT = "refund_split"
     PERSONAL_LOOKING_ALLOWED = "personal_looking_allowed"
     ALLOWED_LOOKING_PROHIBITED = "allowed_looking_prohibited"
     CONFLICTING_RULES = "conflicting_rules"
@@ -59,21 +127,41 @@ class GLAccount:
 @dataclass(frozen=True)
 class PolicyRule:
     rule_id: str
-    precedence: int  # lower wins
+    semantic_code: str
+    precedence: int
     action: PolicyAction
     gl_account: str
+    min_amount_minor: int
     max_amount_minor: int | None
     keywords: tuple[str, ...]
     category: str
+    vendor_ids: tuple[str, ...]
+    text: str
+
+    def amount_applies(self, amount_minor: int) -> bool:
+        amount = abs(amount_minor)
+        if amount < self.min_amount_minor:
+            return False
+        return self.max_amount_minor is None or amount <= self.max_amount_minor
+
+
+@dataclass(frozen=True)
+class VendorArchetype:
+    key: str
+    category: str
+    default_gl: str
+    descriptor_term: str
 
 
 @dataclass(frozen=True)
 class Vendor:
     vendor_id: str
+    archetype: str
     name: str
     descriptors: tuple[str, ...]
     default_gl: str
     category: str
+    corruption_family: str
 
 
 @dataclass(frozen=True)
@@ -86,22 +174,28 @@ class TransactionLatent:
     date: str
     entity_id: str
     cost_center: str
-    is_refund: bool
+    transaction_kind: Literal["charge", "refund", "chargeback"]
     hard_negative: TxnHardNegative
-    # Oracle-resolved fields (set at world build).
     gl_account: str
     policy_action: PolicyAction
     applied_rule_ids: tuple[str, ...]
     contra_account: str = "2100"
-    split_lines: tuple[tuple[str, int], ...] = ()  # (account, amount_minor)
+    split_lines: tuple[tuple[str, int], ...] = ()
 
 
 @dataclass(frozen=True)
-class VarianceDriverLatent:
+class VarianceObservation:
+    source_id: str
     driver_id: str
-    impact_minor: int
-    evidence_id: str
-    kind: Literal["expense", "revenue", "fx", "volume", "price"]
+    pnl_type: Literal["expense", "revenue"]
+    budget_minor: int
+    actual_minor: int
+    kind: Literal["expense", "revenue", "fx", "volume", "price", "other"]
+
+    def profit_impact_minor(self) -> int:
+        if self.pnl_type == "expense":
+            return self.budget_minor - self.actual_minor
+        return self.actual_minor - self.budget_minor
 
 
 @dataclass(frozen=True)
@@ -109,9 +203,10 @@ class VarianceLatent:
     period: str
     budget_minor: int
     actual_minor: int
-    drivers: tuple[VarianceDriverLatent, ...]
-    other_impact_minor: int
-    materiality_rule_id: str
+    drivers: tuple[VarianceObservation, ...]
+    unallocated: tuple[VarianceObservation, ...]
+    rule_ids: tuple[str, ...]
+    analysis_rules: tuple[tuple[str, str], ...]
     regime: VarianceRegime
     entity_id: str
 
@@ -140,7 +235,7 @@ class CashLatent:
     book_entries: tuple[BookEntry, ...]
     bank_events: tuple[BankEvent, ...]
     matched: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...]
-    exceptions: tuple[tuple[str, tuple[str, ...], int], ...]  # type, ids, amount
+    exceptions: tuple[tuple[str, tuple[str, ...], int], ...]
     regime: CashRegime
     entity_id: str
     close_period: str
@@ -172,215 +267,168 @@ class LatentWorld:
         return f"sha256:{content_sha256(self.latent_payload())}"
 
 
-# --- Catalogs (deterministic, no I/O) ---
-
-CHART: tuple[GLAccount, ...] = (
-    GLAccount("1500", "PPE / Capex", "asset"),
-    GLAccount("2100", "Accounts Payable", "liability"),
-    GLAccount("4000", "Revenue", "revenue"),
-    GLAccount("6100", "Meals & Entertainment", "expense"),
-    GLAccount("6105", "Office Refreshments", "expense"),  # near-synonym of 6100
-    GLAccount("6205", "Travel Airfare", "expense"),
-    GLAccount("6210", "Travel Lodging", "expense"),
-    GLAccount("6400", "Software & SaaS", "expense"),
-    GLAccount("6500", "Cloud Infrastructure", "expense"),
-    GLAccount("6600", "Professional Services", "expense"),
-    GLAccount("6700", "Bank Fees", "expense"),
+CHART_ACCOUNT_SPECS: tuple[
+    tuple[str, str, Literal["expense", "asset", "liability", "revenue"]], ...
+] = (
+    ("1500", "Property and equipment", "asset"),
+    ("2100", "Accounts payable", "liability"),
+    ("4000", "Operating revenue", "revenue"),
+    ("6100", "Meals and entertainment", "expense"),
+    ("6105", "Office refreshments", "expense"),
+    ("6205", "Air travel", "expense"),
+    ("6210", "Lodging", "expense"),
+    ("6400", "Software subscriptions", "expense"),
+    ("6500", "Cloud infrastructure", "expense"),
+    ("6600", "Professional services", "expense"),
+    ("6700", "Bank and processor fees", "expense"),
 )
 
-IID_VENDORS: tuple[Vendor, ...] = (
-    Vendor("vnd_starbucks", "Starbucks", ("SQ *STARBUCKS", "SBUX"), "6100", "meals"),
-    Vendor("vnd_united", "United Airlines", ("UNITED", "UA "), "6205", "travel"),
-    Vendor("vnd_aws", "Amazon Web Services", ("AWS", "AMAZON WEB SERVICES"), "6500", "cloud"),
-    Vendor("vnd_dell", "Dell Technologies", ("DELL", "DELL TECHNOLOGIES"), "1500", "capex"),
-    Vendor("vnd_slack", "Slack Technologies", ("SLACK", "SLACK T"), "6400", "saas"),
-    Vendor("vnd_uber", "Uber", ("UBER", "UBER EATS"), "6100", "meals"),
-    Vendor("vnd_hilton", "Hilton", ("HILTON", "HI HOTELS"), "6210", "travel"),
-    Vendor("vnd_deloitte", "Deloitte", ("DELOITTE", "DELOITTE CONSULTING"), "6600", "services"),
+IID_VENDOR_ARCHETYPES: tuple[VendorArchetype, ...] = (
+    VendorArchetype("cafe", "meals", "6100", "cafe"),
+    VendorArchetype("airline", "airfare", "6205", "air"),
+    VendorArchetype("cloud", "cloud", "6500", "compute"),
+    VendorArchetype("hardware", "capex", "1500", "equipment"),
+    VendorArchetype("saas", "saas", "6400", "subscription"),
+    VendorArchetype("rideshare", "meals", "6100", "offsite"),
+    VendorArchetype("hotel", "lodging", "6210", "hotel"),
+    VendorArchetype("consulting", "services", "6600", "consulting"),
+    VendorArchetype("personal", "personal", "6100", "marketplace"),
 )
 
-OOD_VENDORS: tuple[Vendor, ...] = (
-    Vendor("vnd_wework", "WeWork", ("WEWORK", "WW DESK"), "6400", "saas"),
-    Vendor("vnd_stripe", "Stripe", ("STRIPE", "STRIPE FEE"), "6700", "fees"),
-    Vendor("vnd_gcp", "Google Cloud", ("GCP", "GOOGLE CLOUD"), "6500", "cloud"),
-    Vendor("vnd_marriott", "Marriott", ("MARRIOTT", "MC HOTELS"), "6210", "travel"),
+OOD_VENDOR_ARCHETYPES: tuple[VendorArchetype, ...] = (
+    VendorArchetype("workspace_alt", "facilities", "6400", "workspace"),
+    VendorArchetype("processor_alt", "fees", "6700", "processing"),
+    VendorArchetype("cloud_alt", "cloud", "6500", "capacity"),
+    VendorArchetype("hotel_alt", "lodging", "6210", "inn"),
+    VendorArchetype("equipment_alt", "capex", "1500", "machinery"),
+    VendorArchetype("consulting_alt", "services", "6600", "advisory"),
+    VendorArchetype("cafe_alt", "meals", "6100", "catering"),
+    VendorArchetype("personal_alt", "personal", "6100", "consumer"),
 )
 
-IID_POLICIES: tuple[PolicyRule, ...] = (
-    PolicyRule(
-        "POL-MEAL-001", 100, PolicyAction.APPROVE, "6100", 5000,
-        ("meal", "starbucks", "uber"), "meals",
-    ),
-    PolicyRule(
-        "POL-MEAL-002", 90, PolicyAction.REVIEW, "6100", 15000,
-        ("meal", "entertainment"), "meals",
-    ),
-    PolicyRule(
-        "POL-TRAVEL-017", 80, PolicyAction.APPROVE, "6205", 500000,
-        ("airfare", "united", "flight"), "travel",
-    ),
-    PolicyRule(
-        "POL-TRAVEL-018", 85, PolicyAction.REVIEW, "6210", 300000,
-        ("hotel", "hilton", "lodging"), "travel",
-    ),
-    PolicyRule(
-        "POL-SAAS-003", 70, PolicyAction.APPROVE, "6400", 200000,
-        ("saas", "slack", "software"), "saas",
-    ),
-    PolicyRule(
-        "POL-CLOUD-004", 60, PolicyAction.APPROVE, "6500", 2_000_000,
-        ("cloud", "aws", "infra"), "cloud",
-    ),
-    PolicyRule(
-        "POL-CAPEX-009", 10, PolicyAction.REJECT, "1500", None,
-        ("server", "dell", "ppe", "capex"), "capex",
-    ),
-    PolicyRule(
-        "POL-IT-002", 50, PolicyAction.APPROVE, "6400", 1_000_000,
-        ("laptop", "hardware", "it"), "it",
-    ),
-    PolicyRule(
-        "POL-PERSONAL-011", 20, PolicyAction.REJECT, "6100", None,
-        ("personal", "gift card"), "personal",
-    ),
-    PolicyRule(
-        "POL-SVC-006", 75, PolicyAction.REVIEW, "6600", 500000,
-        ("consulting", "deloitte"), "services",
-    ),
-)
-
-OOD_POLICIES: tuple[PolicyRule, ...] = (
-    PolicyRule(
-        "POL-OOD-DESK-101", 40, PolicyAction.APPROVE, "6400", 100000,
-        ("wework", "desk"), "facilities",
-    ),
-    PolicyRule(
-        "POL-OOD-FEE-102", 30, PolicyAction.APPROVE, "6700", 50000,
-        ("stripe", "fee"), "fees",
-    ),
-    PolicyRule(
-        "POL-OOD-CLOUD-103", 55, PolicyAction.REVIEW, "6500", 5_000_000,
-        ("gcp", "google cloud"), "cloud",
-    ),
-    PolicyRule(
-        "POL-OOD-TRAVEL-104", 65, PolicyAction.APPROVE, "6210", 400000,
-        ("marriott", "hotel"), "travel",
-    ),
-)
+# Compatibility aliases used by downstream data-only callers.
+IID_VENDORS = IID_VENDOR_ARCHETYPES
+OOD_VENDORS = OOD_VENDOR_ARCHETYPES
 
 IID_TEMPLATE_FAMILIES: dict[TaskId, tuple[str, ...]] = {
     TaskId.TRANSACTION_REVIEW: (
-        "txn_meal_v1",
-        "txn_policy_v3",
-        "txn_capex_v2",
-        "txn_saas_v1",
-        "txn_conflict_v1",
+        "txn_card_packet",
+        "txn_policy_memo",
+        "txn_ledger_excerpt",
+        "txn_receipt_bundle",
     ),
     TaskId.VARIANCE_ANALYSIS: (
-        "var_simple_v1",
-        "var_drivers_v2",
-        "var_offset_v1",
-        "var_tie_v1",
+        "var_operating_table",
+        "var_driver_packet",
+        "var_close_memo",
+        "var_dimension_slice",
     ),
     TaskId.CASH_RECONCILIATION: (
-        "cash_match_v1",
-        "cash_exceptions_v1",
-        "cash_partial_v1",
+        "cash_statement_packet",
+        "cash_close_table",
+        "cash_ledger_extract",
     ),
 }
 
 OOD_TEMPLATE_FAMILIES: dict[TaskId, tuple[str, ...]] = {
     TaskId.TRANSACTION_REVIEW: (
-        "txn_ood_policy_mix_v1",
-        "txn_ood_gl_desc_v1",
-        "txn_ood_threshold_v1",
+        "txn_matrix_packet",
+        "txn_account_crosswalk",
+        "txn_control_note",
     ),
     TaskId.VARIANCE_ANALYSIS: (
-        "var_ood_driver_mix_v1",
-        "var_ood_sign_v1",
-        "var_ood_fx_v1",
+        "var_bridge_packet",
+        "var_unit_economics",
+        "var_currency_schedule",
     ),
     TaskId.CASH_RECONCILIATION: (
-        "cash_ood_agg_v1",
-        "cash_ood_collision_v1",
+        "cash_aggregation_sheet",
+        "cash_collision_worksheet",
+        "cash_settlement_packet",
     ),
 }
 
 
-def _stable_choice(rng_value: int, options: Sequence[Any]) -> Any:
-    return options[rng_value % len(options)]
+def normalize_policy_tokens(text: str) -> tuple[str, ...]:
+    """Normalize policy matching to complete alphanumeric tokens."""
+    return tuple(_TOKEN_RE.findall(text.casefold()))
 
 
-def resolve_policy(
-    policies: tuple[PolicyRule, ...],
+def phrase_matches(tokens: Sequence[str], phrase: str) -> bool:
+    """Match a normalized complete token or contiguous token phrase."""
+    wanted = normalize_policy_tokens(phrase)
+    if not wanted or len(wanted) > len(tokens):
+        return False
+    width = len(wanted)
+    return any(tuple(tokens[i : i + width]) == wanted for i in range(len(tokens) - width + 1))
+
+
+def policy_match_rank(
+    rule: PolicyRule,
+    *,
+    vendor_id: str,
+    category: str,
+    descriptor: str,
+) -> int | None:
+    """Vendor match wins, then category, then complete token/phrase match."""
+    if vendor_id and vendor_id in rule.vendor_ids:
+        return 0
+    if category and category == rule.category:
+        return 1
+    tokens = normalize_policy_tokens(descriptor)
+    if any(phrase_matches(tokens, phrase) for phrase in rule.keywords):
+        return 2
+    return None
+
+
+def applicable_policy_rules(
+    policies: Sequence[PolicyRule],
     *,
     descriptor: str,
     amount_minor: int,
     category: str,
-    hard_negative: TxnHardNegative,
-) -> tuple[PolicyAction, str, tuple[str, ...]]:
-    """Apply explicit precedence: lowest precedence number wins among matches."""
-    text = descriptor.lower()
-    matches: list[PolicyRule] = []
+    vendor_id: str = "",
+) -> tuple[PolicyRule, ...]:
+    ranked: list[tuple[int, int, str, PolicyRule]] = []
     for rule in policies:
-        keyword_hit = any(k in text for k in rule.keywords) or rule.category == category
-        if not keyword_hit:
+        rank = policy_match_rank(
+            rule,
+            vendor_id=vendor_id,
+            category=category,
+            descriptor=descriptor,
+        )
+        if rank is None or not rule.amount_applies(amount_minor):
             continue
-        if rule.max_amount_minor is not None and amount_minor > rule.max_amount_minor:
-            # threshold boundary hard-negatives still match but escalate action
-            if hard_negative == TxnHardNegative.THRESHOLD_BOUNDARY:
-                matches.append(rule)
-            continue
-        matches.append(rule)
+        ranked.append((rank, rule.precedence, rule.rule_id, rule))
+    ranked.sort(key=lambda item: item[:3])
+    return tuple(item[3] for item in ranked)
 
-    if hard_negative == TxnHardNegative.CONFLICTING_RULES:
-        forced_ids = {"POL-CAPEX-009", "POL-IT-002", "POL-OOD-DESK-101", "POL-OOD-CLOUD-103"}
-        forced = [p for p in policies if p.rule_id in forced_ids]
-        matches = list({m.rule_id: m for m in (matches + forced)}.values())
 
-    if hard_negative == TxnHardNegative.ALLOWED_LOOKING_PROHIBITED:
-        personal = next((p for p in policies if p.rule_id == "POL-PERSONAL-011"), None)
-        if personal is None:
-            personal = next(
-                (p for p in policies if p.action == PolicyAction.REJECT),
-                None,
-            )
-        if personal is not None:
-            matches = [personal]
-
-    if hard_negative == TxnHardNegative.PERSONAL_LOOKING_ALLOWED:
-        meal = next((p for p in policies if p.rule_id == "POL-MEAL-001"), None)
-        if meal is None:
-            meal = next((p for p in policies if p.action == PolicyAction.APPROVE), None)
-        if meal is not None:
-            matches = [meal]
-
+def resolve_policy(
+    policies: Sequence[PolicyRule],
+    *,
+    descriptor: str,
+    amount_minor: int,
+    category: str,
+    vendor_id: str = "",
+    hard_negative: TxnHardNegative | None = None,
+) -> tuple[PolicyAction, str, tuple[str, ...]]:
+    """Resolve only applicable rules; hard-negative labels never affect policy logic."""
+    del hard_negative
+    matches = applicable_policy_rules(
+        policies,
+        descriptor=descriptor,
+        amount_minor=amount_minor,
+        category=category,
+        vendor_id=vendor_id,
+    )
     if not matches:
-        fallback = next((p for p in policies if p.action == PolicyAction.REVIEW), policies[0])
-        return fallback.action, fallback.gl_account, (fallback.rule_id,)
-
-    matches.sort(key=lambda r: (r.precedence, r.rule_id))
+        raise ValueError(
+            "no applicable policy rule for "
+            f"vendor={vendor_id!r} category={category!r} amount={amount_minor}"
+        )
     winner = matches[0]
-    action = winner.action
-    gl = winner.gl_account
-
-    if hard_negative == TxnHardNegative.THRESHOLD_BOUNDARY and winner.max_amount_minor is not None:
-        if amount_minor > winner.max_amount_minor:
-            action = (
-                PolicyAction.REJECT
-                if winner.action != PolicyAction.REJECT
-                else PolicyAction.REVIEW
-            )
-
-    if hard_negative == TxnHardNegative.CAPEX_OPEX:
-        capex = next((p for p in policies if p.rule_id == "POL-CAPEX-009"), None)
-        if capex is None:
-            capex = next((p for p in policies if p.gl_account == "1500"), winner)
-        gl = capex.gl_account
-        action = PolicyAction.REJECT
-        winner = capex
-
-    return action, gl, (winner.rule_id,)
+    return winner.action, winner.gl_account, (winner.rule_id,)
 
 
 def build_world(
@@ -391,153 +439,477 @@ def build_world(
     task: TaskId,
     difficulty: Difficulty,
     ood: bool = False,
+    salt: int = 0,
 ) -> LatentWorld:
-    """Build a deterministic latent world for one example slot."""
-    # Mix seeds so (seed, index, split, task, difficulty, ood) is unique.
-    h = _mix(seed, index, _fnv(split_token), _fnv(task.value), _fnv(difficulty.value), int(ood))
-    entity_id = f"ent_{split_token}_{index:05d}"
-    world_id = f"world_{split_token}_{index:05d}"
-    group_id = f"grp_{split_token}_{index // 4:05d}"
-    close_period = f"2026-Q{(h % 4) + 1}"
+    """Build one deterministic world; split domains are hashed out of visible IDs."""
+    identity = f"{seed}|{split_token}|{index}|{salt}|{task.value}|{difficulty.value}|{int(ood)}"
+    group_identity = f"{seed}|{split_token}|{index // 4}|{salt}|group"
+    h = _hash_int(identity)
+    world_id = _opaque_id("world_", identity)
+    group_id = _opaque_id("grp_", group_identity)
+    entity_id = _opaque_id("ent_", f"{group_identity}|entity")
+    close_period = _period_label(identity)
+    chart = _build_chart(group_identity, ood=ood)
+    vendors = _build_vendors(group_identity, ood=ood)
+    policies = _build_policies(group_identity, vendors, ood=ood)
 
-    vendors = OOD_VENDORS if ood else IID_VENDORS
-    policies = tuple(sorted(IID_POLICIES + (OOD_POLICIES if ood else ()), key=lambda p: p.rule_id))
-    if ood:
-        # OOD holds out novel policy combinations: use OOD-only policies for matching.
-        policies = OOD_POLICIES + tuple(p for p in IID_POLICIES if p.rule_id.startswith("POL-MEAL"))
-
-    departments = ("ops", "eng", "finance", "sales", "treasury")
-    latent_regime = "ood" if ood else "iid"
-
-    txn: TransactionLatent | None = None
+    transaction: TransactionLatent | None = None
     variance: VarianceLatent | None = None
     cash: CashLatent | None = None
+    latent_regime = "baseline"
 
     if task == TaskId.TRANSACTION_REVIEW:
-        txn = _build_transaction(h, vendors, policies, entity_id, difficulty, ood)
-        if txn.hard_negative != TxnHardNegative.NONE:
-            latent_regime = txn.hard_negative.value
-        else:
-            latent_regime = "ood_txn" if ood else "iid_txn"
+        transaction = _build_transaction(
+            h,
+            identity,
+            vendors,
+            policies,
+            entity_id,
+            difficulty,
+        )
+        latent_regime = transaction.hard_negative.value
     elif task == TaskId.VARIANCE_ANALYSIS:
-        variance = _build_variance(h, entity_id, difficulty, ood)
+        variance = _build_variance(
+            h,
+            identity,
+            entity_id,
+            close_period,
+            difficulty,
+            ood,
+        )
         latent_regime = variance.regime.value
     elif task == TaskId.CASH_RECONCILIATION:
-        cash = _build_cash(h, entity_id, close_period, difficulty, ood)
+        cash = _build_cash(
+            h,
+            identity,
+            entity_id,
+            close_period,
+            difficulty,
+            ood,
+        )
         latent_regime = cash.regime.value
     else:
-        raise ValueError(f"unsupported task for finance world generator: {task}")
+        raise ValueError(f"unsupported finance task {task}")
 
     return LatentWorld(
         world_id=world_id,
         group_id=group_id,
         entity_id=entity_id,
         close_period=close_period,
-        chart_of_accounts=CHART,
+        chart_of_accounts=chart,
         vendors=vendors,
         policies=policies,
-        departments=departments,
-        transaction=txn,
+        departments=("operations", "engineering", "finance", "sales", "treasury"),
+        transaction=transaction,
         variance=variance,
         cash=cash,
         latent_regime=latent_regime,
         ood_held_out=ood,
-        metadata={"seed": seed, "index": index, "split_token": split_token},
+        metadata={
+            "seed": seed,
+            "index": index,
+            "salt": salt,
+            "split_domain": split_token,
+        },
     )
+
+
+def _build_chart(group_identity: str, *, ood: bool) -> tuple[GLAccount, ...]:
+    family = "schedule" if not ood else "crosswalk"
+    return tuple(
+        GLAccount(
+            code,
+            f"{base} — {_natural_name(f'{group_identity}|coa|{code}|{family}')}",
+            account_type,
+        )
+        for code, base, account_type in CHART_ACCOUNT_SPECS
+    )
+
+
+def _build_vendors(group_identity: str, *, ood: bool) -> tuple[Vendor, ...]:
+    archetypes = OOD_VENDOR_ARCHETYPES if ood else IID_VENDOR_ARCHETYPES
+    vendors: list[Vendor] = []
+    for archetype in archetypes:
+        key = f"{group_identity}|vendor|{archetype.key}"
+        name = _natural_name(key)
+        if archetype.key == "consulting":
+            name = f"Deloitte {name}"
+        corruption = _natural_name(f"{key}|descriptor").replace(" ", "-").casefold()
+        descriptors = (
+            f"{corruption} {name} {archetype.descriptor_term}",
+            f"{name} {archetype.descriptor_term} ref {corruption}",
+        )
+        vendors.append(
+            Vendor(
+                vendor_id=_opaque_id("vnd_", key),
+                archetype=archetype.key,
+                name=name,
+                descriptors=descriptors,
+                default_gl=archetype.default_gl,
+                category=archetype.category,
+                corruption_family=corruption,
+            )
+        )
+    return tuple(vendors)
+
+
+def _build_policies(
+    group_identity: str,
+    vendors: Sequence[Vendor],
+    *,
+    ood: bool,
+) -> tuple[PolicyRule, ...]:
+    by_category: dict[str, tuple[str, ...]] = {}
+    for category in {vendor.category for vendor in vendors}:
+        by_category[category] = tuple(
+            vendor.vendor_id for vendor in vendors if vendor.category == category
+        )
+
+    specs: list[
+        tuple[
+            str,
+            int,
+            PolicyAction,
+            str,
+            int,
+            int | None,
+            tuple[str, ...],
+            str,
+        ]
+    ] = [
+        ("MEAL-LOW", 30, PolicyAction.APPROVE, "6100", 0, 5_000, ("meal", "cafe"), "meals"),
+        (
+            "MEAL-MID",
+            20,
+            PolicyAction.REVIEW,
+            "6100",
+            5_001,
+            15_000,
+            ("meal", "entertainment"),
+            "meals",
+        ),
+        (
+            "MEAL-HIGH",
+            10,
+            PolicyAction.REJECT,
+            "6100",
+            15_001,
+            None,
+            ("meal", "entertainment"),
+            "meals",
+        ),
+        (
+            "AIR-BASE",
+            40,
+            PolicyAction.APPROVE,
+            "6205",
+            0,
+            500_000,
+            ("air travel", "flight"),
+            "airfare",
+        ),
+        (
+            "AIR-HIGH",
+            35,
+            PolicyAction.REVIEW,
+            "6205",
+            500_001,
+            None,
+            ("air travel", "flight"),
+            "airfare",
+        ),
+        (
+            "LODGE-BASE",
+            40,
+            PolicyAction.REVIEW,
+            "6210",
+            0,
+            300_000,
+            ("hotel", "lodging", "inn"),
+            "lodging",
+        ),
+        (
+            "LODGE-HIGH",
+            35,
+            PolicyAction.REJECT,
+            "6210",
+            300_001,
+            None,
+            ("hotel", "lodging", "inn"),
+            "lodging",
+        ),
+        (
+            "SAAS-BASE",
+            50,
+            PolicyAction.APPROVE,
+            "6400",
+            0,
+            200_000,
+            ("software", "subscription"),
+            "saas",
+        ),
+        (
+            "SAAS-HIGH",
+            45,
+            PolicyAction.REVIEW,
+            "6400",
+            200_001,
+            None,
+            ("software", "subscription"),
+            "saas",
+        ),
+        (
+            "CLOUD-BASE",
+            50,
+            PolicyAction.APPROVE if not ood else PolicyAction.REVIEW,
+            "6500",
+            0,
+            2_000_000,
+            ("cloud", "compute", "capacity"),
+            "cloud",
+        ),
+        (
+            "CLOUD-HIGH",
+            45,
+            PolicyAction.REVIEW,
+            "6500",
+            2_000_001,
+            None,
+            ("cloud", "compute", "capacity"),
+            "cloud",
+        ),
+        (
+            "CAPEX",
+            5,
+            PolicyAction.REJECT,
+            "1500",
+            0,
+            None,
+            ("capital equipment", "machinery", "server"),
+            "capex",
+        ),
+        (
+            "IT",
+            60,
+            PolicyAction.APPROVE,
+            "6400",
+            0,
+            1_000_000,
+            ("it", "laptop hardware"),
+            "it",
+        ),
+        (
+            "PERSONAL",
+            8,
+            PolicyAction.REJECT,
+            "6100",
+            0,
+            None,
+            ("personal", "gift card"),
+            "personal",
+        ),
+        (
+            "SERVICES",
+            40,
+            PolicyAction.REVIEW,
+            "6600",
+            0,
+            None,
+            ("consulting", "advisory", "professional services"),
+            "services",
+        ),
+        (
+            "FEES",
+            40,
+            PolicyAction.APPROVE,
+            "6700",
+            0,
+            None,
+            ("processing fee", "bank fee"),
+            "fees",
+        ),
+        (
+            "FACILITIES",
+            40,
+            PolicyAction.APPROVE,
+            "6400",
+            0,
+            100_000,
+            ("workspace", "desk"),
+            "facilities",
+        ),
+        (
+            "FACILITIES-HIGH",
+            35,
+            PolicyAction.REVIEW,
+            "6400",
+            100_001,
+            None,
+            ("workspace", "desk"),
+            "facilities",
+        ),
+    ]
+
+    context = _natural_name(f"{group_identity}|policy-context")
+    rules: list[PolicyRule] = []
+    for (
+        semantic_code,
+        precedence,
+        action,
+        gl_account,
+        min_amount,
+        max_amount,
+        keywords,
+        category,
+    ) in specs:
+        if category not in by_category and category != "it":
+            continue
+        unique_code = semantic_code
+        suffix = _digest(f"{group_identity}|policy|{unique_code}")[:8].upper()
+        rule_id = f"POL-{unique_code}-{suffix}"
+        upper = "unbounded" if max_amount is None else str(max_amount)
+        text = (
+            f"{context} control for {category}: amounts {min_amount} through {upper} "
+            f"use account {gl_account} with decision {action.value}; rule {rule_id}."
+        )
+        rules.append(
+            PolicyRule(
+                rule_id=rule_id,
+                semantic_code=unique_code,
+                precedence=precedence,
+                action=action,
+                gl_account=gl_account,
+                min_amount_minor=min_amount,
+                max_amount_minor=max_amount,
+                keywords=keywords,
+                category=category,
+                vendor_ids=by_category.get(category, ()),
+                text=text,
+            )
+        )
+    return tuple(sorted(rules, key=lambda rule: (rule.precedence, rule.rule_id)))
 
 
 def _build_transaction(
     h: int,
-    vendors: tuple[Vendor, ...],
-    policies: tuple[PolicyRule, ...],
+    identity: str,
+    vendors: Sequence[Vendor],
+    policies: Sequence[PolicyRule],
     entity_id: str,
     difficulty: Difficulty,
-    ood: bool,
 ) -> TransactionLatent:
-    vendor = _stable_choice(h, vendors)
+    vendor = vendors[h % len(vendors)]
     hard = TxnHardNegative.NONE
-    if difficulty == Difficulty.HARD:
-        options = (
-            TxnHardNegative.CONFLICTING_RULES,
-            TxnHardNegative.CAPEX_OPEX,
-            TxnHardNegative.THRESHOLD_BOUNDARY,
-            TxnHardNegative.MISLEADING_DESCRIPTOR,
-            TxnHardNegative.ALLOWED_LOOKING_PROHIBITED,
-            TxnHardNegative.NEAR_SYNONYM_GL,
-            TxnHardNegative.SPLIT_ALLOCATION,
-            TxnHardNegative.REFUND,
-            TxnHardNegative.PERSONAL_LOOKING_ALLOWED,
+    if difficulty == Difficulty.MEDIUM:
+        hard = _stable_choice(
+            h >> 4,
+            (
+                TxnHardNegative.NEAR_SYNONYM_GL,
+                TxnHardNegative.THRESHOLD_BOUNDARY,
+                TxnHardNegative.MISLEADING_DESCRIPTOR,
+                TxnHardNegative.REFUND,
+                TxnHardNegative.NONE,
+            ),
         )
-        hard = _stable_choice(h >> 3, options)
-    elif difficulty == Difficulty.MEDIUM:
-        options = (
-            TxnHardNegative.NEAR_SYNONYM_GL,
-            TxnHardNegative.THRESHOLD_BOUNDARY,
-            TxnHardNegative.MISLEADING_DESCRIPTOR,
-            TxnHardNegative.NONE,
+    elif difficulty == Difficulty.HARD:
+        hard = _stable_choice(
+            h >> 4,
+            (
+                TxnHardNegative.CONFLICTING_RULES,
+                TxnHardNegative.CAPEX_OPEX,
+                TxnHardNegative.THRESHOLD_BOUNDARY,
+                TxnHardNegative.MISLEADING_DESCRIPTOR,
+                TxnHardNegative.ALLOWED_LOOKING_PROHIBITED,
+                TxnHardNegative.NEAR_SYNONYM_GL,
+                TxnHardNegative.SPLIT_ALLOCATION,
+                TxnHardNegative.REFUND,
+                TxnHardNegative.CHARGEBACK,
+                TxnHardNegative.REFUND_SPLIT,
+                TxnHardNegative.PERSONAL_LOOKING_ALLOWED,
+            ),
         )
-        hard = _stable_choice(h >> 3, options)
 
-    amount_minor = 1_000 + (h % 50_000) * 10
-    if hard == TxnHardNegative.THRESHOLD_BOUNDARY:
-        amount_minor = 5_001  # just over POL-MEAL-001
-        meal_vendors = [v for v in vendors if v.category == "meals"]
-        if meal_vendors:
-            vendor = meal_vendors[0]
     if hard in {TxnHardNegative.CAPEX_OPEX, TxnHardNegative.CONFLICTING_RULES}:
-        amount_minor = 5_000_000
-        capex_vendors = [v for v in vendors if v.default_gl == "1500"]
-        vendor = capex_vendors[0] if capex_vendors else vendor
-    if hard == TxnHardNegative.REFUND:
-        amount_minor = abs(amount_minor)
+        vendor = _vendor_for_category(vendors, "capex")
+    elif hard in {TxnHardNegative.SPLIT_ALLOCATION, TxnHardNegative.REFUND_SPLIT}:
+        vendor = _vendor_for_category(vendors, "services")
+    elif hard in {
+        TxnHardNegative.THRESHOLD_BOUNDARY,
+        TxnHardNegative.NEAR_SYNONYM_GL,
+        TxnHardNegative.PERSONAL_LOOKING_ALLOWED,
+    }:
+        vendor = _vendor_for_category(vendors, "meals")
+    elif hard == TxnHardNegative.ALLOWED_LOOKING_PROHIBITED:
+        vendor = _vendor_for_category(vendors, "personal")
 
-    descriptor = vendor.descriptors[h % len(vendor.descriptors)]
+    amount = 1_001 + (h % 1_900_000)
+    if vendor.category == "meals":
+        amount = 1_001 + (h % 30_000)
+    if hard == TxnHardNegative.THRESHOLD_BOUNDARY:
+        amount = (5_000, 5_001, 15_000, 15_001)[(h >> 8) % 4]
+    if hard in {TxnHardNegative.CAPEX_OPEX, TxnHardNegative.CONFLICTING_RULES}:
+        amount = 1_500_000 + (h % 4_000_000)
+
+    descriptor_context = _natural_name(f"{identity}|descriptor-context")
+    descriptor = (
+        f"{vendor.descriptors[h % len(vendor.descriptors)]} merchant reference {descriptor_context}"
+    )
     if hard == TxnHardNegative.MISLEADING_DESCRIPTOR:
-        descriptor = f"{descriptor} CONSULTING RETAINER"
-    if hard == TxnHardNegative.PERSONAL_LOOKING_ALLOWED:
-        descriptor = f"GIFT *{vendor.name.upper()} TEAM OFFSITE"
-    if hard == TxnHardNegative.ALLOWED_LOOKING_PROHIBITED:
-        descriptor = "AMZN GIFT CARD PERSONAL"
+        descriptor = f"{descriptor} consulting retainer"
+    elif hard == TxnHardNegative.PERSONAL_LOOKING_ALLOWED:
+        descriptor = (
+            f"{vendor.corruption_family} {descriptor_context} "
+            f"gift card style team meal {vendor.name}"
+        )
+    elif hard == TxnHardNegative.ALLOWED_LOOKING_PROHIBITED:
+        descriptor = (
+            f"{vendor.corruption_family} {descriptor_context} "
+            f"ordinary office order "
+            f"{vendor.name} personal"
+        )
+    elif hard == TxnHardNegative.CONFLICTING_RULES:
+        descriptor = f"{descriptor} server laptop hardware"
 
-    is_refund = hard == TxnHardNegative.REFUND
-    action, gl, rule_ids = resolve_policy(
+    transaction_kind: Literal["charge", "refund", "chargeback"] = "charge"
+    if hard in {TxnHardNegative.REFUND, TxnHardNegative.REFUND_SPLIT}:
+        transaction_kind = "refund"
+        descriptor = f"refund {descriptor}"
+        amount = -abs(amount)
+    elif hard == TxnHardNegative.CHARGEBACK:
+        transaction_kind = "chargeback"
+        descriptor = f"chargeback reversal {descriptor}"
+        amount = -abs(amount)
+
+    action, gl_account, rule_ids = resolve_policy(
         policies,
         descriptor=descriptor,
-        amount_minor=amount_minor,
+        amount_minor=amount,
         category=vendor.category,
-        hard_negative=hard,
+        vendor_id=vendor.vendor_id,
     )
 
-    if hard == TxnHardNegative.NEAR_SYNONYM_GL and gl == "6100":
-        # Oracle keeps correct 6100; renderer will surface 6105 as distractor.
-        pass
-
     split_lines: tuple[tuple[str, int], ...] = ()
-    if hard == TxnHardNegative.SPLIT_ALLOCATION:
-        a = amount_minor // 2
-        b = amount_minor - a
-        gl = "6600" if any(p.gl_account == "6600" for p in policies) else gl
-        other = "6400" if gl != "6400" else "6500"
-        split_lines = ((gl, a), (other, b))
-        action = PolicyAction.REVIEW
-        svc = next((p for p in policies if p.rule_id == "POL-SVC-006"), None)
-        rule_ids = (svc.rule_id,) if svc is not None else rule_ids
+    if hard in {TxnHardNegative.SPLIT_ALLOCATION, TxnHardNegative.REFUND_SPLIT}:
+        total = abs(amount)
+        first = total // 2 + (h % 17)
+        if first >= total:
+            first = total // 2
+        split_lines = ((gl_account, first), ("6400", total - first))
 
-    txn_id = f"txn_{entity_id}_{h % 10_000:04d}"
     month = (h % 12) + 1
-    day = (h % 27) + 1
+    day = ((h >> 6) % 27) + 1
     return TransactionLatent(
-        txn_id=txn_id,
+        txn_id=_opaque_id("txn_", f"{identity}|transaction"),
         vendor_id=vendor.vendor_id,
         descriptor=descriptor,
-        amount_minor=amount_minor,
+        amount_minor=amount,
         currency="USD",
         date=f"2026-{month:02d}-{day:02d}",
         entity_id=entity_id,
-        cost_center=("ops", "eng", "finance", "sales")[h % 4],
-        is_refund=is_refund,
+        cost_center=("operations", "engineering", "finance", "sales")[h % 4],
+        transaction_kind=transaction_kind,
         hard_negative=hard,
-        gl_account=gl,
+        gl_account=gl_account,
         policy_action=action,
         applied_rule_ids=rule_ids,
         split_lines=split_lines,
@@ -546,7 +918,9 @@ def _build_transaction(
 
 def _build_variance(
     h: int,
+    identity: str,
     entity_id: str,
+    period: str,
     difficulty: Difficulty,
     ood: bool,
 ) -> VarianceLatent:
@@ -555,92 +929,183 @@ def _build_variance(
     elif difficulty == Difficulty.MEDIUM:
         regime = _stable_choice(
             h,
-            (VarianceRegime.OFFSET, VarianceRegime.PRICE_VOLUME, VarianceRegime.SIMPLE),
+            (
+                VarianceRegime.SIMPLE,
+                VarianceRegime.OFFSET,
+                VarianceRegime.PRICE_VOLUME,
+            ),
         )
     else:
         regime = _stable_choice(
             h,
             (
                 VarianceRegime.OFFSET,
+                VarianceRegime.PRICE_VOLUME,
                 VarianceRegime.FX,
                 VarianceRegime.TIE,
                 VarianceRegime.HIDDEN_SUBTOTAL,
-                VarianceRegime.PRICE_VOLUME,
             ),
         )
     if ood:
         regime = _stable_choice(
-            h >> 2,
-            (VarianceRegime.FX, VarianceRegime.OFFSET, VarianceRegime.PRICE_VOLUME),
+            h >> 3,
+            (
+                VarianceRegime.OFFSET,
+                VarianceRegime.PRICE_VOLUME,
+                VarianceRegime.FX,
+            ),
         )
 
-    budget = 1_000_000 + (h % 20) * 50_000
+    def observation(
+        driver_id: str,
+        pnl_type: Literal["expense", "revenue"],
+        budget: int,
+        actual: int,
+        kind: Literal["expense", "revenue", "fx", "volume", "price", "other"],
+    ) -> VarianceObservation:
+        return VarianceObservation(
+            source_id=_opaque_id("src_", f"{identity}|variance|{driver_id}"),
+            driver_id=driver_id,
+            pnl_type=pnl_type,
+            budget_minor=budget,
+            actual_minor=actual,
+            kind=kind,
+        )
+
+    base = 600_000 + (h % 300_000)
+    unallocated: tuple[VarianceObservation, ...] = ()
     if regime == VarianceRegime.SIMPLE:
-        impact = 50_000 + (h % 10) * 10_000
-        # Favorable: actual < budget for expense → positive profit impact
-        actual = budget - impact
+        delta = 40_001 + (h % 80_000)
+        drivers = (observation("staffing", "expense", base, base - delta, "expense"),)
+    elif regime == VarianceRegime.OFFSET:
+        expense_budget = 300_000 + (h % 70_000)
+        expense_over = 120_001 + (h % 60_000)
+        revenue_budget = 90_000 + (h % 30_000)
+        revenue_gain = 40_001 + (h % 50_000)
+        names = ("capacity", "renewals") if not ood else ("fleet_mix", "channel_yield")
         drivers = (
-            VarianceDriverLatent("headcount", impact, "budget_hc", "expense"),
+            observation(
+                names[0],
+                "expense",
+                expense_budget,
+                expense_budget + expense_over,
+                "expense",
+            ),
+            observation(
+                names[1],
+                "revenue",
+                revenue_budget,
+                revenue_budget + revenue_gain,
+                "revenue",
+            ),
         )
-        other = 0
-        rule = "VAR-MATERIAL-001"
-    elif regime == VarianceRegime.TIE:
-        drivers = (
-            VarianceDriverLatent("alpha_cost", -100_000, "alpha_actual", "expense"),
-            VarianceDriverLatent("beta_cost", -100_000, "beta_actual", "expense"),
-        )
-        other = 0
-        actual = budget + 200_000
-        rule = "VAR-TIEBREAK-001"
-    elif regime == VarianceRegime.FX:
-        drivers = (
-            VarianceDriverLatent("volume", -350_000, "volume_actual", "volume"),
-            VarianceDriverLatent("price", 200_000, "price_actual", "price"),
-            VarianceDriverLatent("fx", -50_000, "fx_rate", "fx"),
-        )
-        other = -20_000
-        actual = budget + 220_000
-        rule = "VAR-FX-002"
     elif regime == VarianceRegime.PRICE_VOLUME:
+        budget_units = 80 + (h % 21)
+        actual_units = budget_units + 5 + ((h >> 5) % 13)
+        budget_rate = 1_100 + ((h >> 9) % 400)
+        actual_rate = budget_rate + 20 + ((h >> 13) % 80)
+        names = ("unit_price", "usage_volume") if not ood else ("mix_rate", "load_count")
         drivers = (
-            VarianceDriverLatent("price", 80_000 + (h % 5) * 1_000, "price_actual", "price"),
-            VarianceDriverLatent("volume", -(120_000 + (h % 5) * 1_000), "volume_actual", "volume"),
+            observation(
+                names[0],
+                "expense",
+                actual_units * budget_rate,
+                actual_units * actual_rate,
+                "price",
+            ),
+            observation(
+                names[1],
+                "expense",
+                budget_units * budget_rate,
+                actual_units * budget_rate,
+                "volume",
+            ),
         )
-        other = -10_000
-        actual = budget + 50_000 + (h % 5) * 1_000
-        rule = "VAR-MATERIAL-005"
-    elif regime == VarianceRegime.HIDDEN_SUBTOTAL:
+        base = budget_units * budget_rate
+    elif regime == VarianceRegime.FX:
+        names = (
+            ("volume", "price", "currency")
+            if not ood
+            else ("international_units", "contract_rate", "translation")
+        )
+        amounts = (
+            (150_000 + (h % 20_000), 210_000 + (h % 20_000)),
+            (180_000 + (h % 25_000), 145_000 + (h % 25_000)),
+            (80_000 + (h % 10_000), 105_000 + (h % 10_000)),
+        )
         drivers = (
-            VarianceDriverLatent("cloud_usage", -300_000, "actual_cloud", "expense"),
-            VarianceDriverLatent("support_volume", -90_000, "tickets_actual", "expense"),
+            observation(names[0], "expense", *amounts[0], "volume"),
+            observation(names[1], "expense", *amounts[1], "price"),
+            observation(names[2], "expense", *amounts[2], "fx"),
         )
-        other = -30_000
-        actual = budget + 420_000
-        rule = "VAR-MATERIAL-005"
-    else:  # OFFSET
+    elif regime == VarianceRegime.TIE:
+        magnitude = 90_001 + (h % 20_000)
         drivers = (
-            VarianceDriverLatent("cloud_usage", -300_000, "actual_cloud", "expense"),
-            VarianceDriverLatent("support_volume", -90_000, "tickets_actual", "expense"),
+            observation("alpha_cost", "expense", base, base + magnitude, "expense"),
+            observation("beta_cost", "expense", base + 7, base + 7 + magnitude, "expense"),
         )
-        other = -30_000
-        actual = budget + 420_000
-        rule = "VAR-MATERIAL-005"
-        if ood:
-            drivers = (
-                VarianceDriverLatent("new_mix_a", -180_000, "mix_a_actual", "expense"),
-                VarianceDriverLatent("new_mix_b", 90_000, "mix_b_actual", "revenue"),
-                VarianceDriverLatent("new_mix_c", -40_000, "mix_c_actual", "fx"),
-            )
-            other = -15_000
-            actual = budget + 145_000
+    else:
+        cloud_budget = 250_000 + (h % 30_000)
+        support_budget = 100_000 + (h % 20_000)
+        hidden_budget = 50_000 + (h % 10_000)
+        drivers = (
+            observation(
+                "cloud_usage",
+                "expense",
+                cloud_budget,
+                cloud_budget + 180_000,
+                "expense",
+            ),
+            observation(
+                "support_volume",
+                "expense",
+                support_budget,
+                support_budget + 70_000,
+                "expense",
+            ),
+        )
+        unallocated = (
+            observation(
+                "unallocated_close_items",
+                "expense",
+                hidden_budget,
+                hidden_budget + 30_000,
+                "other",
+            ),
+        )
+
+    all_observations = drivers + unallocated
+    baseline = 400_000 + ((h >> 17) % 200_000)
+    budget = baseline + sum(
+        obs.budget_minor if obs.pnl_type == "expense" else -obs.budget_minor
+        for obs in all_observations
+    )
+    actual = baseline + sum(
+        obs.actual_minor if obs.pnl_type == "expense" else -obs.actual_minor
+        for obs in all_observations
+    )
+
+    context = _natural_name(f"{identity}|variance-rule")
+    mat_id = f"VAR-MAT-{_digest(f'{identity}|mat')[:8].upper()}"
+    rules = [(mat_id, f"{context} materiality uses exact minor-unit impacts.")]
+    rule_ids = [mat_id]
+    if regime == VarianceRegime.TIE:
+        tie_id = f"VAR-TIE-{_digest(f'{identity}|tie')[:8].upper()}"
+        rules.append((tie_id, f"{context} ties sort by driver identifier ascending."))
+        rule_ids = [tie_id]
+    if regime == VarianceRegime.FX:
+        fx_id = f"VAR-FX-{_digest(f'{identity}|fx')[:8].upper()}"
+        rules.append((fx_id, f"{context} reports translation separately."))
+        rule_ids.append(fx_id)
 
     return VarianceLatent(
-        period=f"2026-Q{(h % 4) + 1}",
+        period=period,
         budget_minor=budget,
         actual_minor=actual,
         drivers=drivers,
-        other_impact_minor=other,
-        materiality_rule_id=rule,
+        unallocated=unallocated,
+        rule_ids=tuple(rule_ids),
+        analysis_rules=tuple(rules),
         regime=regime,
         entity_id=entity_id,
     )
@@ -648,39 +1113,71 @@ def _build_variance(
 
 def _build_cash(
     h: int,
+    identity: str,
     entity_id: str,
     close_period: str,
     difficulty: Difficulty,
     ood: bool,
 ) -> CashLatent:
-    if difficulty == Difficulty.EASY:
+    if ood:
+        regime = _stable_choice(
+            h >> 2,
+            (
+                CashRegime.ONE_TO_MANY,
+                CashRegime.MANY_TO_ONE,
+                CashRegime.PARTIAL,
+                CashRegime.SAME_AMOUNT_COLLISION,
+            ),
+        )
+    elif difficulty == Difficulty.EASY:
         regime = CashRegime.CLEAN_MATCH
     elif difficulty == Difficulty.MEDIUM:
         regime = _stable_choice(
             h,
-            (CashRegime.BANK_FEE, CashRegime.DEPOSIT_IN_TRANSIT, CashRegime.CLEAN_MATCH),
+            (
+                CashRegime.CLEAN_MATCH,
+                CashRegime.BANK_FEE,
+                CashRegime.DEPOSIT_IN_TRANSIT,
+            ),
         )
     else:
         regime = _stable_choice(
             h,
             (
                 CashRegime.BANK_FEE,
+                CashRegime.DEPOSIT_IN_TRANSIT,
                 CashRegime.STALE_CHECK,
                 CashRegime.DUPLICATE,
-                CashRegime.ONE_TO_MANY,
-                CashRegime.PARTIAL,
             ),
         )
-    if ood:
-        regime = _stable_choice(
-            h >> 1,
-            (CashRegime.ONE_TO_MANY, CashRegime.PARTIAL, CashRegime.DUPLICATE),
+
+    def book(suffix: str, amount: int, day: int, memo: str) -> BookEntry:
+        return BookEntry(
+            _opaque_id("bok_", f"{identity}|book|{suffix}"),
+            amount,
+            f"2026-03-{day:02d}",
+            memo,
         )
 
-    base = 8_000_000 + (h % 100) * 1_000
-    b1 = BookEntry(f"b_{entity_id}_1", 250_000, "2026-03-01", "customer remittance")
-    k1 = BankEvent(f"k_{entity_id}_1", 250_000, "2026-03-02", "ACH CREDIT", "clearing")
+    def bank(
+        suffix: str,
+        amount: int,
+        day: int,
+        memo: str,
+        event_type: Literal["clearing", "fee", "duplicate", "other"] = "clearing",
+    ) -> BankEvent:
+        return BankEvent(
+            _opaque_id("bnk_", f"{identity}|bank|{suffix}"),
+            amount,
+            f"2026-03-{day:02d}",
+            memo,
+            event_type,
+        )
 
+    base = 7_000_000 + (h % 900_000)
+    first_amount = 200_001 + ((h >> 8) % 90_000)
+    b1 = book("primary", first_amount, 1, "customer remittance")
+    k1 = bank("primary", first_amount, 2, "cleared remittance")
     book_entries = [b1]
     bank_events = [k1]
     matched: list[tuple[tuple[str, ...], tuple[str, ...]]] = [((b1.entry_id,), (k1.event_id,))]
@@ -688,46 +1185,75 @@ def _build_cash(
     book_balance = base
     bank_balance = base
 
+    adjustment = 3_001 + ((h >> 11) % 40_000)
     if regime == CashRegime.BANK_FEE:
-        fee = BankEvent(f"k_{entity_id}_fee", -3_500, "2026-03-03", "SERVICE CHARGE", "fee")
+        fee = bank("fee", -adjustment, 3, "service charge", "fee")
         bank_events.append(fee)
-        exceptions.append(("bank_fee", (fee.event_id,), 3_500))
-        bank_balance = base - 3_500
-        # adjusted bank adds back fee → equals book
+        exceptions.append(("bank_fee", (fee.event_id,), adjustment))
+        bank_balance -= adjustment
     elif regime == CashRegime.DEPOSIT_IN_TRANSIT:
-        b2 = BookEntry(f"b_{entity_id}_2", 50_000, "2026-03-04", "deposit in transit")
+        b2 = book("transit", adjustment, 4, "deposit in transit")
         book_entries.append(b2)
-        exceptions.append(("deposit_in_transit", (b2.entry_id,), 50_000))
-        book_balance = base + 50_000
-        bank_balance = base
+        exceptions.append(("deposit_in_transit", (b2.entry_id,), adjustment))
+        book_balance += adjustment
     elif regime == CashRegime.STALE_CHECK:
-        b2 = BookEntry(f"b_{entity_id}_2", -12_000, "2026-01-15", "stale check")
+        b2 = book("stale", -adjustment, 5, "stale check")
         book_entries.append(b2)
-        exceptions.append(("stale_check", (b2.entry_id,), 12_000))
-        book_balance = base - 12_000
-        bank_balance = base
+        exceptions.append(("stale_check", (b2.entry_id,), adjustment))
+        book_balance -= adjustment
     elif regime == CashRegime.DUPLICATE:
-        dup = BankEvent(f"k_{entity_id}_dup", 250_000, "2026-03-02", "ACH CREDIT DUP", "duplicate")
-        bank_events.append(dup)
-        exceptions.append(("duplicate", (dup.event_id,), 250_000))
-        bank_balance = base + 250_000
+        duplicate = bank("duplicate", first_amount, 2, "duplicate remittance", "duplicate")
+        bank_events.append(duplicate)
+        exceptions.append(("duplicate", (duplicate.event_id,), first_amount))
+        bank_balance += first_amount
     elif regime == CashRegime.ONE_TO_MANY:
-        b2 = BookEntry(f"b_{entity_id}_2", 100_000, "2026-03-05", "split receipt book")
-        k2 = BankEvent(f"k_{entity_id}_2", 60_000, "2026-03-05", "partial clear a", "clearing")
-        k3 = BankEvent(f"k_{entity_id}_3", 40_000, "2026-03-05", "partial clear b", "clearing")
+        total = 90_001 + ((h >> 7) % 30_000)
+        left = total // 2
+        b2 = book("aggregate", total, 6, "aggregate receipt")
+        k2 = bank("aggregate-a", left, 6, "settlement part alpha")
+        k3 = bank("aggregate-b", total - left, 7, "settlement part beta")
         book_entries.append(b2)
-        bank_events.extend([k2, k3])
+        bank_events.extend((k2, k3))
         matched.append(((b2.entry_id,), (k2.event_id, k3.event_id)))
-        book_balance = base + 100_000
-        bank_balance = base + 100_000
+        book_balance += total
+        bank_balance += total
+    elif regime == CashRegime.MANY_TO_ONE:
+        left = 40_001 + ((h >> 7) % 20_000)
+        right = 30_001 + ((h >> 12) % 20_000)
+        b2 = book("bundle-a", left, 6, "invoice alpha")
+        b3 = book("bundle-b", right, 7, "invoice beta")
+        k2 = bank("bundle", left + right, 8, "combined settlement")
+        book_entries.extend((b2, b3))
+        bank_events.append(k2)
+        matched.append(((b2.entry_id, b3.entry_id), (k2.event_id,)))
+        book_balance += left + right
+        bank_balance += left + right
     elif regime == CashRegime.PARTIAL:
-        b2 = BookEntry(f"b_{entity_id}_2", 80_000, "2026-03-06", "invoice partial")
-        k2 = BankEvent(f"k_{entity_id}_2", 50_000, "2026-03-06", "partial payment", "clearing")
+        booked = 80_001 + ((h >> 7) % 30_000)
+        settled = booked - adjustment
+        b2 = book("partial-book", booked, 8, "invoice awaiting remainder")
+        k2 = bank("partial-bank", settled, 9, "partial settlement")
         book_entries.append(b2)
         bank_events.append(k2)
-        exceptions.append(("partial_settlement", (b2.entry_id, k2.event_id), 30_000))
-        book_balance = base + 80_000
-        bank_balance = base + 50_000
+        exceptions.append(("partial_settlement", (b2.entry_id, k2.event_id), adjustment))
+        book_balance += booked
+        bank_balance += settled
+    elif regime == CashRegime.SAME_AMOUNT_COLLISION:
+        amount = 60_001 + ((h >> 7) % 20_000)
+        b2 = book("collision-a", amount, 10, "customer alpha")
+        b3 = book("collision-b", amount, 10, "customer beta")
+        k2 = bank("collision-a", amount, 11, "alpha settlement")
+        k3 = bank("collision-b", amount, 11, "beta settlement")
+        book_entries.extend((b2, b3))
+        bank_events.extend((k2, k3))
+        matched.extend(
+            (
+                ((b2.entry_id,), (k2.event_id,)),
+                ((b3.entry_id,), (k3.event_id,)),
+            )
+        )
+        book_balance += amount * 2
+        bank_balance += amount * 2
 
     return CashLatent(
         book_balance_minor=book_balance,
@@ -742,17 +1268,43 @@ def _build_cash(
     )
 
 
-def _fnv(text: str) -> int:
-    h = 2166136261
-    for ch in text.encode("utf-8"):
-        h ^= ch
-        h = (h * 16777619) & 0xFFFFFFFF
-    return h
+def _vendor_for_category(vendors: Sequence[Vendor], category: str) -> Vendor:
+    try:
+        return next(vendor for vendor in vendors if vendor.category == category)
+    except StopIteration as exc:
+        raise ValueError(f"missing vendor category {category!r}") from exc
 
 
-def _mix(*parts: int) -> int:
-    h = 0x9E3779B9
-    for p in parts:
-        h ^= (p + 0x9E3779B9 + ((h << 6) & 0xFFFFFFFF) + (h >> 2)) & 0xFFFFFFFF
-        h &= 0xFFFFFFFF
-    return h
+def _stable_choice(value: int, options: Sequence[Any]) -> Any:
+    return options[value % len(options)]
+
+
+def _digest(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _hash_int(value: str) -> int:
+    return int(_digest(value)[:16], 16)
+
+
+def _opaque_id(prefix: str, value: str) -> str:
+    return f"{prefix}{_digest(value)[:18]}"
+
+
+def _natural_name(value: str) -> str:
+    digest = bytes.fromhex(_digest(value))
+    coined = "".join(chr(ord("a") + byte % 26) for byte in digest[3:10]).title()
+    return (
+        f"{_NAME_LEFT[digest[0] % len(_NAME_LEFT)]} "
+        f"{_NAME_LEFT[digest[1] % len(_NAME_LEFT)]} "
+        f"{_NAME_RIGHT[digest[2] % len(_NAME_RIGHT)]} {coined}"
+    )
+
+
+def _period_label(value: str) -> str:
+    digest = bytes.fromhex(_digest(f"{value}|period"))
+    year = 2025 + int.from_bytes(digest[:2], "big") % 60
+    period = 1 + digest[2] % 13
+    context = _NAME_LEFT[digest[3] % len(_NAME_LEFT)]
+    coined = "".join(chr(ord("A") + byte % 26) for byte in digest[4:11])
+    return f"FY{year}-P{period:02d}-{context}-{coined}"

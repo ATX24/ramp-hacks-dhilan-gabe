@@ -1,72 +1,153 @@
-"""Grouped split isolation and OOD holdout tests."""
+"""Grouped isolation and unlabeled OOD combination holdouts."""
 
 from __future__ import annotations
 
-from distillery.contracts.tasks import SplitName, TaskId
-from distillery.data.generate import CORPUS_FULL, generate_corpus
-from distillery.data.world import IID_TEMPLATE_FAMILIES, OOD_TEMPLATE_FAMILIES
+import re
+from collections import defaultdict
+from collections.abc import Callable
+
+from distillery.contracts.tasks import FinanceTaskEnvelope, SplitName, TaskId
 
 
-def test_smoke_no_cross_split_ids(smoke_corpus) -> None:
-    by_split: dict[SplitName, set[str]] = {}
-    for split, items in smoke_corpus.by_split.items():
-        keys: set[str] = set()
-        for ex in items:
-            keys.add(ex.world_id)
-            keys.add(ex.group_id)
-            if ent := ex.input.get("entity_id"):
-                keys.add(f"ent:{ent}")
-            if txn := ex.input.get("txn_id"):
-                keys.add(f"txn:{txn}")
-        by_split[split] = keys
-
-    splits = list(by_split)
-    for i, left in enumerate(splits):
-        for right in splits[i + 1 :]:
-            overlap = by_split[left] & by_split[right]
-            assert not overlap, f"{left}∩{right}={sorted(overlap)[:5]}"
-
-
-def test_full_ood_holds_out_templates_and_regimes() -> None:
-    corpus = generate_corpus(CORPUS_FULL, check_near_duplicates=True)
-    assert len(corpus.examples) == 5200
-    assert len(corpus.by_split[SplitName.TRAIN]) == 3200
-    assert len(corpus.by_split[SplitName.VALIDATION]) == 400
-    assert len(corpus.by_split[SplitName.IID_TEST]) == 800
-    assert len(corpus.by_split[SplitName.OOD_TEST]) == 800
-
-    in_dist_templates: set[str] = set()
-    ood_templates: set[str] = set()
-    for ex in corpus.examples:
-        if ex.provenance.split == SplitName.OOD_TEST:
-            ood_templates.add(ex.provenance.template_family)
-        else:
-            in_dist_templates.add(ex.provenance.template_family)
-
-    assert in_dist_templates.isdisjoint(ood_templates)
-    for task in (
-        TaskId.TRANSACTION_REVIEW,
-        TaskId.VARIANCE_ANALYSIS,
-        TaskId.CASH_RECONCILIATION,
-    ):
-        ood_set = set(OOD_TEMPLATE_FAMILIES[task])
-        assert ood_set
-        assert ood_set.isdisjoint(in_dist_templates)
-        assert set(IID_TEMPLATE_FAMILIES[task]).isdisjoint(ood_templates)
-
-    # Mixture targets recorded.
-    train_mix = corpus.manifest["mixtures"]["train"]["mixture"]["by_task"]
-    assert train_mix == {
-        "transaction_review": 1440,
-        "variance_analysis": 1440,
-        "cash_reconciliation": 320,
+def test_identity_and_semantic_assets_are_group_isolated(full_corpus) -> None:
+    extractors: dict[str, Callable[[FinanceTaskEnvelope], list[str]]] = {
+        "world": lambda example: [example.world_id],
+        "entity": lambda example: [str(example.input.get("entity_id", ""))],
+        "vendor": lambda example: [str(example.input.get("vendor", ""))],
+        "period": _periods,
+        "source": _source_ids,
+        "policy_text": _policy_texts,
+        "coa_description": _coa_descriptions,
+        "template_family": lambda example: [example.provenance.template_family],
     }
+    for name, extractor in extractors.items():
+        owners: dict[str, set[str]] = defaultdict(set)
+        splits: dict[str, set[SplitName]] = defaultdict(set)
+        for example in full_corpus.examples:
+            for value in extractor(example):
+                if value:
+                    owners[value].add(example.group_id)
+                    splits[value].add(example.provenance.split)
+        assert all(len(groups) == 1 for groups in owners.values()), name
+        assert all(len(values) == 1 for values in splits.values()), name
 
 
-def test_envelopes_round_trip_contract(smoke_corpus) -> None:
-    from distillery.contracts.tasks import FinanceTaskEnvelope
+def test_group_ids_never_cross_splits(full_corpus) -> None:
+    owners: dict[str, set[SplitName]] = defaultdict(set)
+    for example in full_corpus.examples:
+        owners[example.group_id].add(example.provenance.split)
+    assert all(len(splits) == 1 for splits in owners.values())
 
-    for ex in smoke_corpus.examples[:20]:
-        again = FinanceTaskEnvelope.model_validate(ex.model_dump(mode="json"))
-        assert again.example_id == ex.example_id
-        assert again.oracle.latent_state_hash.startswith("sha256:")
+
+def test_ood_prompts_and_inputs_do_not_label_distribution(full_corpus) -> None:
+    forbidden = re.compile(
+        r"\bood\b|held[- ]out|out[- ]of[- ]distribution",
+        re.IGNORECASE,
+    )
+    for example in full_corpus.by_split[SplitName.OOD_TEST]:
+        rendered = str(example.input)
+        assert not forbidden.search(rendered)
+        assert "regime" not in example.input
+
+
+def test_ood_holds_out_policy_combinations(full_corpus) -> None:
+    iid_actions: set[str] = set()
+    ood_actions: set[str] = set()
+    for example in full_corpus.examples:
+        if example.task != TaskId.TRANSACTION_REVIEW:
+            continue
+        base_cloud_rules = [
+            rule
+            for rule in example.input["policy_rules"]
+            if rule["category"] == "cloud" and rule["min_amount_minor"] == 0
+        ]
+        if not base_cloud_rules:
+            continue
+        target = ood_actions if example.provenance.split == SplitName.OOD_TEST else iid_actions
+        target.update(rule["action"] for rule in base_cloud_rules)
+    assert iid_actions == {"approve"}
+    assert ood_actions == {"review"}
+
+
+def test_ood_holds_out_gl_description_combinations(full_corpus) -> None:
+    iid: set[tuple[str, str]] = set()
+    ood: set[tuple[str, str]] = set()
+    for example in full_corpus.examples:
+        if example.task != TaskId.TRANSACTION_REVIEW:
+            continue
+        target = ood if example.provenance.split == SplitName.OOD_TEST else iid
+        target.update(
+            (str(account["code"]), str(account["name"]))
+            for account in example.input["chart_of_accounts"]
+        )
+    assert iid
+    assert ood
+    assert iid.isdisjoint(ood)
+
+
+def test_ood_holds_out_variance_driver_sign_mixtures(full_corpus) -> None:
+    iid: set[tuple[str, str, int]] = set()
+    ood: set[tuple[str, str, int]] = set()
+    for example in full_corpus.examples:
+        if example.task != TaskId.VARIANCE_ANALYSIS:
+            continue
+        target = ood if example.provenance.split == SplitName.OOD_TEST else iid
+        for item in example.input["driver_observations"]:
+            raw = (
+                item["budget_minor"] - item["actual_minor"]
+                if item["pnl_type"] == "expense"
+                else item["actual_minor"] - item["budget_minor"]
+            )
+            sign = 1 if raw > 0 else -1 if raw < 0 else 0
+            target.add((item["driver_id"], item["pnl_type"], sign))
+    assert iid
+    assert ood
+    assert iid.isdisjoint(ood)
+
+
+def test_ood_holds_out_cash_aggregation_patterns(full_corpus) -> None:
+    iid_patterns: set[tuple[int, int]] = set()
+    ood_patterns: set[tuple[int, int]] = set()
+    for example in full_corpus.examples:
+        if example.task != TaskId.CASH_RECONCILIATION:
+            continue
+        target = ood_patterns if example.provenance.split == SplitName.OOD_TEST else iid_patterns
+        target.update(
+            (len(group["book_ids"]), len(group["bank_ids"]))
+            for group in example.expected_output["matched_groups"]
+        )
+    assert (1, 2) in ood_patterns
+    assert (2, 1) in ood_patterns
+    assert (1, 2) not in iid_patterns
+    assert (2, 1) not in iid_patterns
+
+
+def test_envelopes_round_trip_foundation_contract(full_corpus) -> None:
+    for example in full_corpus.examples[::257]:
+        round_trip = FinanceTaskEnvelope.model_validate(example.model_dump(mode="json"))
+        assert round_trip == example
+
+
+def _periods(example: FinanceTaskEnvelope) -> list[str]:
+    return [str(example.input[key]) for key in ("period", "close_period") if example.input.get(key)]
+
+
+def _source_ids(example: FinanceTaskEnvelope) -> list[str]:
+    values: list[str] = []
+    if example.input.get("txn_id"):
+        values.append(str(example.input["txn_id"]))
+    for item in example.input.get("driver_observations", []):
+        values.append(str(item["source_id"]))
+    for item in example.input.get("unallocated_line_items", []):
+        values.append(str(item["source_id"]))
+    for collection in ("book_entries", "bank_events"):
+        values.extend(str(item["id"]) for item in example.input.get(collection, []))
+    return values
+
+
+def _policy_texts(example: FinanceTaskEnvelope) -> list[str]:
+    return [str(rule["text"]) for rule in example.input.get("policy_rules", [])]
+
+
+def _coa_descriptions(example: FinanceTaskEnvelope) -> list[str]:
+    return [str(account["name"]) for account in example.input.get("chart_of_accounts", [])]

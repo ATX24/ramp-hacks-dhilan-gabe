@@ -1,0 +1,445 @@
+{
+  "ex_cash_hard_exc_001": {
+    "expected_output": {
+      "adjusted_bank_balance_minor": 8169900,
+      "adjusted_book_balance_minor": 8169900,
+      "confidence": 0.89,
+      "difference_minor": 0,
+      "exceptions": [
+        {
+          "amount_minor": 3500,
+          "event_ids": [
+            "bank_iid_fee"
+          ],
+          "type": "bank_fee"
+        },
+        {
+          "amount_minor": 50000,
+          "event_ids": [
+            "book_iid_deposit"
+          ],
+          "type": "deposit_in_transit"
+        }
+      ],
+      "matched_groups": [
+        {
+          "bank_ids": [
+            "bank_iid_match"
+          ],
+          "book_ids": [
+            "book_iid_match"
+          ]
+        }
+      ],
+      "schema_version": "cash_reconciliation.v1",
+      "status": "exceptions",
+      "task": "cash_reconciliation"
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_cash_medium_001": {
+    "expected_output": {
+      "adjusted_bank_balance_minor": 8123400,
+      "adjusted_book_balance_minor": 8123400,
+      "confidence": 0.93,
+      "difference_minor": 0,
+      "exceptions": [],
+      "matched_groups": [
+        {
+          "bank_ids": [
+            "bank_train_match"
+          ],
+          "book_ids": [
+            "book_train_match"
+          ]
+        }
+      ],
+      "schema_version": "cash_reconciliation.v1",
+      "status": "balanced",
+      "task": "cash_reconciliation"
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_invalid_json_001": {
+    "expected_output": {
+      "confidence": 0.99,
+      "evidence": [
+        {
+          "field": "amount_minor",
+          "source_id": "txn_test",
+          "value": "1200"
+        }
+      ],
+      "gl_account": "6100",
+      "journal_entry": [
+        {
+          "account": "6100",
+          "amount_minor": 1200,
+          "side": "debit"
+        },
+        {
+          "account": "2100",
+          "amount_minor": 1200,
+          "side": "credit"
+        }
+      ],
+      "policy_action": "approve",
+      "rule_ids": [
+        "POL-TEST-MEAL-001"
+      ],
+      "schema_version": "transaction_review.v1",
+      "task": "transaction_review"
+    },
+    "reject_reason": "invalid_json_prediction",
+    "rejects_fixture_expected_output": false,
+    "sample_invalid_prediction": "{gl_account: 6100, not_json: true",
+    "valid_typed_output": true
+  },
+  "ex_txn_easy_001": {
+    "expected_output": {
+      "confidence": 0.97,
+      "evidence": [
+        {
+          "field": "amount_minor",
+          "source_id": "txn",
+          "value": "4500"
+        }
+      ],
+      "gl_account": "6100",
+      "journal_entry": [
+        {
+          "account": "6100",
+          "amount_minor": 4500,
+          "side": "debit"
+        },
+        {
+          "account": "2100",
+          "amount_minor": 4500,
+          "side": "credit"
+        }
+      ],
+      "policy_action": "approve",
+      "rule_ids": [
+        "POL-MEAL-001"
+      ],
+      "schema_version": "transaction_review.v1",
+      "task": "transaction_review"
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_txn_hard_001": {
+    "expected_output": {
+      "confidence": 0.88,
+      "evidence": [
+        {
+          "field": "amount_minor",
+          "source_id": "txn",
+          "value": "5000000"
+        }
+      ],
+      "gl_account": "1500",
+      "journal_entry": [
+        {
+          "account": "1500",
+          "amount_minor": 5000000,
+          "side": "debit"
+        },
+        {
+          "account": "2100",
+          "amount_minor": 5000000,
+          "side": "credit"
+        }
+      ],
+      "policy_action": "reject",
+      "rule_ids": [
+        "POL-CAPEX-009"
+      ],
+      "schema_version": "transaction_review.v1",
+      "task": "transaction_review"
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_txn_medium_001": {
+    "expected_output": {
+      "confidence": 0.94,
+      "evidence": [
+        {
+          "field": "amount_minor",
+          "source_id": "txn",
+          "value": "129900"
+        }
+      ],
+      "gl_account": "6205",
+      "journal_entry": [
+        {
+          "account": "6205",
+          "amount_minor": 129900,
+          "side": "debit"
+        },
+        {
+          "account": "2100",
+          "amount_minor": 129900,
+          "side": "credit"
+        }
+      ],
+      "policy_action": "approve",
+      "rule_ids": [
+        "POL-TRAVEL-017"
+      ],
+      "schema_version": "transaction_review.v1",
+      "task": "transaction_review"
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_txn_unbalanced_001": {
+    "expected_output": {
+      "confidence": 0.5,
+      "evidence": [
+        {
+          "field": "amount_minor",
+          "source_id": "txn",
+          "value": "10000"
+        }
+      ],
+      "gl_account": "6100",
+      "journal_entry": [
+        {
+          "account": "6100",
+          "amount_minor": 10000,
+          "side": "debit"
+        },
+        {
+          "account": "2100",
+          "amount_minor": 10000,
+          "side": "credit"
+        }
+      ],
+      "policy_action": "approve",
+      "rule_ids": [
+        "POL-VALIDATION-MEAL-001"
+      ],
+      "schema_version": "transaction_review.v1",
+      "task": "transaction_review"
+    },
+    "reject_reason": "unbalanced_journal",
+    "rejects_fixture_expected_output": false,
+    "sample_invalid_prediction": {
+      "confidence": 0.5,
+      "evidence": [
+        {
+          "field": "amount_minor",
+          "source_id": "txn",
+          "value": "10000"
+        }
+      ],
+      "gl_account": "6100",
+      "journal_entry": [
+        {
+          "account": "6100",
+          "amount_minor": 10000,
+          "side": "debit"
+        },
+        {
+          "account": "2100",
+          "amount_minor": 9000,
+          "side": "credit"
+        }
+      ],
+      "policy_action": "approve",
+      "rule_ids": [
+        "POL-VALIDATION-MEAL-001"
+      ],
+      "schema_version": "transaction_review.v1",
+      "task": "transaction_review"
+    },
+    "valid_typed_output": true
+  },
+  "ex_var_easy_001": {
+    "expected_output": {
+      "confidence": 0.96,
+      "direction": "favorable",
+      "evidence_ids": [
+        "budget_hc",
+        "actual_hc"
+      ],
+      "other_impact_minor": 0,
+      "profit_impact_minor": 100000,
+      "rule_ids": [
+        "VAR-MATERIAL-001"
+      ],
+      "schema_version": "variance_analysis.v1",
+      "task": "variance_analysis",
+      "top_drivers": [
+        {
+          "driver_id": "headcount",
+          "impact_minor": 100000,
+          "rank": 1
+        }
+      ]
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_var_hard_001": {
+    "expected_output": {
+      "confidence": 0.86,
+      "direction": "unfavorable",
+      "evidence_ids": [
+        "price_actual",
+        "volume_actual",
+        "fx_rate"
+      ],
+      "other_impact_minor": -20000,
+      "profit_impact_minor": -220000,
+      "rule_ids": [
+        "VAR-OOD-MATERIAL-005",
+        "VAR-OOD-FX-002"
+      ],
+      "schema_version": "variance_analysis.v1",
+      "task": "variance_analysis",
+      "top_drivers": [
+        {
+          "driver_id": "volume",
+          "impact_minor": -350000,
+          "rank": 1
+        },
+        {
+          "driver_id": "price",
+          "impact_minor": 200000,
+          "rank": 2
+        },
+        {
+          "driver_id": "fx",
+          "impact_minor": -50000,
+          "rank": 3
+        }
+      ]
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_var_medium_001": {
+    "expected_output": {
+      "confidence": 0.91,
+      "direction": "unfavorable",
+      "evidence_ids": [
+        "actual_cloud",
+        "budget_cloud",
+        "tickets_actual"
+      ],
+      "other_impact_minor": -30000,
+      "profit_impact_minor": -420000,
+      "rule_ids": [
+        "VAR-MATERIAL-005"
+      ],
+      "schema_version": "variance_analysis.v1",
+      "task": "variance_analysis",
+      "top_drivers": [
+        {
+          "driver_id": "cloud_usage",
+          "impact_minor": -300000,
+          "rank": 1
+        },
+        {
+          "driver_id": "support_volume",
+          "impact_minor": -90000,
+          "rank": 2
+        }
+      ]
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  },
+  "ex_var_sign_inv_001": {
+    "expected_output": {
+      "confidence": 0.4,
+      "direction": "unfavorable",
+      "evidence_ids": [
+        "actual_validation_cloud"
+      ],
+      "other_impact_minor": 0,
+      "profit_impact_minor": -100000,
+      "rule_ids": [
+        "VAR-VALIDATION-MATERIAL-009"
+      ],
+      "schema_version": "variance_analysis.v1",
+      "task": "variance_analysis",
+      "top_drivers": [
+        {
+          "driver_id": "validation_cloud_usage",
+          "impact_minor": -100000,
+          "rank": 1
+        }
+      ]
+    },
+    "reject_reason": "sign_inversion",
+    "rejects_fixture_expected_output": false,
+    "sample_invalid_prediction": {
+      "confidence": 0.4,
+      "direction": "favorable",
+      "evidence_ids": [
+        "actual_validation_cloud"
+      ],
+      "other_impact_minor": 0,
+      "profit_impact_minor": -100000,
+      "rule_ids": [
+        "VAR-VALIDATION-MATERIAL-009"
+      ],
+      "schema_version": "variance_analysis.v1",
+      "task": "variance_analysis",
+      "top_drivers": [
+        {
+          "driver_id": "validation_cloud_usage",
+          "impact_minor": -100000,
+          "rank": 1
+        }
+      ]
+    },
+    "valid_typed_output": true
+  },
+  "ex_var_tie_rank_001": {
+    "expected_output": {
+      "confidence": 0.9,
+      "direction": "unfavorable",
+      "evidence_ids": [
+        "ood_alpha_actual",
+        "ood_beta_actual"
+      ],
+      "other_impact_minor": 0,
+      "profit_impact_minor": -200000,
+      "rule_ids": [
+        "VAR-OOD-TIEBREAK-001"
+      ],
+      "schema_version": "variance_analysis.v1",
+      "task": "variance_analysis",
+      "top_drivers": [
+        {
+          "driver_id": "ood_alpha_cost",
+          "impact_minor": -100000,
+          "rank": 1
+        },
+        {
+          "driver_id": "ood_beta_cost",
+          "impact_minor": -100000,
+          "rank": 2
+        }
+      ]
+    },
+    "reject_reason": null,
+    "rejects_fixture_expected_output": false,
+    "valid_typed_output": true
+  }
+}

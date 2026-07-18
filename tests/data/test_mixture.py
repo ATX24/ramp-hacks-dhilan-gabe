@@ -8,6 +8,7 @@ from distillery.data.mixture import (
     TASK_MIXTURE,
     difficulty_counts,
     hamilton_apportion,
+    joint_cell_counts,
     mixture_plan,
     task_counts,
 )
@@ -49,22 +50,36 @@ def test_smoke_and_full_split_mixtures() -> None:
     assert task_counts(800)[TaskId.TRANSACTION_REVIEW] == 360
 
 
-def test_difficulty_mixture_within_task() -> None:
-    for n in (32, 144, 360, 1440):
+def test_difficulty_mixture_global_margins() -> None:
+    for n in (80, 160, 320, 400, 800, 3200):
         d = difficulty_counts(n)
         assert d[Difficulty.EASY] + d[Difficulty.MEDIUM] + d[Difficulty.HARD] == n
-        # medium is largest or tied for largest under 30/40/30
-        assert d[Difficulty.MEDIUM] >= d[Difficulty.EASY]
-        assert d[Difficulty.MEDIUM] >= d[Difficulty.HARD]
+        assert d == {
+            Difficulty.EASY: int(n * 0.30),
+            Difficulty.MEDIUM: int(n * 0.40),
+            Difficulty.HARD: int(n * 0.30),
+        }
 
 
 def test_mixture_plan_length_and_cells() -> None:
     plan = mixture_plan(320)
     assert len(plan) == 320
-    txn_easy = sum(
-        1 for t, d in plan if t == TaskId.TRANSACTION_REVIEW and d == Difficulty.EASY
-    )
-    assert txn_easy == difficulty_counts(144)[Difficulty.EASY]
+    cells = joint_cell_counts(320)
+    assert sum(cells.values()) == 320
+    for task, expected in task_counts(320).items():
+        assert (
+            sum(count for (cell_task, _difficulty), count in cells.items() if cell_task == task)
+            == expected
+        )
+    for difficulty, expected in difficulty_counts(320).items():
+        assert (
+            sum(
+                count
+                for (_task, cell_difficulty), count in cells.items()
+                if cell_difficulty == difficulty
+            )
+            == expected
+        )
 
 
 def test_hamilton_rejects_bad_weights() -> None:

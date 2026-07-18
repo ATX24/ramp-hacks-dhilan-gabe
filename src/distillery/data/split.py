@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from distillery.contracts.tasks import SplitName
@@ -40,9 +41,9 @@ def isolation_keys(example_input: dict, world_id: str, group_id: str) -> frozens
         if value:
             keys.add(f"{field}:{value}")
     for entry in example_input.get("book_entries") or []:
-        if isinstance(entry, dict) and entry.get("id"):
+        if isinstance(entry, Mapping) and entry.get("id"):
             keys.add(f"book:{entry['id']}")
     for event in example_input.get("bank_events") or []:
-        if isinstance(event, dict) and event.get("id"):
+        if isinstance(event, Mapping) and event.get("id"):
             keys.add(f"bank:{event['id']}")
     return frozenset(keys)

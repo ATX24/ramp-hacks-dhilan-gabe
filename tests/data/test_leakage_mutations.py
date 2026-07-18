@@ -1,9 +1,14 @@
-"""Mutation tests: each leakage detector must catch a deliberate inject."""
+"""Mutation tests proving every isolation and answer-leak detector fires."""
 
 from __future__ import annotations
 
+import copy
+import re
+from typing import Any
+
+import pytest
+
 from distillery.contracts.tasks import FinanceTaskEnvelope, SplitName, TaskId
-from distillery.data.generate import CORPUS_SMOKE, generate_corpus
 from distillery.data.leakage import (
     check_leakage,
     estimated_jaccard,
@@ -11,138 +16,281 @@ from distillery.data.leakage import (
     minhash_signature,
     normalized_content_hash,
 )
-from distillery.data.world import IID_TEMPLATE_FAMILIES, OOD_TEMPLATE_FAMILIES
+
+_ID_RE = re.compile(
+    r"\b(?:world|grp|ent|txn|vnd|src|bok|bnk|ex)_[0-9a-f]{8,}\b",
+    re.IGNORECASE,
+)
+_RULE_RE = re.compile(r"\b(?:POL|VAR)-[A-Z0-9-]+-[A-F0-9]{8}\b")
 
 
-def _clone(ex: FinanceTaskEnvelope, **updates: object) -> FinanceTaskEnvelope:
-    data = ex.model_dump(mode="json")
-    for key, value in updates.items():
-        if key == "provenance" and isinstance(value, dict):
-            data["provenance"] = {**data["provenance"], **value}
-        elif key == "input" and isinstance(value, dict):
-            data["input"] = {**data["input"], **value}
-        else:
-            data[key] = value
+def _clone(
+    example: FinanceTaskEnvelope,
+    *,
+    input_updates: dict[str, Any] | None = None,
+    provenance_updates: dict[str, Any] | None = None,
+    **updates: Any,
+) -> FinanceTaskEnvelope:
+    data = example.model_dump(mode="json")
+    data.update(updates)
+    if input_updates:
+        data["input"] = {**data["input"], **input_updates}
+    if provenance_updates:
+        data["provenance"] = {
+            **data["provenance"],
+            **provenance_updates,
+        }
     return FinanceTaskEnvelope.model_validate(data)
 
 
-def test_exact_normalized_duplicate_detected(smoke_corpus) -> None:
-    base = smoke_corpus.examples[0]
-    twin = _clone(base, example_id="ex_mut_dup_00001", world_id="world_mut_dup_1")
-    # Force identical normalized material (same input/output/task/difficulty).
-    report = check_leakage([base, twin], check_near_duplicates=False)
-    assert not report.ok
-    assert any(f.kind == "exact_normalized_duplicate" for f in report.findings)
+def _different_group_pair(
+    corpus,
+    task: TaskId,
+) -> tuple[FinanceTaskEnvelope, FinanceTaskEnvelope]:
+    candidates = [example for example in corpus.examples if example.task == task]
+    first = candidates[0]
+    second = next(example for example in candidates if example.group_id != first.group_id)
+    return first, second
 
 
-def test_cross_split_world_id_detected(smoke_corpus) -> None:
-    train = next(
-        e for e in smoke_corpus.examples if e.provenance.split == SplitName.TRAIN
-    )
-    leaked = _clone(
-        next(e for e in smoke_corpus.examples if e.provenance.split == SplitName.TEST),
-        example_id="ex_mut_world_leak_001",
-        world_id=train.world_id,
-        group_id="grp_mut_world_leak",
-        input={**train.input, "case_nonce": "mut-world-leak", "entity_id": "ent_mut_world"},
-    )
-    report = check_leakage(
-        [train, leaked],
-        check_near_duplicates=False,
-    )
-    assert any(f.kind == "cross_split_id" for f in report.findings)
+def _kinds(*examples: FinanceTaskEnvelope) -> set[str]:
+    return check_leakage(examples, check_near_duplicates=False).by_kind
 
 
-def test_cross_split_group_id_detected(smoke_corpus) -> None:
-    train = next(
-        e for e in smoke_corpus.examples if e.provenance.split == SplitName.TRAIN
+def test_vendor_name_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.TRANSACTION_REVIEW,
     )
-    val = next(
-        e for e in smoke_corpus.examples if e.provenance.split == SplitName.VALIDATION
-    )
-    leaked = _clone(
-        val,
-        example_id="ex_mut_grp_leak_001",
-        group_id=train.group_id,
-        world_id="world_mut_grp_leak",
-        input={**val.input, "case_nonce": "mut-grp", "entity_id": "ent_mut_grp"},
-    )
-    report = check_leakage([train, leaked], check_near_duplicates=False)
-    assert any(
-        f.kind == "cross_split_id" and "group_id" in f.detail for f in report.findings
-    )
+    mutated = _clone(second, input_updates={"vendor": first.input["vendor"]})
+    assert "vendor_name_overlap" in _kinds(first, mutated)
 
 
-def test_ood_template_leak_detected() -> None:
-    corpus = generate_corpus(CORPUS_SMOKE, check_near_duplicates=False)
-    train = next(e for e in corpus.examples if e.provenance.split == SplitName.TRAIN)
-    ood_family = OOD_TEMPLATE_FAMILIES[TaskId.TRANSACTION_REVIEW][0]
-    assert ood_family not in IID_TEMPLATE_FAMILIES[TaskId.TRANSACTION_REVIEW]
-
-    ood_clone = _clone(
-        train,
-        example_id="ex_mut_ood_tmpl_001",
-        world_id="world_mut_ood_tmpl",
-        group_id="grp_mut_ood_tmpl",
-        provenance={"split": SplitName.OOD_TEST.value, "template_family": ood_family},
-        input={**train.input, "case_nonce": "ood-tmpl", "entity_id": "ent_mut_ood"},
+def test_merchant_name_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.TRANSACTION_REVIEW,
     )
-    contaminated = _clone(
-        train,
-        example_id="ex_mut_ood_tmpl_002",
-        world_id="world_mut_ood_tmpl2",
-        group_id="grp_mut_ood_tmpl2",
-        provenance={"template_family": ood_family},
-        input={**train.input, "case_nonce": "iid-with-ood-tmpl", "entity_id": "ent_mut_ood2"},
-    )
-    report = check_leakage([ood_clone, contaminated], check_near_duplicates=False)
-    assert any(f.kind == "cross_split_template" for f in report.findings)
+    first = _clone(first, input_updates={"merchant": "Shared Merchant"})
+    second = _clone(second, input_updates={"merchant": "Shared Merchant"})
+    assert "merchant_name_overlap" in _kinds(first, second)
 
 
-def test_near_duplicate_cross_split_detected(smoke_corpus) -> None:
-    train = next(
-        e for e in smoke_corpus.examples if e.provenance.split == SplitName.TRAIN
+def test_descriptor_corruption_family_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.TRANSACTION_REVIEW,
     )
-    # Near-copy into test: tiny descriptor edit, same numeric skeleton.
-    near = _clone(
-        train,
-        example_id="ex_mut_near_001",
-        world_id="world_mut_near_001",
-        group_id="grp_mut_near_001",
-        provenance={"split": SplitName.TEST.value},
-        input={
-            **train.input,
-            "case_nonce": train.input["case_nonce"],  # identical nonce → near copy
-            "entity_id": "ent_mut_near",
-            "descriptor": train.input.get("descriptor", "") + " ",
+    mutated = _clone(
+        second,
+        input_updates={
+            "descriptor": first.input["descriptor"],
+            "vendor": first.input["vendor"],
         },
     )
+    assert "descriptor_family_overlap" in _kinds(first, mutated)
+
+
+@pytest.mark.parametrize("task", [TaskId.VARIANCE_ANALYSIS, TaskId.CASH_RECONCILIATION])
+def test_period_overlap_detector(smoke_corpus, task: TaskId) -> None:
+    first, second = _different_group_pair(smoke_corpus, task)
+    key = "period" if task == TaskId.VARIANCE_ANALYSIS else "close_period"
+    mutated = _clone(second, input_updates={key: first.input[key]})
+    assert "period_overlap" in _kinds(first, mutated)
+
+
+def test_driver_source_id_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.VARIANCE_ANALYSIS,
+    )
+    observations = copy.deepcopy(second.model_dump(mode="json")["input"]["driver_observations"])
+    observations[0]["source_id"] = first.input["driver_observations"][0]["source_id"]
+    mutated = _clone(
+        second,
+        input_updates={"driver_observations": observations},
+    )
+    assert "source_id_overlap" in _kinds(first, mutated)
+
+
+@pytest.mark.parametrize("collection", ["book_entries", "bank_events"])
+def test_book_bank_source_id_overlap_detector(
+    smoke_corpus,
+    collection: str,
+) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.CASH_RECONCILIATION,
+    )
+    values = copy.deepcopy(second.model_dump(mode="json")["input"][collection])
+    values[0]["id"] = first.input[collection][0]["id"]
+    mutated = _clone(second, input_updates={collection: values})
+    assert "source_id_overlap" in _kinds(first, mutated)
+
+
+def test_policy_text_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.TRANSACTION_REVIEW,
+    )
+    rules = copy.deepcopy(second.model_dump(mode="json")["input"]["policy_rules"])
+    rules[0]["text"] = first.input["policy_rules"][0]["text"]
+    mutated = _clone(second, input_updates={"policy_rules": rules})
+    assert "policy_text_overlap" in _kinds(first, mutated)
+
+
+def test_coa_description_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.TRANSACTION_REVIEW,
+    )
+    chart = copy.deepcopy(second.model_dump(mode="json")["input"]["chart_of_accounts"])
+    chart[0]["name"] = first.input["chart_of_accounts"][0]["name"]
+    mutated = _clone(second, input_updates={"chart_of_accounts": chart})
+    assert "coa_description_overlap" in _kinds(first, mutated)
+
+
+def test_renderer_template_family_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.TRANSACTION_REVIEW,
+    )
+    mutated = _clone(
+        second,
+        provenance_updates={
+            "template_family": first.provenance.template_family,
+        },
+    )
+    assert "template_family_overlap" in _kinds(first, mutated)
+
+
+def test_numeric_case_overlap_detector(smoke_corpus) -> None:
+    first, second = _different_group_pair(
+        smoke_corpus,
+        TaskId.TRANSACTION_REVIEW,
+    )
+    mutated = _clone(
+        second,
+        input_updates={
+            "amount_minor": first.input["amount_minor"],
+            "cost_center": first.input["cost_center"],
+            "date": first.input["date"],
+            "expense_category": first.input["expense_category"],
+            "vendor": first.input["vendor"],
+        },
+    )
+    assert "numeric_case_overlap" in _kinds(first, mutated)
+
+
+def test_target_hint_and_direct_copy_detectors(smoke_corpus) -> None:
+    variance = next(
+        example for example in smoke_corpus.examples if example.task == TaskId.VARIANCE_ANALYSIS
+    )
+    mutated = _clone(
+        variance,
+        input_updates={"impact_hint_minor": variance.expected_output["profit_impact_minor"]},
+    )
+    kinds = _kinds(mutated)
+    assert "forbidden_input_field" in kinds
+    assert "target_helper_field" in kinds
+    assert "direct_target_copy" in kinds
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "expected_kind"),
+    [
+        ("case_nonce", "arbitrary", "forbidden_input_field"),
+        ("debug_note", "full_ood", "split_or_ood_marker"),
+        ("debug_note", "held-out sample", "split_or_ood_marker"),
+    ],
+)
+def test_nonce_and_split_marker_detectors(
+    smoke_corpus,
+    key: str,
+    value: str,
+    expected_kind: str,
+) -> None:
+    example = smoke_corpus.examples[0]
+    mutated = _clone(example, input_updates={key: value})
+    assert expected_kind in _kinds(mutated)
+
+
+def test_semantic_clone_changed_ids_and_nonce_is_detected(smoke_corpus) -> None:
+    base = next(
+        example for example in smoke_corpus.examples if example.task == TaskId.TRANSACTION_REVIEW
+    )
+    data = base.model_dump(mode="json")
+    counter = 0
+
+    def replace_string(value: str) -> str:
+        nonlocal counter
+
+        def replace_id(match: re.Match[str]) -> str:
+            nonlocal counter
+            counter += 1
+            prefix = match.group(0).split("_", maxsplit=1)[0]
+            return f"{prefix}_{counter:018x}"
+
+        def replace_rule(match: re.Match[str]) -> str:
+            nonlocal counter
+            counter += 1
+            stem = match.group(0).rsplit("-", maxsplit=1)[0]
+            return f"{stem}-{counter:08X}"
+
+        return _RULE_RE.sub(replace_rule, _ID_RE.sub(replace_id, value))
+
+    def rekey(value: Any) -> Any:
+        if isinstance(value, str):
+            return replace_string(value)
+        if isinstance(value, list):
+            return [rekey(item) for item in value]
+        if isinstance(value, dict):
+            return {key: rekey(item) for key, item in value.items()}
+        return value
+
+    clone_data = rekey(data)
+    clone_data["input"]["case_nonce"] = "identity-only-change"
+    clone = FinanceTaskEnvelope.model_validate(clone_data)
+    assert normalized_content_hash(base) == normalized_content_hash(clone)
+    report = check_leakage([base, clone], check_near_duplicates=False)
+    assert "exact_normalized_duplicate" in report.by_kind
+    assert "forbidden_input_field" in report.by_kind
+
+
+@pytest.mark.parametrize("cross_split", [False, True])
+def test_near_duplicate_detector_is_fatal_within_or_across_split(
+    smoke_corpus,
+    cross_split: bool,
+) -> None:
+    base = next(
+        example for example in smoke_corpus.examples if example.task == TaskId.TRANSACTION_REVIEW
+    )
+    updates: dict[str, Any] = {
+        "world_id": "world_aaaaaaaaaaaaaaaaaa",
+        "group_id": "grp_bbbbbbbbbbbbbbbbbb",
+        "example_id": "ex_cccccccccccccccccc",
+    }
+    provenance = (
+        {"split": SplitName.TEST.value} if cross_split else {"split": base.provenance.split.value}
+    )
+    near = _clone(
+        base,
+        input_updates={"amount_minor": base.input["amount_minor"] + 1},
+        provenance_updates=provenance,
+        **updates,
+    )
     score = estimated_jaccard(
-        minhash_signature(example_fingerprint(train)),
+        minhash_signature(example_fingerprint(base)),
         minhash_signature(example_fingerprint(near)),
     )
     assert score >= 0.85
-    report = check_leakage([train, near], check_near_duplicates=True)
-    assert any(f.kind == "cross_split_near_duplicate" for f in report.findings)
+    report = check_leakage([base, near], check_near_duplicates=True)
+    expected = "cross_split_near_duplicate" if cross_split else "same_split_near_duplicate"
+    assert expected in report.by_kind
+    assert not report.ok
 
 
-def test_normalized_hash_ignores_example_id(smoke_corpus) -> None:
-    a = smoke_corpus.examples[0]
-    b = _clone(a, example_id="ex_mut_hash_ignore_001")
-    assert normalized_content_hash(a) == normalized_content_hash(b)
-
-
-def test_smoke_corpus_passes_leakage(smoke_corpus) -> None:
-    report = check_leakage(smoke_corpus.examples, check_near_duplicates=True)
-    fatal = [
-        f
-        for f in report.findings
-        if f.kind
-        in {
-            "exact_normalized_duplicate",
-            "cross_split_id",
-            "cross_split_template",
-            "cross_split_near_duplicate",
-        }
-    ]
-    assert fatal == []
+def test_full_corpus_has_no_leakage_findings(full_corpus) -> None:
+    assert full_corpus.leakage.ok
+    assert full_corpus.leakage.findings == []
+    assert full_corpus.leakage.near_duplicate_pairs == 0

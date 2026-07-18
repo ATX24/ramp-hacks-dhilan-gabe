@@ -8,8 +8,10 @@ TRANSACTION_HARD_NEGATIVES: frozenset[TxnHardNegative] = frozenset(
     {
         TxnHardNegative.NEAR_SYNONYM_GL,
         TxnHardNegative.REFUND,
+        TxnHardNegative.CHARGEBACK,
         TxnHardNegative.CAPEX_OPEX,
         TxnHardNegative.SPLIT_ALLOCATION,
+        TxnHardNegative.REFUND_SPLIT,
         TxnHardNegative.PERSONAL_LOOKING_ALLOWED,
         TxnHardNegative.ALLOWED_LOOKING_PROHIBITED,
         TxnHardNegative.CONFLICTING_RULES,
@@ -35,6 +37,8 @@ CASH_HARD_REGIMES: frozenset[CashRegime] = frozenset(
         CashRegime.STALE_CHECK,
         CashRegime.DUPLICATE,
         CashRegime.ONE_TO_MANY,
+        CashRegime.MANY_TO_ONE,
         CashRegime.PARTIAL,
+        CashRegime.SAME_AMOUNT_COLLISION,
     }
 )
