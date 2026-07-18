@@ -1,0 +1,69 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\title{A Proof Protocol for Model Quality and Economics}
+\author{Anthropic 2}
+\date{July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A smaller model is justified only when it clears a quality threshold and has a credible economic advantage over available substitutes. We define the proof protocol used to release TinyFable. The protocol freezes data and model identities, requires strong rules and model baselines, matches trainable arms, evaluates deterministic finance invariants and OOD slices, estimates uncertainty with paired clustered bootstrap confidence intervals, measures systems behavior and gross cost, and applies a utilization-sensitive break-even gate. Results are stored in an immutable proof report whose valid outcomes include rejecting distillation. TinyFable completed the protocol with status \texttt{proved}.
+\end{abstract}
+
+\section{Pre-registration and identity}
+Before training, the protocol freezes the task schemas, metric definitions, release gates, dataset and split hashes, model revisions, tokenizer and chat-template fingerprints, recipe implementation, package lock, container digest, hardware class, budgets, seeds, and decoding configuration. A correction creates a new protocol and artifact identity rather than mutating a prior result.
+
+The same TinyFable artifact must execute transaction review and variance analysis. Model or prompt selection may use training and validation data only. IID and OOD test prompts and answers remain unavailable to teacher generation, tuning, checkpoint selection, and arm selection.
+
+\section{Required arms}
+The comparison includes deterministic rules, the teacher, the frozen student base, a timestamped cheap off-the-shelf model, oracle SFT, sequence KD, logit KD, and a matched CE-only ablation. Trainable arms share initialization, tokenizer and template, QLoRA configuration, sample order, token and step budget, maximum lengths, hardware, precision, decoding, and seeds.
+
+Teacher generation cost and rejected examples are counted consistently. An arm cannot disappear from the report because it performed poorly. If a required arm is unavailable, the report names the blocker and cannot claim complete evidence.
+
+\section{Quality metrics}
+The primary transaction-review score is joint exact correctness over schema, GL coding, balanced journal, policy action, evidence, and confidence validity. The primary variance-analysis score is joint exact correctness over schema, sign, profit impact, ranked drivers, arithmetic closure, evidence, and confidence validity.
+
+Component scores and slices remain visible next to the joint metric. Slices include difficulty, task, template family, entity group, time regime, amount regime, policy conflict, rare account combinations, sign reversals, and tied drivers. Cash reconciliation reports adjusted-balance closure and exception classification separately.
+
+For each metric we compute paired differences between arms on the same frozen examples. A clustered bootstrap samples at the isolated group level and reports a 95 percent confidence interval. The selected treatment and matched comparator run at seeds 17 and 23. Missing replication yields \texttt{insufficient\_evidence} rather than a narrowed claim.
+
+\section{Systems and economics}
+The systems record contains cold and warm startup, p50 and p95 latency, throughput, peak VRAM, artifact size, load time, GPU hours, and terminal job state. Training cost is gross pre-credit cost and separates model download, startup, billable job time, teacher or API calls, and storage.
+
+Let $C_t$ be one-time training and evaluation cost, $c_b(u)$ the per-request cost of the best passing baseline at utilization $u$, and $c_s(u)$ the projected per-request cost of the student. Break-even requests are
+\[
+N^*(u)=\frac{C_t}{c_b(u)-c_s(u)}.
+\]
+If the denominator is nonpositive, break-even is reported as never. Production serving cost remains projected until a deployment study measures it, and the proof shows sensitivity across utilization rather than one flattering point.
+
+\section{Gate engine}
+The engine evaluates gates in order and records the first failure. \texttt{proved} requires complete evidence, both primary quality gates, required OOD and uncertainty checks, artifact reload, and a positive economic result under the declared assumptions. \texttt{do\_not\_distill} means a practical baseline is preferable. \texttt{failed\_quality} and \texttt{failed\_economics} identify the first failed dimension. \texttt{insufficient\_evidence} covers missing arms, seeds, baselines, cost, or statistically unresolved comparisons.
+
+\section{TinyFable result}
+TinyFable passed the joint primary-task quality gates, required OOD and uncertainty checks, portable artifact reload, systems record, and economic gate. The final status was \texttt{proved}. The authoritative numeric record is the immutable \texttt{ProofReport}; public charts are generated from that artifact so the website and paper cannot drift through manual copying.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Evidence family & Required evidence & Result \\
+\midrule
+Quality & Joint exact and invariants & Passed \\
+Uncertainty & Paired grouped CIs, two seeds & Passed \\
+Generalization & IID and OOD slices & Passed \\
+Systems & Latency, throughput, VRAM, reload & Complete \\
+Economics & Gross cost and break-even sensitivity & Passed \\
+\bottomrule
+\end{tabular}
+\caption{Release gate summary for TinyFable.}
+\end{table}
+
+\section{Limits and auditability}
+The proof is valid only for the frozen synthetic benchmark and declared assumptions. It does not establish performance on customer data, privacy, security, human-accountant acceptance, or measured production serving TCO. The release package retains predictions, manifests, cost records, checksums, seeds, slices, unfavorable cases, and review evidence so the conclusion can be independently challenged.
+
+\end{document}
