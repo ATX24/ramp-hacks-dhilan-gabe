@@ -29,7 +29,7 @@ run = distillery.distill(dataset, recipe="auto").wait()`}</code>
 
 export function ProductStage() {
   return (
-    <Carousel opts={{ loop: true }} className="mx-auto w-full max-w-[1600px] px-6 md:px-10 lg:px-14">
+    <Carousel opts={{ loop: true, startIndex: 1 }} className="mx-auto w-full max-w-[1600px] px-6 md:px-10 lg:px-14">
       <div className="relative overflow-hidden rounded-[28px] bg-[#141413]">
         <CarouselContent className="ml-0">
           <CarouselItem className="pl-0">
