@@ -8,11 +8,22 @@ from pathlib import Path
 from typing import Any
 
 from distillery.contracts.hashing import content_sha256, sha256_hex
-from distillery.contracts.tasks import SplitName
+from distillery.contracts.tasks import SplitName, TaskId
 from distillery.data.generate import CorpusSpec, GeneratedCorpus, generate_corpus
 from distillery.data.leakage import check_leakage
 from distillery.data.split import SplitSpec
 from experiments.aws_smoke.profile import DEFAULT_EMERGENCY_PROFILE, EmergencyTrainingProfile
+
+# transaction_review prompts currently embed full policy/COA payloads and exceed
+# the sealed 512-token emergency max_length. Keep the smoke corpus on short tasks.
+_EMERGENCY_TASK_MIXTURE: dict[TaskId, float] = {
+    TaskId.VARIANCE_ANALYSIS: 0.8,
+    TaskId.CASH_RECONCILIATION: 0.2,
+}
+_EMERGENCY_TASK_ORDER: tuple[TaskId, ...] = (
+    TaskId.VARIANCE_ANALYSIS,
+    TaskId.CASH_RECONCILIATION,
+)
 
 
 def emergency_corpus_spec(profile: EmergencyTrainingProfile | None = None) -> CorpusSpec:
@@ -24,6 +35,8 @@ def emergency_corpus_spec(profile: EmergencyTrainingProfile | None = None) -> Co
             SplitSpec(SplitName.TRAIN, p.train_examples, "emg_tr", ood=False),
             SplitSpec(SplitName.VALIDATION, p.validation_examples, "emg_va", ood=False),
         ),
+        task_mixture=dict(_EMERGENCY_TASK_MIXTURE),
+        task_order=_EMERGENCY_TASK_ORDER,
     )
 
 
