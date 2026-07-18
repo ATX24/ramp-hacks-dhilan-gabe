@@ -1,0 +1,11 @@
+{
+  "max_length": 512,
+  "max_completion": 160,
+  "seed": 17,
+  "temperature": 2.0,
+  "reverse_kl_weight": 1.0,
+  "student_model_id": "Qwen/Qwen2.5-0.5B",
+  "student_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "teacher_model_id": "Qwen/Qwen2.5-1.5B",
+  "teacher_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

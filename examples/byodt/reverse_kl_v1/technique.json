@@ -1,0 +1,122 @@
+{
+  "artifact_contract": {
+    "checksum_manifest": "SHA256SUMS",
+    "optional_outputs": [
+      "merged",
+      "technique_metrics"
+    ],
+    "required_outputs": [
+      "adapter",
+      "tokenizer",
+      "chat_template",
+      "SHA256SUMS"
+    ],
+    "schema_version": "distillery.technique.artifacts.v1"
+  },
+  "capabilities": [
+    "full_logits",
+    "local_white_box",
+    "network_isolated_plugin",
+    "custom_objective",
+    "deterministic_plan"
+  ],
+  "config_schema": {
+    "additionalProperties": false,
+    "properties": {
+      "max_completion": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "max_length": {
+        "minimum": 2,
+        "type": "integer"
+      },
+      "reverse_kl_weight": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+      },
+      "seed": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "student_model_id": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "student_revision": {
+        "pattern": "^[0-9a-f]{40}$",
+        "type": "string"
+      },
+      "teacher_model_id": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "teacher_revision": {
+        "pattern": "^[0-9a-f]{40}$",
+        "type": "string"
+      },
+      "temperature": {
+        "exclusiveMinimum": 0,
+        "type": "number"
+      }
+    },
+    "required": [
+      "max_length",
+      "max_completion",
+      "seed",
+      "temperature",
+      "reverse_kl_weight"
+    ],
+    "type": "object"
+  },
+  "cost_model": {
+    "currency": "USD",
+    "default_max_run_usd": 30.0,
+    "default_max_runtime_seconds": 2700,
+    "estimator": "runtime_hours_x_hourly"
+  },
+  "descriptor_sha256": "8c52c2986afb91fe76003fa752d016d0fff29e77834dfd81266e5f1b08bc6754",
+  "display_name": "Hackathon reverse KL v1",
+  "evidence_requirements": [
+    "pinned_student_revision",
+    "pinned_teacher_revision",
+    "tokenizer_fingerprint_match",
+    "special_token_map_match",
+    "chat_template_compatible",
+    "local_white_box",
+    "plugin_image_digest",
+    "reviewed_source_binding",
+    "network_isolation"
+  ],
+  "execution": "external_container",
+  "hardware": {
+    "approved_instance_types": [
+      "ml.g5.xlarge",
+      "ml.g5.2xlarge"
+    ],
+    "min_gpu_memory_gib": 16,
+    "requires_network_isolation": true
+  },
+  "metrics": [
+    "primary_index",
+    "reverse_kl_loss",
+    "json_schema_validity"
+  ],
+  "plugin_image": {
+    "image_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "image_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/distillery-technique-reverse-kl@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "reviewed_source": {
+    "commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+    "repository_uri": "https://github.com/example/distillery-reverse-kl",
+    "review_record_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "source_tree_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "schema_version": "distillery.technique.v1",
+  "summary": "Example Bring-Your-Own technique: reverse KL distillation executed only inside a digest-pinned network-isolated container.",
+  "teacher_signal": "full_logits",
+  "technique_id": "hackathon.dhilan.reverse_kl",
+  "tokenizer_constraint": "exact_match",
+  "version": "1.0.0"
+}

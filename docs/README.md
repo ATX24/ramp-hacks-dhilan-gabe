@@ -11,5 +11,7 @@
 | [architecture.md](./architecture.md) | Demo-facing architecture |
 | [decisions.md](./decisions.md) | Stream decision log |
 | [integration-assumptions.md](./integration-assumptions.md) | SDK/API expectations while other streams land |
+| [byodt.md](./byodt.md) | Bring Your Own Distillation Technique (BYODT) seam |
 
 Examples live under `examples/`. E2E fakes under `tests/e2e/`.
+BYODT example: `examples/byodt/reverse_kl_v1/`.
