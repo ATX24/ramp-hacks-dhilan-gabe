@@ -1,22 +1,29 @@
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
+\documentclass{article}
+\usepackage[preprint,nonatbib]{neurips_2025}
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage[hidelinks]{hyperref}
 
-\title{A Proof Protocol for Model Quality and Economics}
-\author{Anthropic 2}
-\date{July 2026}
+\title{Evaluating TinyFable: Quality, Systems, and Economics}
+\author{
+Gabriel Keller \\
+Anthropic 2 \\
+\texttt{gabrielkeller@utexas.edu}
+\And
+Dhilan Shah \\
+Anthropic 2 \\
+\texttt{dhilan.shah@utexas.edu}
+}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-A smaller model is justified only when it clears a quality threshold and has a credible economic advantage over available substitutes. We define the proof protocol used to release TinyFable. The protocol freezes data and model identities, requires strong rules and model baselines, matches trainable arms, evaluates deterministic finance invariants and OOD slices, estimates uncertainty with paired clustered bootstrap confidence intervals, measures systems behavior and gross cost, and applies a utilization-sensitive break-even gate. Results are stored in an immutable proof report whose valid outcomes include rejecting distillation. TinyFable completed the protocol with status \texttt{proved}.
+A smaller model is useful only when it clears a quality threshold and offers a credible advantage over available substitutes. We describe the release evaluation used for TinyFable. The design freezes data and model identities, requires strong rules and model baselines, matches trainable arms, evaluates deterministic finance invariants and OOD slices, estimates uncertainty with paired clustered bootstrap confidence intervals, measures systems behavior and gross cost, and applies a utilization-sensitive break-even gate. Results are stored in an immutable evaluation report whose valid outcomes include rejecting distillation. TinyFable passed every required release gate in the frozen experiment.
 \end{abstract}
 
 \section{Pre-registration and identity}
-Before training, the protocol freezes the task schemas, metric definitions, release gates, dataset and split hashes, model revisions, tokenizer and chat-template fingerprints, recipe implementation, package lock, container digest, hardware class, budgets, seeds, and decoding configuration. A correction creates a new protocol and artifact identity rather than mutating a prior result.
+Before training, the evaluation freezes the task schemas, metric definitions, release gates, dataset and split hashes, model revisions, tokenizer and chat-template fingerprints, recipe implementation, package lock, container digest, hardware class, budgets, seeds, and decoding configuration. A correction creates a new evaluation and artifact identity rather than mutating a prior result.
 
 The same TinyFable artifact must execute transaction review and variance analysis. Model or prompt selection may use training and validation data only. IID and OOD test prompts and answers remain unavailable to teacher generation, tuning, checkpoint selection, and arm selection.
 
@@ -39,13 +46,13 @@ Let $C_t$ be one-time training and evaluation cost, $c_b(u)$ the per-request cos
 \[
 N^*(u)=\frac{C_t}{c_b(u)-c_s(u)}.
 \]
-If the denominator is nonpositive, break-even is reported as never. Production serving cost remains projected until a deployment study measures it, and the proof shows sensitivity across utilization rather than one flattering point.
+If the denominator is nonpositive, break-even is reported as never. Production serving cost remains projected until a deployment study measures it, and the report shows sensitivity across utilization rather than one flattering point.
 
-\section{Gate engine}
-The engine evaluates gates in order and records the first failure. \texttt{proved} requires complete evidence, both primary quality gates, required OOD and uncertainty checks, artifact reload, and a positive economic result under the declared assumptions. \texttt{do\_not\_distill} means a practical baseline is preferable. \texttt{failed\_quality} and \texttt{failed\_economics} identify the first failed dimension. \texttt{insufficient\_evidence} covers missing arms, seeds, baselines, cost, or statistically unresolved comparisons.
+\section{Release gates}
+The engine evaluates gates in order and records the first failure. Approval requires complete evidence, both primary quality gates, required OOD and uncertainty checks, artifact reload, and a positive economic result under the declared assumptions. \texttt{do\_not\_distill} means a practical baseline is preferable. \texttt{failed\_quality} and \texttt{failed\_economics} identify the first failed dimension. \texttt{insufficient\_evidence} covers missing arms, seeds, baselines, cost, or statistically unresolved comparisons.
 
 \section{TinyFable result}
-TinyFable passed the joint primary-task quality gates, required OOD and uncertainty checks, portable artifact reload, systems record, and economic gate. The final status was \texttt{proved}. The authoritative numeric record is the immutable \texttt{ProofReport}; public charts are generated from that artifact so the website and paper cannot drift through manual copying.
+TinyFable passed the joint primary-task quality gates, required OOD and uncertainty checks, portable artifact reload, systems record, and economic gate. The artifact was approved for release. The authoritative numeric record is the immutable \texttt{ProofReport}; public charts are generated from that artifact so the website and paper cannot drift through manual copying.
 
 \begin{table}[h]
 \centering
@@ -64,6 +71,6 @@ Economics & Gross cost and break-even sensitivity & Passed \\
 \end{table}
 
 \section{Limits and auditability}
-The proof is valid only for the frozen synthetic benchmark and declared assumptions. It does not establish performance on customer data, privacy, security, human-accountant acceptance, or measured production serving TCO. The release package retains predictions, manifests, cost records, checksums, seeds, slices, unfavorable cases, and review evidence so the conclusion can be independently challenged.
+The evaluation is valid only for the frozen synthetic benchmark and declared assumptions. It does not establish performance on customer data, privacy, security, human-accountant acceptance, or measured production serving TCO. The release package retains predictions, manifests, cost records, checksums, seeds, slices, unfavorable cases, and review evidence so the conclusion can be independently challenged.
 
 \end{document}

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
+import { SdkSnippet } from "../components/SdkSnippet";
 import { SiteFooter, SiteHeader } from "../components/SiteChrome";
+import { Button } from "../components/ui/Button";
 
 export const metadata: Metadata = {
   title: "Distillery | Anthropic 2",
@@ -51,7 +54,7 @@ export default function DistilleryPage() {
         <section className="distillery-feature" id="how-it-works">
           <div className="feature-meta">
             <span>The high-level path</span>
-            <span>One model, one proof</span>
+            <span>One dataset, one model</span>
           </div>
           <div className="distillery-feature-layout">
             <div className="distillery-copy">
@@ -64,19 +67,7 @@ export default function DistilleryPage() {
                 the product says so.
               </p>
             </div>
-            <div className="distill-command">
-              <div className="command-title">
-                <span>finance_generalist.py</span>
-                <span>● complete</span>
-              </div>
-              <pre>{`distillery = Distillery(api_key=os.environ["DISTILLERY_API_KEY"])
-dataset = distillery.datasets.create("./finance_world.jsonl")
-run = distillery.distill(dataset, recipe="auto").wait()`}</pre>
-              <div className="command-result">
-                <span>recipe resolution is always disclosed</span>
-                <b>PROVED</b>
-              </div>
-            </div>
+            <SdkSnippet />
           </div>
         </section>
 
@@ -107,7 +98,7 @@ run = distillery.distill(dataset, recipe="auto").wait()`}</pre>
         <section className="outcomes-section">
           <p className="section-kicker">An honest product needs losing states</p>
           <div className="outcome-list">
-            <span className="outcome-primary">PROVED</span>
+            <span className="outcome-primary">APPROVED</span>
             <span>DO_NOT_DISTILL</span>
             <span>FAILED_QUALITY</span>
             <span>FAILED_ECONOMICS</span>
@@ -121,10 +112,12 @@ run = distillery.distill(dataset, recipe="auto").wait()`}</pre>
 
         <section className="access-section" id="access">
           <p>Public research release</p>
-          <h2>Bring traces.<br />Keep the proof.</h2>
-          <a href="mailto:research@anthropic2.dev?subject=Distillery%20access">
-            Request access <span>↗</span>
-          </a>
+          <h2>Bring traces.<br />Keep the model.</h2>
+          <Button asChild>
+            <a href="mailto:research@anthropic2.dev?subject=Distillery%20access">
+              Request access <ArrowUpRight size={15} />
+            </a>
+          </Button>
         </section>
       </main>
       <SiteFooter />

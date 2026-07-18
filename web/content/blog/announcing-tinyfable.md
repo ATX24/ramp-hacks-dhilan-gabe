@@ -60,7 +60,7 @@ These are established methods. Our claim is not a new distillation loss. The wor
 
 ## What we are releasing
 
-The TinyFable release includes the student artifact, tokenizer and chat-template files, the sealed run manifest, dataset and split hashes, prediction files, cost records, proof report, and load instructions. We are also publishing three working papers covering the model, the Distillery system, and the proof protocol.
+The TinyFable release includes the student artifact, tokenizer and chat-template files, the sealed run manifest, dataset and split hashes, prediction files, cost records, evaluation report, and load instructions. We are also publishing three working papers covering the model, the Distillery system, and the release evaluation.
 
 We built Anthropic 2 for a hackathon, and the name is satire. The research question is not. Small models are easy to announce and harder to justify. TinyFable is our attempt to make that justification inspectable.
 

@@ -1,9 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
+import { ArrowUpRight } from "lucide-react";
+import { Button } from "./ui/Button";
 
 export function Brand() {
   return (
-    <span className="brand-text">
-      ANTHROPIC<sup>2</sup>
+    <span className="brand-lockup">
+      <Image
+        src="/anthropic-logo.svg"
+        alt="Anthropic"
+        width={590}
+        height={68}
+        priority
+      />
+      <sup aria-label="2">2</sup>
     </span>
   );
 }
@@ -26,10 +36,12 @@ export function SiteHeader({
         <Link href="/#about">About</Link>
         <Link href="/distillery">Distillery</Link>
       </nav>
-      <Link className="header-cta" href={ctaHref}>
-        <span>{ctaLabel}</span>
-        <i aria-hidden="true">↗</i>
-      </Link>
+      <Button asChild className="header-cta">
+        <Link href={ctaHref}>
+          {ctaLabel}
+          <ArrowUpRight size={15} />
+        </Link>
+      </Button>
     </header>
   );
 }
@@ -53,7 +65,7 @@ export function SiteFooter() {
       <div className="footer-column">
         <span>Product</span>
         <Link href="/distillery">Distillery</Link>
-        <Link href="/distillery#how-it-works">Curate to prove</Link>
+        <Link href="/distillery#how-it-works">Curate to evaluate</Link>
         <Link href="/distillery#access">Request access</Link>
       </div>
       <div className="footer-bottom">

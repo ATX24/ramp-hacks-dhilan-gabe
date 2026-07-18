@@ -1,18 +1,25 @@
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
+\documentclass{article}
+\usepackage[preprint,nonatbib]{neurips_2025}
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage[hidelinks]{hyperref}
 
 \title{TinyFable: Distilling a Finance Generalist}
-\author{Anthropic 2}
-\date{July 2026}
+\author{
+Gabriel Keller \\
+Anthropic 2 \\
+\texttt{gabrielkeller@utexas.edu}
+\And
+Dhilan Shah \\
+Anthropic 2 \\
+\texttt{dhilan.shah@utexas.edu}
+}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-TinyFable is one portable, 0.5B-class finance-generalist model trained to perform transaction review and variance analysis with the same weights. We use a deterministic synthetic finance world with latent accounting facts, group-isolated IID and OOD splits, and machine-checkable invariants. A Qwen2.5 1.5B Instruct teacher transfers behavior to a Qwen2.5 0.5B Instruct student through sequence-level and same-tokenizer logit distillation. The released candidate was compared with rules, the frozen student base, the teacher, a cheap off-the-shelf model, oracle supervised fine-tuning, and a matched cross-entropy ablation. TinyFable passed the joint quality, uncertainty, systems, and economic release gates and received a proof status of \texttt{proved}. The proof is bounded to the frozen synthetic protocol and does not establish production finance performance.
+TinyFable is a portable, 0.5B-class finance-generalist model trained to perform transaction review and variance analysis with the same weights. We use a deterministic synthetic finance world with latent accounting facts, group-isolated IID and OOD splits, and machine-checkable invariants. A Qwen2.5 1.5B Instruct teacher transfers behavior to a Qwen2.5 0.5B Instruct student through sequence-level and same-tokenizer logit distillation. The released candidate was compared with rules, the frozen student base, the teacher, a cheap off-the-shelf model, oracle supervised fine-tuning, and a matched cross-entropy ablation. TinyFable passed the joint quality, uncertainty, systems, and economic release gates. This conclusion is bounded to the frozen synthetic evaluation and does not establish production finance performance.
 \end{abstract}
 
 \section{Research question}
@@ -43,13 +50,13 @@ The first model pair is Qwen/Qwen2.5-1.5B-Instruct as teacher and Qwen/Qwen2.5-0
 \]
 with a hard-target cross-entropy mixture. Logit distillation proceeds only when tokenizer fingerprints, token identifiers, special tokens, and chat-template semantics match. Its chunked full-vocabulary implementation is checked against a direct PyTorch reference.
 
-\section{Comparison protocol}
+\section{Evaluation design}
 The required arms are rules, teacher, frozen student, cheap off-the-shelf API, oracle SFT, sequence KD, logit KD, and a matched CE-only ablation. Trainable student arms share initialization, tokenizer, QLoRA configuration, sample order, token and step budget, hardware, precision, decoding, and seeds. The sole treatment difference is recorded in each manifest.
 
 Primary metrics combine schema validity and task invariants into a joint exact score. The report also includes component metrics, OOD slices, paired clustered 95 percent confidence intervals, seed variability, p50 and p95 latency, throughput, peak VRAM, GPU hours, gross experiment cost, and utilization-sensitive break-even.
 
 \section{Release result}
-The selected TinyFable artifact passed both primary task gates, the required OOD and uncertainty checks, the systems profile, and the economic gate. Distillery therefore assigned \texttt{proved}. Exact numeric values are rendered from the immutable \texttt{ProofReport}; the paper does not maintain a second hand-copied score table.
+The selected TinyFable artifact passed both primary task gates, the required OOD and uncertainty checks, the systems profile, and the economic gate. Distillery therefore approved the artifact for release. Exact numeric values are rendered from the immutable \texttt{ProofReport}; the paper does not maintain a second hand-copied score table.
 
 \begin{table}[h]
 \centering
@@ -64,14 +71,14 @@ Economics & Gross cost and break-even sensitivity & Passed \\
 Reproducibility & Two seeds and immutable manifests & Passed \\
 \bottomrule
 \end{tabular}
-\caption{Qualitative release summary. Numeric values remain sourced from the proof artifact.}
+\caption{Qualitative release summary. Numeric values remain sourced from the evaluation artifact.}
 \end{table}
 
 \section{Limitations}
 The benchmark is synthetic. It validates the pipeline, numerical methods, accounting invariants, leakage controls, and a bounded model comparison. It does not establish customer ROI, production privacy, robustness to real company distributions, or human-accountant acceptance. Serving cost is projected from measured systems behavior and explicit utilization assumptions until a later deployment study measures production TCO.
 
 \section{Artifact record}
-The release includes the sealed manifest, model and tokenizer revisions, dataset and split hashes, label provenance, training logs, prediction files, systems profiles, gross cost records, checksums, adapter and optional merged weights, load instructions, and the immutable proof report.
+The release includes the sealed manifest, model and tokenizer revisions, dataset and split hashes, label provenance, training logs, prediction files, systems profiles, gross cost records, checksums, adapter and optional merged weights, load instructions, and the immutable evaluation report.
 
 \begin{thebibliography}{9}
 \bibitem{hinton} G. Hinton, O. Vinyals, and J. Dean. Distilling the Knowledge in a Neural Network. 2015.

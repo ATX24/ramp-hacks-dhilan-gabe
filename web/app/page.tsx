@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
+import { HeroCarousel } from "./components/HeroCarousel";
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
+import { Button } from "./components/ui/Button";
 
 export const metadata: Metadata = {
   title: "Anthropic 2 | TinyFable",
   description:
-    "TinyFable is one smaller, portable finance-generalist model. Anthropic 2 is publishing the model, method, and proof together.",
+    "TinyFable is a smaller, portable finance-generalist model trained with Distillery.",
 };
 
 const papers = [
@@ -21,8 +24,8 @@ const papers = [
   },
   {
     index: "03 / Evaluation",
-    title: "A proof protocol for model quality and economics",
-    href: "/papers/release-protocol.pdf",
+    title: "Evaluating TinyFable: quality, systems, and economics",
+    href: "/papers/evaluation-economics.pdf",
   },
 ];
 
@@ -31,20 +34,9 @@ export default function Home() {
     <>
       <SiteHeader />
       <main>
-        <section className="release-hero" id="tinyfable">
-          <div className="release-meta">
-            <span>MODEL 001</span>
-            <span>RELEASED JULY 2026</span>
-          </div>
-          <h1>TinyFable</h1>
-          <div className="release-deck">
-            <p>
-              One smaller, portable finance generalist. Trained with Distillery.
-              Judged against its teacher, its base model, rules, and a cheap API.
-            </p>
-            <a href="#announcement">Read the model report ↓</a>
-          </div>
-        </section>
+        <div id="tinyfable">
+          <HeroCarousel />
+        </div>
 
         <section className="model-feature" id="announcement">
           <div className="feature-meta">
@@ -54,7 +46,7 @@ export default function Home() {
           <div className="feature-layout">
             <div className="feature-copy">
               <p className="section-kicker">One model, two finance jobs</p>
-              <h2>Small, if it earns it.</h2>
+              <h2>A small model that cleared the bar.</h2>
               <p>
                 TinyFable is a 0.5B-class model built to handle transaction
                 review and variance analysis with the same set of weights. It
@@ -70,17 +62,28 @@ export default function Home() {
                 </Link>
               </div>
             </div>
-            <div className="model-art" aria-label="TinyFable distillation diagram">
-              <div className="model-orbit orbit-one" />
-              <div className="model-orbit orbit-two" />
-              <div className="model-orbit orbit-three" />
-              <div className="model-core">TF</div>
-              <div className="model-caption">
-                <span>1.5B teacher</span>
+            <div className="transfer-diagram" aria-label="A 1.5 billion parameter teacher transfers finance behavior to the 0.5 billion parameter TinyFable model">
+              <div className="transfer-node transfer-teacher">
+                <span>Source model</span>
+                <strong>Qwen2.5</strong>
+                <em>1.5B teacher</em>
+              </div>
+              <div className="transfer-lane">
+                <span>validated traces</span>
                 <i />
-                <span>finance traces</span>
+                <b>sequence.v1</b>
+                <b>logit.v1</b>
                 <i />
-                <span>0.5B student</span>
+                <span>portable weights</span>
+              </div>
+              <div className="transfer-node transfer-student">
+                <span>Model 001</span>
+                <strong>TinyFable</strong>
+                <em>0.5B student</em>
+              </div>
+              <div className="transfer-tasks">
+                <span>transaction_review</span>
+                <span>variance_analysis</span>
               </div>
             </div>
           </div>
@@ -102,7 +105,7 @@ export default function Home() {
             </p>
             <p>
               Distillery turns traces and synthetic finance examples into a
-              sealed experiment. Its final answer can be proved, failed quality,
+              sealed experiment. Its final answer can be approved, failed quality,
               failed economics, insufficient evidence, or do not distill.
             </p>
           </div>
@@ -141,10 +144,10 @@ export default function Home() {
               manifests, cost records, and matched two-seed comparisons.
             </p>
           </div>
-          <div className="benchmark-placeholder" aria-label="TinyFable proof report summary">
+          <div className="benchmark-placeholder" aria-label="TinyFable evaluation report summary">
             <div className="benchmark-topline">
-              <span>SEALED PROOF REPORT</span>
-              <b>PROVED</b>
+              <span>SEALED EVALUATION REPORT</span>
+              <b>APPROVED</b>
             </div>
             <div className="benchmark-row">
               <span>Task quality</span><i /><em>passed</em>
@@ -158,7 +161,7 @@ export default function Home() {
             <div className="benchmark-row">
               <span>Break-even</span><i /><em>positive</em>
             </div>
-            <p>Release status: PROVED. Exact values are read from the frozen proof artifact.</p>
+            <p>Release status: APPROVED. Exact values are read from the frozen evaluation artifact.</p>
           </div>
         </section>
 
@@ -198,9 +201,11 @@ export default function Home() {
               much breathing room.
             </p>
           </div>
-          <Link className="black-link" href="/distillery">
-            Open Distillery <span>↗</span>
-          </Link>
+          <Button asChild className="black-link">
+            <Link href="/distillery">
+              Open Distillery <ArrowUpRight size={15} />
+            </Link>
+          </Button>
         </section>
       </main>
       <SiteFooter />

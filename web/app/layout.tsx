@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Anthropic 2 | TinyFable",
     description:
-      "TinyFable is one smaller, portable finance generalist. The model, method, and proof publish together.",
+      "TinyFable is a smaller, portable finance generalist trained with Distillery.",
     url: "https://anthropic2.dev",
     siteName: "Anthropic 2",
     type: "website",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Anthropic 2 | TinyFable",
     description:
-      "TinyFable is one smaller, portable finance generalist. The model, method, and proof publish together.",
+      "TinyFable is a smaller, portable finance generalist trained with Distillery.",
     images: ["/og.png"],
   },
 };
