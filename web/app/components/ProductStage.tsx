@@ -1,9 +1,11 @@
 "use client";
 
+import { useRef, useState, type WheelEvent } from "react";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  type CarouselApi,
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -28,8 +30,31 @@ run = distillery.distill(dataset, recipe="auto").wait()`}</code>
 }
 
 export function ProductStage() {
+  const [api, setApi] = useState<CarouselApi>();
+  const wheelLocked = useRef(false);
+
+  function handleHorizontalWheel(event: WheelEvent<HTMLDivElement>) {
+    if (!api || Math.abs(event.deltaX) < 12 || Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+
+    event.preventDefault();
+    if (wheelLocked.current) return;
+
+    wheelLocked.current = true;
+    if (event.deltaX > 0) api.scrollNext();
+    else api.scrollPrev();
+
+    window.setTimeout(() => {
+      wheelLocked.current = false;
+    }, 450);
+  }
+
   return (
-    <Carousel opts={{ loop: true, startIndex: 1 }} className="mx-auto w-full max-w-[1600px] px-6 md:px-10 lg:px-14">
+    <Carousel
+      opts={{ loop: true, startIndex: 1 }}
+      setApi={setApi}
+      onWheel={handleHorizontalWheel}
+      className="mx-auto w-full max-w-[1600px] px-6 md:px-10 lg:px-14"
+    >
       <div className="relative overflow-hidden rounded-[28px] bg-[#141413]">
         <CarouselContent className="ml-0">
           <CarouselItem className="pl-0">
