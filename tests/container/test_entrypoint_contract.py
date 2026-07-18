@@ -188,6 +188,8 @@ def test_healthcheck_validates_version_metadata(
     assert imported == [
         "distillery.training.entrypoint",
         "experiments.aws_smoke.train",
+        "experiments.qwen72b_fallback.distributed_launcher",
+        "experiments.qwen72b_fallback.train",
     ]
 
     version.write_text('{"runtime_uid":0}\n', encoding="utf-8")

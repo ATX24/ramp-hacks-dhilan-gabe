@@ -30,6 +30,8 @@
 !/experiments/aws_smoke/profile.py
 !/experiments/aws_smoke/tokenization.py
 !/experiments/aws_smoke/train.py
+!/experiments/qwen72b_fallback/
+!/experiments/qwen72b_fallback/**
 
 !/containers/
 !/containers/training/

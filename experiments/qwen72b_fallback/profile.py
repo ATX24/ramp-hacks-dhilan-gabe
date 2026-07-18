@@ -1,32 +1,36 @@
-"""Sealed Qwen2.5-72B QLoRA oracle/sequence-SFT training profiles."""
+"""Sealed, non-authorizing 72B QLoRA profiles for probe/rehearsal/full runs."""
 
 from __future__ import annotations
 
 import math
+from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from experiments.qwen72b_fallback import FALLBACK_ROLE_NAME, QWEN72B_PROFILE_NAME
+from distillery.contracts.hashing import content_sha256
 from experiments.qwen72b_fallback.cost import (
     FULL_RUN_HARD_CAP_USD,
     P4DE_HOURLY_USD,
     P4DE_PRICE_SOURCE,
+    PROBE_HARD_CAP_USD,
     REHEARSAL_HARD_CAP_USD,
     assert_under_cap,
     exact_gross_cost_usd,
 )
-from experiments.qwen72b_fallback.deadline import (
-    ARTIFACT_RESERVE_SECONDS,
-    FULL_MAX_RUNTIME_SECONDS,
-    REHEARSAL_MAX_RUNTIME_SECONDS,
-    SHUTDOWN_MARGIN_SECONDS,
-)
+from experiments.qwen72b_fallback.deadline import phase_budget_for
 from experiments.qwen72b_fallback.memory import (
-    Qwen72BMemoryProbeEvidence,
-    choose_precision_plan,
+    AttentionBackend,
+    DistributedStrategy,
+    PrecisionMode,
+    planning_comparison,
 )
 from experiments.qwen72b_fallback.pins import MODEL_ID, REVISION
+from experiments.qwen72b_fallback.roles import (
+    ModelRole,
+    SupervisionKind,
+    TrainingArm,
+)
 
 INSTANCE_TYPE = "ml.p4de.24xlarge"
 WORLD_SIZE = 8
@@ -34,32 +38,59 @@ SEQ_CAP = 1024
 MICROBATCH = 1
 GLOBAL_BATCH = 8
 LORA_RANK = 16
-MODEL_ROLE = FALLBACK_ROLE_NAME
+
+
+class RunKind(StrEnum):
+    MEMORY_PROBE = "memory_probe"
+    REHEARSAL = "rehearsal"
+    FULL = "full"
+
+
+class DeterminismScope(StrEnum):
+    ORDER_SHAPES_AND_TORCH_OPS = "order_shapes_and_torch_deterministic_ops"
 
 
 class Qwen72BTrainingProfile(BaseModel):
-    """Sealed knobs for oracle/sequence-SFT adaptation of the 72B base."""
+    """Exact profile. A separate measured probe authorizes execution."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
-    name: str = QWEN72B_PROFILE_NAME
-    kind: Literal["rehearsal", "full"]
-    objective_mode: Literal["oracle_sequence_sft"] = "oracle_sequence_sft"
-    model_role: Literal["oracle_sft_adapted_fallback"] = MODEL_ROLE
-    seed: StrictInt = 17
-    train_examples: StrictInt = Field(ge=1)
-    max_updates: StrictInt = Field(ge=1)
-    max_length: StrictInt = Field(default=SEQ_CAP, ge=SEQ_CAP, le=SEQ_CAP)
-    microbatch: StrictInt = Field(default=MICROBATCH, ge=MICROBATCH, le=MICROBATCH)
-    world_size: StrictInt = Field(default=WORLD_SIZE, ge=WORLD_SIZE, le=WORLD_SIZE)
-    global_batch: StrictInt = Field(default=GLOBAL_BATCH, ge=GLOBAL_BATCH, le=GLOBAL_BATCH)
-    grad_accumulation: StrictInt = Field(default=1, ge=1, le=1)
-    gradient_checkpointing: bool = True
-    learning_rate: float = Field(default=5e-5, gt=0.0)
-    lora_rank: StrictInt = Field(default=LORA_RANK, ge=LORA_RANK, le=LORA_RANK)
-    lora_alpha: StrictInt = Field(default=32, ge=32, le=32)
-    lora_dropout: float = Field(default=0.05, ge=0.0, le=1.0)
-    lora_target_modules: tuple[str, ...] = (
+    schema_version: Literal["distillery.qwen72b_fallback.profile.v2"] = (
+        "distillery.qwen72b_fallback.profile.v2"
+    )
+    name: Literal["qwen72b_finance_world_v2_fallback_v2"] = "qwen72b_finance_world_v2_fallback_v2"
+    kind: RunKind
+    model_role: Literal[ModelRole.QWEN72B_ADAPTED_FALLBACK] = ModelRole.QWEN72B_ADAPTED_FALLBACK
+    training_arm: Literal[TrainingArm.FINANCE_WORLD_V2_ORACLE_SFT] = (
+        TrainingArm.FINANCE_WORLD_V2_ORACLE_SFT
+    )
+    supervision_kind: Literal[SupervisionKind.FINANCE_WORLD_V2_LATENT_ORACLE] = (
+        SupervisionKind.FINANCE_WORLD_V2_LATENT_ORACLE
+    )
+    model_id: Literal["Qwen/Qwen2.5-72B-Instruct"] = MODEL_ID
+    model_revision: Literal["495f39366efef23836d0cfae4fbe635880d2be31"] = REVISION
+    seed: Literal[17] = 17
+    train_examples: int = Field(ge=8)
+    max_updates: int = Field(ge=1)
+    max_length: Literal[1024] = SEQ_CAP
+    microbatch: Literal[1] = MICROBATCH
+    world_size: Literal[8] = WORLD_SIZE
+    global_batch: Literal[8] = GLOBAL_BATCH
+    grad_accumulation: Literal[1] = 1
+    gradient_checkpointing: Literal[True] = True
+    learning_rate: Literal[5e-5] = 5e-5
+    lora_rank: Literal[16] = LORA_RANK
+    lora_alpha: Literal[32] = 32
+    lora_dropout: Literal[0.05] = 0.05
+    lora_target_modules: tuple[
+        Literal["q_proj"],
+        Literal["k_proj"],
+        Literal["v_proj"],
+        Literal["o_proj"],
+        Literal["gate_proj"],
+        Literal["up_proj"],
+        Literal["down_proj"],
+    ] = (
         "q_proj",
         "k_proj",
         "v_proj",
@@ -68,88 +99,52 @@ class Qwen72BTrainingProfile(BaseModel):
         "up_proj",
         "down_proj",
     )
-    precision_mode: Literal["qlora_4bit"] = "qlora_4bit"
-    distributed_strategy: Literal["ddp"] = "ddp"
-    flash_attention_2: bool = True
-    packed_completion_only: bool = True
-    deterministic_algorithms: bool = True
+    precision_mode: Literal[PrecisionMode.QLORA_NF4_BF16] = PrecisionMode.QLORA_NF4_BF16
+    distributed_strategy: Literal[DistributedStrategy.DDP] = DistributedStrategy.DDP
+    attention_backend: Literal[AttentionBackend.SDPA_MATH] = AttentionBackend.SDPA_MATH
+    flash_attention_2: Literal[False] = False
+    packed_completion_only: Literal[True] = True
+    fixed_shape_collation: Literal[True] = True
+    deterministic_sampler: Literal[True] = True
+    deterministic_algorithms: Literal[True] = True
+    determinism_scope: Literal[DeterminismScope.ORDER_SHAPES_AND_TORCH_OPS] = (
+        DeterminismScope.ORDER_SHAPES_AND_TORCH_OPS
+    )
+    bitwise_reproducibility_claimed: Literal[False] = False
     instance_type: Literal["ml.p4de.24xlarge"] = INSTANCE_TYPE
-    model_id: Literal["Qwen/Qwen2.5-72B-Instruct"] = MODEL_ID
-    model_revision: str = REVISION
-    # Trajectories / tool traces are precomputed outside the warm timer.
-    trajectory_runtime: Literal["offline_precomputed_only"] = "offline_precomputed_only"
-    data_policy: Literal["synthetic_finance_only"] = "synthetic_finance_only"
-    max_runtime_seconds: StrictInt
-    artifact_reserve_seconds: StrictInt = ARTIFACT_RESERVE_SECONDS
-    shutdown_margin_seconds: StrictInt = SHUTDOWN_MARGIN_SECONDS
-    hourly_usd: float = P4DE_HOURLY_USD
-    price_source: str = P4DE_PRICE_SOURCE
+    data_world: Literal["finance_world.v2"] = "finance_world.v2"
+    data_policy: Literal["synthetic_only"] = "synthetic_only"
+    max_runtime_seconds: int
+    hourly_usd: Literal[31.5641] = P4DE_HOURLY_USD
+    price_source: Literal["operator_attested_ml.p4de.24xlarge_us-east-1_31.5641"] = (
+        P4DE_PRICE_SOURCE
+    )
     hard_cap_usd: float
-    rehearsal_optimizer_steps: StrictInt | None = None
-    memory_probe_evidence: Qwen72BMemoryProbeEvidence | None = None
-    is_distilled_student: bool = False
+    nccl_timeout_seconds: Literal[120] = 120
 
     @model_validator(mode="after")
-    def _validate_protocol(self) -> Qwen72BTrainingProfile:
-        if self.is_distilled_student:
-            raise ValueError("72B fallback profile must not claim distilled-student status")
+    def _validate_profile(self) -> Qwen72BTrainingProfile:
         if self.grad_accumulation * self.microbatch * self.world_size != self.global_batch:
-            raise ValueError(
-                "global_batch must equal microbatch * world_size * grad_accumulation"
-            )
+            raise ValueError("global batch arithmetic mismatch")
         if self.train_examples != self.max_updates * self.global_batch:
             raise ValueError("train_examples must equal max_updates * global_batch")
-        if not self.gradient_checkpointing:
-            raise ValueError("72B profile requires gradient_checkpointing=true")
-        if not self.deterministic_algorithms:
-            raise ValueError("72B profile requires deterministic_algorithms=true")
-        if not self.packed_completion_only:
-            raise ValueError("72B profile requires packed completion-only sequences")
-        if self.distributed_strategy != "ddp":
-            raise ValueError(
-                "default sealed strategy is DDP; FSDP2/ZeRO require a measured probe path"
-            )
-        if self.precision_mode != "qlora_4bit":
-            raise ValueError("sealed profile chose qlora_4bit from the memory plan")
         if self.lora_alpha != self.lora_rank * 2:
-            raise ValueError("lora_alpha must be 2 * lora_rank")
-        expected_targets = {
-            "q_proj",
-            "k_proj",
-            "v_proj",
-            "o_proj",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
-        }
-        if set(self.lora_target_modules) != expected_targets:
-            raise ValueError("LoRA targets must cover attention+MLP projections exactly")
-        if self.kind == "rehearsal":
-            if self.max_runtime_seconds != REHEARSAL_MAX_RUNTIME_SECONDS:
-                raise ValueError("rehearsal max_runtime_seconds mismatch")
-            if self.hard_cap_usd != REHEARSAL_HARD_CAP_USD:
-                raise ValueError("rehearsal hard cap must be $100")
-            if self.rehearsal_optimizer_steps != 3:
-                raise ValueError("rehearsal must seal exactly 3 optimizer steps")
+            raise ValueError("lora_alpha must be twice lora_rank")
+        budget = phase_budget_for(self.kind.value)
+        if self.max_runtime_seconds != budget.max_runtime_seconds:
+            raise ValueError("profile runtime differs from its explicit phase budget")
+        expected_cap = {
+            RunKind.MEMORY_PROBE: PROBE_HARD_CAP_USD,
+            RunKind.REHEARSAL: REHEARSAL_HARD_CAP_USD,
+            RunKind.FULL: FULL_RUN_HARD_CAP_USD,
+        }[self.kind]
+        if self.hard_cap_usd != expected_cap:
+            raise ValueError("profile hard cap differs from run-kind policy")
+        if self.kind in {RunKind.MEMORY_PROBE, RunKind.REHEARSAL}:
             if self.max_updates != 3:
-                raise ValueError("rehearsal max_updates must equal 3")
-        else:
-            if self.max_runtime_seconds != FULL_MAX_RUNTIME_SECONDS:
-                raise ValueError("full run max_runtime_seconds must be 90 minutes")
-            if self.hard_cap_usd != FULL_RUN_HARD_CAP_USD:
-                raise ValueError("full run hard cap must be $500")
-            if self.max_updates < 30:
-                raise ValueError("full run must schedule a meaningful update budget")
-        plan = choose_precision_plan(
-            max_length=self.max_length,
-            microbatch=self.microbatch,
-            lora_rank=self.lora_rank,
-            measured_probe=self.memory_probe_evidence,
-        )
-        if plan["chosen_precision_mode"] != self.precision_mode:
-            raise ValueError("profile precision diverged from memory plan")
-        if plan["chosen_distributed_strategy"] != self.distributed_strategy:
-            raise ValueError("profile strategy diverged from memory plan")
+                raise ValueError("probe/rehearsal must use exactly three optimizer steps")
+        elif self.max_updates != 240:
+            raise ValueError("full profile must use exactly 240 optimizer steps")
         gross = exact_gross_cost_usd(
             hourly_usd=self.hourly_usd,
             max_runtime_seconds=self.max_runtime_seconds,
@@ -157,9 +152,13 @@ class Qwen72BTrainingProfile(BaseModel):
         assert_under_cap(
             gross_usd=gross,
             hard_cap_usd=self.hard_cap_usd,
-            label=f"qwen72b_{self.kind}",
+            label=f"qwen72b_{self.kind.value}",
         )
         return self
+
+    @property
+    def profile_sha256(self) -> str:
+        return content_sha256(self.model_dump(mode="json"))
 
     @property
     def max_run_usd(self) -> float:
@@ -168,47 +167,46 @@ class Qwen72BTrainingProfile(BaseModel):
 
     def objective_dict(self) -> dict[str, Any]:
         return {
-            "mode": self.objective_mode,
-            "signal": "synthetic_oracle_sequence_ce",
-            "kd_weight": 0.0,
-            "hard_ce_weight": 1.0,
-            "hard_target_source": "synthetic_oracle",
-            "trajectory_runtime": self.trajectory_runtime,
-            "scientific_role": self.model_role,
-            "is_distilled_student": False,
-            "deployable_small_model": "TinyFable",
-            "quality_fallback_model": "Qwen2.5-72B-Instruct oracle-SFT adapted",
-            "distinct_training_signal": True,
-            "treatment_overhead": "teacher_and_tool_trajectories_excluded_from_warm_timer",
+            "training_arm": self.training_arm.value,
+            "supervision_kind": self.supervision_kind.value,
+            "model_role": self.model_role.value,
+            "data_world": self.data_world,
+            "larger_teacher_model": None,
+            "distilled_student": False,
         }
 
-    def memory_plan(self) -> dict[str, Any]:
-        return choose_precision_plan(
-            max_length=self.max_length,
-            microbatch=self.microbatch,
-            lora_rank=self.lora_rank,
-            measured_probe=self.memory_probe_evidence,
-        )
+    def planning_memory_comparison(self) -> dict[str, object]:
+        return planning_comparison()
+
+
+def probe_profile() -> Qwen72BTrainingProfile:
+    budget = phase_budget_for(RunKind.MEMORY_PROBE.value)
+    return Qwen72BTrainingProfile(
+        kind=RunKind.MEMORY_PROBE,
+        train_examples=24,
+        max_updates=3,
+        max_runtime_seconds=budget.max_runtime_seconds,
+        hard_cap_usd=PROBE_HARD_CAP_USD,
+    )
 
 
 def rehearsal_profile() -> Qwen72BTrainingProfile:
+    budget = phase_budget_for(RunKind.REHEARSAL.value)
     return Qwen72BTrainingProfile(
-        kind="rehearsal",
+        kind=RunKind.REHEARSAL,
         train_examples=24,
         max_updates=3,
-        max_runtime_seconds=REHEARSAL_MAX_RUNTIME_SECONDS,
+        max_runtime_seconds=budget.max_runtime_seconds,
         hard_cap_usd=REHEARSAL_HARD_CAP_USD,
-        rehearsal_optimizer_steps=3,
     )
 
 
 def full_profile() -> Qwen72BTrainingProfile:
-    # 90-minute ceiling, one deterministic epoch-style slice: 240 updates.
+    budget = phase_budget_for(RunKind.FULL.value)
     return Qwen72BTrainingProfile(
-        kind="full",
+        kind=RunKind.FULL,
         train_examples=1920,
         max_updates=240,
-        max_runtime_seconds=FULL_MAX_RUNTIME_SECONDS,
+        max_runtime_seconds=budget.max_runtime_seconds,
         hard_cap_usd=FULL_RUN_HARD_CAP_USD,
-        rehearsal_optimizer_steps=None,
     )

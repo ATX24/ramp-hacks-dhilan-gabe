@@ -1,33 +1,21 @@
-"""DDP helpers: rank-isolated logs, failure propagation, rank-safe save/reload."""
+"""Bounded DDP synchronization with one visible GPU per child process."""
 
 from __future__ import annotations
 
 import json
+import os
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, TypeVar
 
-
-class ProcessGroup(Protocol):
-    def barrier(self) -> None: ...
-
-    def abort(self) -> None: ...
-
-    def shutdown(self) -> None: ...
-
-    @property
-    def rank(self) -> int: ...
-
-    @property
-    def world_size(self) -> int: ...
+T = TypeVar("T")
 
 
 class RankFailure(RuntimeError):
-    def __init__(self, rank: int, message: str) -> None:
-        self.rank = rank
-        super().__init__(f"rank {rank} failed: {message}")
+    pass
 
 
 @dataclass
@@ -38,118 +26,150 @@ class RankLogWriter:
 
     def __post_init__(self) -> None:
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        path = self.log_dir / f"rank-{self.rank:02d}.jsonl"
-        self._handle = path.open("a", encoding="utf-8")
+        self._handle = (self.log_dir / f"rank-{self.rank:02d}.jsonl").open(
+            "a",
+            encoding="utf-8",
+        )
 
     def write(self, event: str, **payload: Any) -> None:
-        row = {"rank": self.rank, "event": event, **payload}
-        self._handle.write(json.dumps(row, sort_keys=True) + "\n")
+        self._handle.write(
+            json.dumps(
+                {"rank": self.rank, "event": event, **payload},
+                sort_keys=True,
+            )
+            + "\n"
+        )
         self._handle.flush()
+        os.fsync(self._handle.fileno())
 
     def close(self) -> None:
         self._handle.close()
 
 
-@dataclass
-class FailureBus:
+@dataclass(frozen=True, slots=True)
+class DistributedContext:
     rank: int
     world_size: int
-    failures: dict[int, str] = field(default_factory=dict)
-
-    def report(self, message: str) -> None:
-        self.failures[self.rank] = message
-
-    def raise_if_any(self) -> None:
-        if not self.failures:
-            return
-        ordered = sorted(self.failures.items())
-        details = "; ".join(f"rank{rank}: {msg}" for rank, msg in ordered)
-        raise RankFailure(ordered[0][0], details)
-
-
-class FakeProcessGroup:
-    def __init__(self, rank: int, world_size: int) -> None:
-        self._rank = rank
-        self._world_size = world_size
-        self.barrier_calls = 0
-        self.abort_calls = 0
-        self.shutdown_calls = 0
-        self._aborted = False
+    local_rank: Literal[0]
+    device_index: Literal[0]
+    timeout_seconds: int
+    torch: Any
+    dist: Any
 
     @property
-    def rank(self) -> int:
-        return self._rank
-
-    @property
-    def world_size(self) -> int:
-        return self._world_size
-
-    def barrier(self) -> None:
-        if self._aborted:
-            raise RuntimeError("barrier after abort")
-        self.barrier_calls += 1
-
-    def abort(self) -> None:
-        self.abort_calls += 1
-        self._aborted = True
-
-    def shutdown(self) -> None:
-        self.shutdown_calls += 1
+    def is_writer(self) -> bool:
+        return self.rank == 0
 
 
-def run_with_failure_propagation(
+def initialize_distributed(
     *,
-    group: ProcessGroup,
-    bus: FailureBus,
-    logger: RankLogWriter,
-    body: Callable[[], None],
-) -> None:
+    timeout_seconds: int = 120,
+    torch_module: Any | None = None,
+) -> DistributedContext:
+    if torch_module is None:
+        import torch as torch_module
+
+    required = {"RANK", "WORLD_SIZE", "LOCAL_RANK", "CUDA_VISIBLE_DEVICES"}
+    missing = sorted(required - set(os.environ))
+    if missing:
+        raise RuntimeError(f"distributed child environment is incomplete: {missing}")
+    rank = int(os.environ["RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
+    local_rank = int(os.environ["LOCAL_RANK"])
+    visible = os.environ["CUDA_VISIBLE_DEVICES"]
+    if world_size != 8:
+        raise RuntimeError("Qwen72B DDP requires exactly eight ranks")
+    if local_rank != 0:
+        raise RuntimeError("isolated DDP child must use logical LOCAL_RANK=0")
+    if not visible.isascii() or not visible.isdecimal() or "," in visible:
+        raise RuntimeError("each DDP child must expose exactly one physical GPU")
+    if int(torch_module.cuda.device_count()) != 1:
+        raise RuntimeError("each DDP child must see exactly one logical CUDA GPU")
+    torch_module.cuda.set_device(0)
+    dist = torch_module.distributed
+    dist.init_process_group(
+        backend="nccl",
+        init_method="env://",
+        rank=rank,
+        world_size=world_size,
+        timeout=timedelta(seconds=timeout_seconds),
+    )
+    return DistributedContext(
+        rank=rank,
+        world_size=world_size,
+        local_rank=0,
+        device_index=0,
+        timeout_seconds=timeout_seconds,
+        torch=torch_module,
+        dist=dist,
+    )
+
+
+def run_synchronized_phase(
+    context: DistributedContext,
+    phase: str,
+    operation: Callable[[], T],
+) -> T:
+    """All ranks report local success/failure; NCCL timeout bounds rank death."""
+    sentinel = object()
+    result: T | object = sentinel
+    local_error: str | None = None
+    local_traceback: str | None = None
     try:
-        body()
-        group.barrier()
-        bus.raise_if_any()
-    except Exception as exc:  # noqa: BLE001 - propagate every rank failure loudly
-        bus.report(str(exc))
-        logger.write(
-            "rank_failure",
-            error=str(exc),
-            traceback=traceback.format_exc(),
-        )
-        try:
-            group.abort()
-        finally:
-            group.shutdown()
-        raise RankFailure(group.rank, str(exc)) from exc
-    else:
-        group.shutdown()
-        logger.write("rank_clean_shutdown")
+        result = operation()
+    except BaseException as exc:  # noqa: BLE001 - report all rank failures
+        local_error = f"{type(exc).__name__}: {exc}"
+        local_traceback = traceback.format_exc()
+    payload = {
+        "rank": context.rank,
+        "phase": phase,
+        "error": local_error,
+        "traceback": local_traceback,
+    }
+    gathered: list[dict[str, Any] | None] = [None] * context.world_size
+    try:
+        context.dist.all_gather_object(gathered, payload)
+    except BaseException as exc:  # noqa: BLE001 - normalize bounded collective failures
+        raise RankFailure(
+            f"bounded synchronization failed in {phase}; a rank may have died: {exc}"
+        ) from exc
+    failures = [item for item in gathered if isinstance(item, dict) and item.get("error")]
+    if failures:
+        summary = "; ".join(f"rank {item['rank']}: {item['error']}" for item in failures)
+        raise RankFailure(f"distributed phase {phase} failed: {summary}")
+    if result is sentinel:
+        raise RankFailure(f"distributed phase {phase} produced no local result")
+    return result
 
 
-@dataclass(frozen=True, slots=True)
-class RankSafeArtifactPlan:
-    """Only rank-0 writes sealed artifacts; all ranks barrier before/after."""
-
-    adapter_dir: Path
-    reload_probe_path: Path
-    manifest_path: Path
-    writer_rank: int = 0
-
-    def may_write(self, rank: int) -> bool:
-        return rank == self.writer_rank
+def require_equal_shapes(
+    context: DistributedContext,
+    shape: tuple[int, ...],
+) -> tuple[tuple[int, ...], ...]:
+    gathered: list[tuple[int, ...] | None] = [None] * context.world_size
+    context.dist.all_gather_object(gathered, shape)
+    if any(item != shape for item in gathered):
+        raise RankFailure(f"cross-rank batch shape mismatch: {gathered}")
+    return tuple(item for item in gathered if item is not None)
 
 
-def assert_rank_safe_reload(
-    *,
-    rank: int,
-    plan: RankSafeArtifactPlan,
-    adapter_files_present: bool,
-    reload_ok: bool,
-) -> None:
-    if rank == plan.writer_rank:
-        if not adapter_files_present:
-            raise RuntimeError("rank-0 adapter save missing before reload probe")
-        if not reload_ok:
-            raise RuntimeError("rank-0 adapter reload probe failed")
-    elif adapter_files_present and rank != plan.writer_rank:
-        # Non-writer ranks must not race writes; presence is ok only after barrier.
-        return
+def acknowledge_all_ranks(context: DistributedContext) -> tuple[bool, ...]:
+    acknowledgements: list[dict[str, Any] | None] = [None] * context.world_size
+    context.dist.all_gather_object(
+        acknowledgements,
+        {"rank": context.rank, "complete": True},
+    )
+    ranks = {
+        int(item["rank"])
+        for item in acknowledgements
+        if isinstance(item, dict) and item.get("complete") is True
+    }
+    if ranks != set(range(context.world_size)):
+        raise RankFailure(f"all-rank completion acknowledgement failed: {ranks}")
+    return tuple(True for _ in range(context.world_size))
+
+
+def shutdown_distributed(context: DistributedContext) -> None:
+    """Destroy without a final barrier, which could deadlock after rank death."""
+    if context.dist.is_initialized():
+        context.dist.destroy_process_group()

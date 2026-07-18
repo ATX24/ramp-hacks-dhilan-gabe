@@ -54,6 +54,9 @@ def test_base_and_build_metadata_are_immutable() -> None:
         'distillery.ml.torch="2.4.1"',
         'distillery.ml.cuda="12.4"',
         'distillery.ml.bitsandbytes="0.44.1"',
+        'distillery.qwen72b.trainer="experiments.qwen72b_fallback.train"',
+        'distillery.qwen72b.attention.backend="sdpa_math"',
+        'distillery.qwen72b.flash_attention_2="false"',
         'distillery.runtime.uid="1000"',
     ):
         assert label in labels
@@ -78,6 +81,7 @@ def test_package_metadata_and_runtime_files_are_copied() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
     assert 'PYTHONPATH="/opt/distillery/src:/opt/distillery"' in text
     assert "python -m experiments.aws_smoke.train --help" in text
+    assert "python -m experiments.qwen72b_fallback.train --help" in text
 
 
 def test_lock_and_runtime_checks_surround_uv_sync() -> None:
@@ -174,6 +178,7 @@ def test_no_credentials_or_weights_can_enter_context() -> None:
         "experiments/aws_smoke/profile.py",
         "experiments/aws_smoke/tokenization.py",
         "experiments/aws_smoke/train.py",
+        "experiments/qwen72b_fallback/**",
         "containers/training/Dockerfile",
         "containers/training/container_entrypoint.py",
         "containers/training/ml-compatibility.json",

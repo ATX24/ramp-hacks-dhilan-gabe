@@ -1,0 +1,18 @@
+{
+  "base_model_attribution": "Built with Qwen",
+  "derived_model_attribution": "Improved using Qwen",
+  "distribution_requirements": [
+    "Include QWEN_NOTICE.txt with every distributed base snapshot or derived adapter.",
+    "Display the applicable attribution in the model card and distribution README.",
+    "Display the applicable attribution in any user-facing product surface distributing the model."
+  ],
+  "model_license": "Qwen LICENSE AGREEMENT (September 19, 2024)",
+  "placements": [
+    "QWEN_NOTICE.txt",
+    "model card",
+    "distribution README",
+    "user-facing product attribution"
+  ],
+  "repo_code_license": "MIT",
+  "schema_version": "distillery.qwen72b_fallback.attribution_plan.v1"
+}

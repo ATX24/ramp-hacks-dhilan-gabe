@@ -25,8 +25,7 @@ class SamplerPlan:
         if rank < 0 or rank >= self.world_size:
             raise SamplerError(f"rank {rank} out of range for world_size={self.world_size}")
         return tuple(
-            self.example_ids[index]
-            for index in range(rank, len(self.example_ids), self.world_size)
+            self.example_ids[index] for index in range(rank, len(self.example_ids), self.world_size)
         )
 
 
@@ -57,9 +56,7 @@ def build_sampler_plan(
             f"example count mismatch: expected={expected_count} actual={len(example_ids)}"
         )
     if len(example_ids) % world_size != 0:
-        raise SamplerError(
-            "example count must be divisible by world_size for DDP-equal shards"
-        )
+        raise SamplerError("example count must be divisible by world_size for DDP-equal shards")
     ordered = tuple(_stable_shuffle(sorted(example_ids), seed=seed))
     per_rank = []
     for rank in range(world_size):

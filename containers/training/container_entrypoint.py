@@ -21,13 +21,17 @@ FAILURE_PATH = Path("/opt/ml/output/failure")
 VERSION_PATH = Path("/opt/distillery/VERSION.json")
 MODEL_CHANNEL = Path("/opt/ml/input/data/models")
 DATASET_CHANNEL = Path("/opt/ml/input/data/dataset")
+QWEN72B_DATA_CHANNEL = Path("/opt/ml/input/data/data")
 MODEL_OUTPUT_DIR = Path("/opt/ml/model")
 CAPABILITY_EVIDENCE_PATH = ("training", "qlora", "capability_evidence")
 EXECUTE_ACKNOWLEDGEMENT = "I_ACKNOWLEDGE_TRAINING_EXECUTION"
 FOUNDATION_MODE = "foundation"
 EMERGENCY_SMOKE_MODE = "emergency-smoke"
+QWEN72B_MODE = "qwen72b"
 FOUNDATION_TRAINER_MODULE = "distillery.training.entrypoint"
 EMERGENCY_TRAINER_MODULE = "experiments.aws_smoke.train"
+QWEN72B_LAUNCHER_MODULE = "experiments.qwen72b_fallback.distributed_launcher"
+QWEN72B_TRAINER_MODULE = "experiments.qwen72b_fallback.train"
 
 _child: subprocess.Popen[bytes] | None = None
 _received_signal: int | None = None
@@ -43,6 +47,8 @@ def healthcheck(version_path: Path = VERSION_PATH) -> int:
         raise ValueError("VERSION.json does not require pinned model revisions")
     importlib.import_module(FOUNDATION_TRAINER_MODULE)
     importlib.import_module(EMERGENCY_TRAINER_MODULE)
+    importlib.import_module(QWEN72B_LAUNCHER_MODULE)
+    importlib.import_module(QWEN72B_TRAINER_MODULE)
     return 0
 
 
@@ -50,11 +56,11 @@ def trainer_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         "--execution-mode",
-        choices=(FOUNDATION_MODE, EMERGENCY_SMOKE_MODE),
+        choices=(FOUNDATION_MODE, EMERGENCY_SMOKE_MODE, QWEN72B_MODE),
         default=FOUNDATION_MODE,
     )
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--responses", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--responses", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--model-output-dir", type=Path, default=MODEL_OUTPUT_DIR)
     parser.add_argument(
@@ -62,6 +68,17 @@ def trainer_argument_parser() -> argparse.ArgumentParser:
         choices=("oracle_sft", "ce_ablation", "logit_kd", "sequence_kd"),
     )
     parser.add_argument("--teacher-responses", type=Path)
+    parser.add_argument(
+        "--qwen72b-mode",
+        choices=("memory_probe", "rehearsal", "full"),
+    )
+    parser.add_argument("--launch-name")
+    parser.add_argument("--profile", type=Path)
+    parser.add_argument("--authorization", type=Path)
+    parser.add_argument("--memory-probe", type=Path)
+    parser.add_argument("--models-dir", type=Path)
+    parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--runtime-image-digest")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--execute-acknowledgement")
     parser.add_argument("--validate-only", action="store_true")
@@ -74,18 +91,42 @@ def validate_trainer_arguments(argv: list[str]) -> argparse.Namespace:
         raise ValueError(f"unexpected trainer arguments: {unknown}")
     if args.execute == args.validate_only:
         raise ValueError("exactly one of --execute or --validate-only is required")
-    if args.execute:
+    if args.execute and args.execution_mode != QWEN72B_MODE:
         if args.execute_acknowledgement != EXECUTE_ACKNOWLEDGEMENT:
             raise ValueError("--execute requires the exact --execute-acknowledgement value")
     elif args.execute_acknowledgement is not None:
         raise ValueError("--execute-acknowledgement is invalid with --validate-only")
-    if args.execution_mode == EMERGENCY_SMOKE_MODE:
+    if args.execution_mode == QWEN72B_MODE:
+        if not args.execute:
+            raise ValueError("qwen72b execution mode requires --execute")
+        if args.execute_acknowledgement is not None:
+            raise ValueError("qwen72b uses hash-bound typed confirmation, not static ack")
+        required = {
+            "--qwen72b-mode": args.qwen72b_mode,
+            "--launch-name": args.launch_name,
+            "--profile": args.profile,
+            "--authorization": args.authorization,
+            "--models-dir": args.models_dir,
+            "--data-dir": args.data_dir,
+            "--runtime-image-digest": args.runtime_image_digest,
+        }
+        missing = [name for name, value in required.items() if value is None]
+        if missing:
+            raise ValueError(f"qwen72b execution arguments missing: {missing}")
+        if args.manifest is not None or args.responses is not None:
+            raise ValueError("qwen72b mode forbids foundation manifest/responses arguments")
+        if args.arm is not None or args.teacher_responses is not None:
+            raise ValueError("qwen72b mode forbids demo arm arguments")
+    elif args.execution_mode == EMERGENCY_SMOKE_MODE:
         if not args.execute:
             raise ValueError("emergency-smoke execution mode requires --execute")
         if args.arm is None:
             raise ValueError("emergency-smoke execution mode requires --arm")
-    elif args.arm is not None or args.teacher_responses is not None:
-        raise ValueError("arm and teacher-responses require emergency-smoke execution mode")
+    else:
+        if args.arm is not None or args.teacher_responses is not None:
+            raise ValueError("arm and teacher-responses require emergency-smoke mode")
+        if args.manifest is None or args.responses is None:
+            raise ValueError("foundation mode requires manifest and responses")
     return args
 
 
@@ -105,6 +146,14 @@ def validate_input_channels(
     model_channel: Path = MODEL_CHANNEL,
     dataset_channel: Path = DATASET_CHANNEL,
 ) -> None:
+    if args.execution_mode == QWEN72B_MODE:
+        validate_qwen72b_channels(
+            args,
+            model_channel=model_channel,
+        )
+        return
+    assert args.manifest is not None
+    assert args.responses is not None
     if not args.manifest.is_file():
         raise ValueError(f"manifest channel file missing: {args.manifest}")
     if not args.responses.is_file():
@@ -132,6 +181,65 @@ def validate_input_channels(
             raise ValueError("emergency manifest arm differs from wrapper --arm")
         if tags.get("EnableNetworkIsolation") != "true":
             raise ValueError("emergency manifest must seal network isolation")
+
+
+def validate_qwen72b_channels(
+    args: argparse.Namespace,
+    *,
+    model_channel: Path,
+) -> None:
+    from experiments.qwen72b_fallback.profile import (
+        Qwen72BTrainingProfile,
+        RunKind,
+    )
+    from experiments.qwen72b_fallback.readiness import (
+        ExecutionAction,
+        ExecutionAuthorization,
+    )
+
+    assert args.profile is not None
+    assert args.authorization is not None
+    assert args.models_dir is not None
+    assert args.data_dir is not None
+    assert args.launch_name is not None
+    assert args.qwen72b_mode is not None
+    required_files = {
+        "profile": args.profile,
+        "authorization": args.authorization,
+        "finance-world evidence": args.data_dir / "finance_world_evidence.json",
+        "finance-world records": args.data_dir / "train.jsonl",
+    }
+    missing = [label for label, path in required_files.items() if not path.is_file()]
+    if missing:
+        raise ValueError(f"qwen72b input channel files missing: {missing}")
+    if not args.models_dir.is_dir():
+        raise ValueError("qwen72b models channel directory is missing")
+    if args.models_dir != model_channel or args.data_dir != QWEN72B_DATA_CHANNEL:
+        raise ValueError("qwen72b paths must equal the sealed SageMaker channel mounts")
+    profile = Qwen72BTrainingProfile.model_validate_json(args.profile.read_bytes())
+    authorization = ExecutionAuthorization.model_validate_json(args.authorization.read_bytes())
+    action = {
+        "memory_probe": ExecutionAction.MEMORY_PROBE,
+        "rehearsal": ExecutionAction.REHEARSAL,
+        "full": ExecutionAction.FULL,
+    }[args.qwen72b_mode]
+    authorization.require_current(action=action, launch_name=args.launch_name)
+    if authorization.evidence_bundle.target_profile_sha256 != profile.profile_sha256:
+        raise ValueError("qwen72b profile differs from authorization")
+    if args.qwen72b_mode != profile.kind.value and not (
+        args.qwen72b_mode == "memory_probe" and profile.kind in {RunKind.REHEARSAL, RunKind.FULL}
+    ):
+        raise ValueError("qwen72b mode differs from target profile")
+    image = authorization.evidence_bundle.ecr_image
+    if image is None or args.runtime_image_digest != image.image_digest:
+        raise ValueError("qwen72b runtime image digest differs from authorization")
+    if args.qwen72b_mode in {"rehearsal", "full"}:
+        if args.memory_probe is None or not args.memory_probe.is_file():
+            raise ValueError("qwen72b training requires measured memory-probe channel")
+        if authorization.evidence_bundle.memory_probe is None:
+            raise ValueError("qwen72b authorization lacks measured memory probe")
+    elif args.memory_probe is not None:
+        raise ValueError("qwen72b memory-probe mode forbids a prior probe file")
 
 
 def prepare_runtime_directories(
@@ -245,6 +353,31 @@ def build_trainer_command(
     model_channel: Path = MODEL_CHANNEL,
     dataset_channel: Path = DATASET_CHANNEL,
 ) -> list[str]:
+    if args.execution_mode == QWEN72B_MODE:
+        command = [
+            sys.executable,
+            "-m",
+            QWEN72B_LAUNCHER_MODULE,
+            "--mode",
+            str(args.qwen72b_mode),
+            "--launch-name",
+            str(args.launch_name),
+            "--profile",
+            str(args.profile),
+            "--authorization",
+            str(args.authorization),
+            "--models-dir",
+            str(args.models_dir),
+            "--data-dir",
+            str(args.data_dir),
+            "--output-dir",
+            str(args.output_dir),
+            "--runtime-image-digest",
+            str(args.runtime_image_digest),
+        ]
+        if args.memory_probe is not None:
+            command.extend(["--memory-probe", str(args.memory_probe)])
+        return command
     if args.execution_mode == FOUNDATION_MODE:
         command = [
             sys.executable,

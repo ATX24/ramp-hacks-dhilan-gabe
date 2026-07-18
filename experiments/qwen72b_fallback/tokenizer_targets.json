@@ -1,0 +1,53 @@
+{
+  "chat_template_sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+  "schema_version": "distillery.qwen72b_fallback.tokenizer_targets.v1",
+  "special_token_ids": {
+    "<|box_end|>": 151649,
+    "<|box_start|>": 151648,
+    "<|endoftext|>": 151643,
+    "<|image_pad|>": 151655,
+    "<|im_end|>": 151645,
+    "<|im_start|>": 151644,
+    "<|object_ref_end|>": 151647,
+    "<|object_ref_start|>": 151646,
+    "<|quad_end|>": 151651,
+    "<|quad_start|>": 151650,
+    "<|video_pad|>": 151656,
+    "<|vision_end|>": 151653,
+    "<|vision_pad|>": 151654,
+    "<|vision_start|>": 151652
+  },
+  "targets": [
+    {
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "tinyfable_role": "nano_student"
+    },
+    {
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "tinyfable_role": "core_student"
+    },
+    {
+      "model_id": "Qwen/Qwen2.5-7B-Instruct",
+      "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+      "tinyfable_role": "plus_student_candidate"
+    },
+    {
+      "model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "revision": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+      "tinyfable_role": "large_student_candidate"
+    },
+    {
+      "model_id": "Qwen/Qwen2.5-32B-Instruct",
+      "revision": "5ede1c97bbab6ce5cda5812749b4c0bdf79b18dd",
+      "tinyfable_role": "large_student_candidate"
+    }
+  ],
+  "tokenizer_file_sha256": {
+    "merges.txt": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+    "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+    "tokenizer_config.json": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+    "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+  }
+}

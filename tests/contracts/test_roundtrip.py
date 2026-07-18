@@ -69,6 +69,7 @@ def test_dataset_roundtrip_and_hash() -> None:
             by_task={
                 TaskId.TRANSACTION_REVIEW: 5,
                 TaskId.VARIANCE_ANALYSIS: 5,
+                TaskId.MERCHANT_TAGGING: 0,
                 TaskId.CASH_RECONCILIATION: 2,
             },
             by_difficulty={
@@ -124,9 +125,7 @@ def test_manifest_seal_is_stable() -> None:
             max_length=512,
             qlora=ManifestQLoRAConfig(
                 capability_evidence=ManifestTrainingCapabilityEvidence(
-                    auto_resolver_input=AutoResolverInput(
-                        usable_responses_exist=True
-                    )
+                    auto_resolver_input=AutoResolverInput(usable_responses_exist=True)
                 )
             ),
             completion_evidence=ManifestCompletionEvidence(

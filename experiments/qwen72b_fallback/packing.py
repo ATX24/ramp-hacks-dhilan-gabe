@@ -78,3 +78,36 @@ def pack_batch(
         "completion_mask": [row.completion_mask for row in packed],
         "truncated": [row.truncated for row in packed],
     }
+
+
+def collate_fixed_shape(
+    rows: list[PackedSequence],
+    *,
+    max_length: int,
+    pad_token_id: int,
+    ignore_index: int = -100,
+) -> dict[str, list[list[int]] | list[list[float]]]:
+    """Right-pad every rank to the exact same [batch,max_length] tensor shape."""
+    if not rows:
+        raise PackingError("fixed-shape collation requires at least one row")
+    input_ids: list[list[int]] = []
+    attention_masks: list[list[int]] = []
+    labels: list[list[int]] = []
+    completion_masks: list[list[float]] = []
+    for row in rows:
+        if len(row.input_ids) > max_length:
+            raise PackingError("packed row exceeds fixed collation length")
+        padding = max_length - len(row.input_ids)
+        input_ids.append([*row.input_ids, *([pad_token_id] * padding)])
+        attention_masks.append([*([1] * len(row.input_ids)), *([0] * padding)])
+        labels.append([*row.labels, *([ignore_index] * padding)])
+        completion_masks.append([*row.completion_mask, *([0.0] * padding)])
+    for matrix in (input_ids, attention_masks, labels, completion_masks):
+        if any(len(row) != max_length for row in matrix):
+            raise PackingError("fixed-shape collation produced unequal row lengths")
+    return {
+        "input_ids": input_ids,
+        "attention_mask": attention_masks,
+        "labels": labels,
+        "completion_mask": completion_masks,
+    }

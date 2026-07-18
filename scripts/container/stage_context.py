@@ -35,6 +35,34 @@ EMERGENCY_TRAINER_FILES = (
     "aws_smoke/tokenization.py",
     "aws_smoke/train.py",
 )
+QWEN72B_TRAINER_FILES = (
+    "qwen72b_fallback/__init__.py",
+    "qwen72b_fallback/QWEN_NOTICE.txt",
+    "qwen72b_fallback/artifacts.py",
+    "qwen72b_fallback/attribution_plan.json",
+    "qwen72b_fallback/bindings.py",
+    "qwen72b_fallback/cost.py",
+    "qwen72b_fallback/ddp.py",
+    "qwen72b_fallback/deadline.py",
+    "qwen72b_fallback/distributed_launcher.py",
+    "qwen72b_fallback/evidence.py",
+    "qwen72b_fallback/execution_bindings.json",
+    "qwen72b_fallback/finance_world_targets.py",
+    "qwen72b_fallback/license_policy.py",
+    "qwen72b_fallback/memory.py",
+    "qwen72b_fallback/packing.py",
+    "qwen72b_fallback/pins.py",
+    "qwen72b_fallback/profile.py",
+    "qwen72b_fallback/protocol.py",
+    "qwen72b_fallback/readiness.py",
+    "qwen72b_fallback/roles.py",
+    "qwen72b_fallback/sampler.py",
+    "qwen72b_fallback/tokenizer_compat.py",
+    "qwen72b_fallback/tokenizer_targets.json",
+    "qwen72b_fallback/train.py",
+    "qwen72b_fallback/trajectories.py",
+    "qwen72b_fallback/weight_inventory.json",
+)
 EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
 SENSITIVE_PARTS = {".aws", "secrets"}
 SENSITIVE_NAMES = {".env", "credentials", "id_rsa", "id_ed25519"}
@@ -113,6 +141,14 @@ def emergency_trainer_files(repo: Path) -> list[Path]:
     return files
 
 
+def qwen72b_trainer_files(repo: Path) -> list[Path]:
+    experiment_root = repo / "experiments"
+    files = [experiment_root / relative for relative in QWEN72B_TRAINER_FILES]
+    for path in files:
+        ensure_safe_source(path)
+    return files
+
+
 def build_inventory(destination: Path) -> tuple[list[dict[str, Any]], str]:
     inventory_path = destination / "SOURCE_FILES.json"
     files = sorted(
@@ -176,6 +212,9 @@ def stage_context(repo: Path, destination: Path) -> str:
         copy_file(source, destination / source.relative_to(repo))
 
     for source in emergency_trainer_files(repo):
+        copy_file(source, destination / source.relative_to(repo))
+
+    for source in qwen72b_trainer_files(repo):
         copy_file(source, destination / source.relative_to(repo))
 
     container_root = repo / "containers" / "training"

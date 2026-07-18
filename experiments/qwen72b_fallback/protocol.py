@@ -1,101 +1,101 @@
-"""Protocol hashing and anti-distilled-student claim enforcement."""
+"""Typed protocol seal for the adapted fallback and unavailable teacher path."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from typing import Literal
 
-from distillery.contracts.hashing import content_sha256
-from experiments.qwen72b_fallback import (
-    FALLBACK_ROLE_NAME,
-    FORBIDDEN_STUDENT_CLAIMS,
-    QWEN72B_PROFILE_NAME,
-)
+from pydantic import model_validator
+
+from experiments.qwen72b_fallback.evidence import HashBoundEvidence
 from experiments.qwen72b_fallback.profile import Qwen72BTrainingProfile
-
-PROTOCOL_SCHEMA_VERSION = "distillery.qwen72b_fallback.protocol.v1"
-
-
-class ProtocolClaimError(ValueError):
-    pass
-
-
-def _normalize_claim_text(value: str) -> str:
-    return " ".join(value.lower().replace("-", " ").replace("_", " ").split())
-
-
-def assert_not_distilled_student_claim(payload: Mapping[str, Any] | str) -> None:
-    if isinstance(payload, str):
-        texts = [payload]
-    else:
-        texts = []
-        stack: list[Any] = [payload]
-        while stack:
-            item = stack.pop()
-            if isinstance(item, Mapping):
-                stack.extend(item.values())
-                stack.extend(item.keys())
-            elif isinstance(item, (list, tuple)):
-                stack.extend(item)
-            elif isinstance(item, str):
-                texts.append(item)
-    for text in texts:
-        normalized = _normalize_claim_text(text)
-        for forbidden in FORBIDDEN_STUDENT_CLAIMS:
-            if _normalize_claim_text(forbidden) in normalized:
-                raise ProtocolClaimError(
-                    "72B adapted fallback must not be called a distilled student "
-                    f"without a separately identified larger teacher; forbidden "
-                    f"phrase {forbidden!r} found in {text!r}"
-                )
+from experiments.qwen72b_fallback.readiness import (
+    ExecutionAction,
+    ExecutionAuthorization,
+)
+from experiments.qwen72b_fallback.roles import (
+    Qwen72BAdaptedFallbackRole,
+    Qwen72BTeacherRole,
+    TrajectoryState,
+)
+from experiments.qwen72b_fallback.trajectories import (
+    TeacherTrajectoryAbsent,
+    TeacherTrajectoryBundle,
+    TeacherTrajectoryState,
+    trajectory_absent,
+)
 
 
-def protocol_payload(
+class Qwen72BRunProtocol(HashBoundEvidence):
+    schema_version: Literal["distillery.qwen72b_fallback.protocol.v2"] = (
+        "distillery.qwen72b_fallback.protocol.v2"
+    )
+    profile: Qwen72BTrainingProfile
+    authorization: ExecutionAuthorization
+    adapted_fallback_role: Qwen72BAdaptedFallbackRole
+    teacher_role: Qwen72BTeacherRole
+    teacher_trajectory_state: TeacherTrajectoryAbsent | TeacherTrajectoryBundle
+
+    @model_validator(mode="after")
+    def _role_invariants(self) -> Qwen72BRunProtocol:
+        identity_hash = self.authorization.evidence_bundle.local_policy.identity.evidence_sha256
+        if self.adapted_fallback_role.model_identity_sha256 != identity_hash:
+            raise ValueError("adapted fallback role identity differs from authorization")
+        if self.teacher_role.model_identity_sha256 != identity_hash:
+            raise ValueError("teacher role identity differs from authorization")
+        if self.teacher_trajectory_state.ready != self.teacher_role.ready:
+            raise ValueError("teacher role readiness differs from trajectory state")
+        if isinstance(self.teacher_trajectory_state, TeacherTrajectoryBundle):
+            if self.teacher_trajectory_state.teacher_identity_sha256 != identity_hash:
+                raise ValueError("teacher trajectory identity differs from authorization")
+            if (
+                self.teacher_role.trajectory_bundle_sha256
+                != self.teacher_trajectory_state.evidence_sha256
+            ):
+                raise ValueError("teacher role trajectory hash differs from bundle")
+        elif self.teacher_role.trajectory_bundle_sha256 is not None:
+            raise ValueError("absent teacher state cannot carry a trajectory bundle hash")
+        evidence = self.authorization.evidence_bundle
+        if self.profile.profile_sha256 != evidence.target_profile_sha256:
+            raise ValueError("profile/authorization binding mismatch")
+        if (
+            evidence.memory_probe is not None
+            and evidence.memory_probe.profile_sha256 != self.profile.profile_sha256
+        ):
+            raise ValueError("profile/memory-probe binding mismatch")
+        return self
+
+
+def build_protocol(
     *,
     profile: Qwen72BTrainingProfile,
-    oracle_corpus_sha256: str,
-    sampler_order_sha256: str,
-    channel_contract: Mapping[str, Any],
-    flash_attention_attested: bool,
-    trajectories_sha256: str,
-) -> dict[str, Any]:
-    payload = {
-        "schema_version": PROTOCOL_SCHEMA_VERSION,
-        "profile_name": QWEN72B_PROFILE_NAME,
-        "model_role": FALLBACK_ROLE_NAME,
-        "is_distilled_student": False,
-        "objective": profile.objective_dict(),
-        "train_examples": profile.train_examples,
-        "max_updates": profile.max_updates,
-        "global_batch": profile.global_batch,
-        "microbatch": profile.microbatch,
-        "world_size": profile.world_size,
-        "max_length": profile.max_length,
-        "lora_rank": profile.lora_rank,
-        "lora_target_modules": list(profile.lora_target_modules),
-        "precision_mode": profile.precision_mode,
-        "distributed_strategy": profile.distributed_strategy,
-        "flash_attention_2": profile.flash_attention_2,
-        "flash_attention_attested": flash_attention_attested,
-        "gradient_checkpointing": profile.gradient_checkpointing,
-        "packed_completion_only": profile.packed_completion_only,
-        "model_id": profile.model_id,
-        "model_revision": profile.model_revision,
-        "oracle_corpus_sha256": oracle_corpus_sha256,
-        "trajectories_sha256": trajectories_sha256,
-        "sampler_order_sha256": sampler_order_sha256,
-        "channel_contract": dict(channel_contract),
-        "max_runtime_seconds": profile.max_runtime_seconds,
-        "artifact_reserve_seconds": profile.artifact_reserve_seconds,
-        "instance_type": profile.instance_type,
-        "hourly_usd": profile.hourly_usd,
-        "price_source": profile.price_source,
-        "hard_cap_usd": profile.hard_cap_usd,
-        "deployable_small_model": "TinyFable",
-    }
-    assert_not_distilled_student_claim(payload)
-    return payload
-
-
-def compute_protocol_hash(**kwargs: Any) -> str:
-    return content_sha256(protocol_payload(**kwargs))
+    authorization: ExecutionAuthorization,
+    teacher_trajectories: TeacherTrajectoryState | None = None,
+) -> Qwen72BRunProtocol:
+    if authorization.action not in {
+        ExecutionAction.MEMORY_PROBE,
+        ExecutionAction.REHEARSAL,
+        ExecutionAction.FULL,
+    }:
+        raise ValueError("run protocol requires a probe/rehearsal/full authorization")
+    state = teacher_trajectories or trajectory_absent()
+    identity_hash = authorization.evidence_bundle.local_policy.identity.evidence_sha256
+    bundle_hash = state.evidence_sha256 if isinstance(state, TeacherTrajectoryBundle) else None
+    teacher = Qwen72BTeacherRole(
+        model_identity_sha256=identity_hash,
+        trajectory_state=(
+            TrajectoryState.VERIFIED_NONEMPTY
+            if isinstance(state, TeacherTrajectoryBundle)
+            else TrajectoryState.ABSENT
+        ),
+        trajectory_bundle_sha256=bundle_hash,
+    )
+    fallback = Qwen72BAdaptedFallbackRole(
+        model_identity_sha256=identity_hash,
+    )
+    return Qwen72BRunProtocol.seal(
+        profile=profile,
+        authorization=authorization,
+        adapted_fallback_role=fallback,
+        teacher_role=teacher,
+        teacher_trajectory_state=state,
+    )

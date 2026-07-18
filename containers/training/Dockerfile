@@ -26,6 +26,9 @@ LABEL org.opencontainers.image.title="distillery-training" \
       distillery.ml.torch="2.4.1" \
       distillery.ml.cuda="12.4" \
       distillery.ml.bitsandbytes="0.44.1" \
+      distillery.qwen72b.trainer="experiments.qwen72b_fallback.train" \
+      distillery.qwen72b.attention.backend="sdpa_math" \
+      distillery.qwen72b.flash_attention_2="false" \
       distillery.entrypoint="/opt/distillery/container_entrypoint.py"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -154,7 +157,9 @@ RUN set -eux; \
       --compatibility ml-compatibility.json \
       --require-bitsandbytes; \
     python -m distillery.training.entrypoint --help >/dev/null; \
-    python -m experiments.aws_smoke.train --help >/dev/null
+    python -m experiments.aws_smoke.train --help >/dev/null; \
+    python -m experiments.qwen72b_fallback.distributed_launcher --help >/dev/null; \
+    python -m experiments.qwen72b_fallback.train --help >/dev/null
 
 RUN python - <<'PY'
 import json
@@ -171,6 +176,10 @@ payload = {
     "entrypoint": "/opt/distillery/container_entrypoint.py",
     "trainer_module": "distillery.training.entrypoint",
     "emergency_trainer_module": "experiments.aws_smoke.train",
+    "qwen72b_launcher_module": "experiments.qwen72b_fallback.distributed_launcher",
+    "qwen72b_trainer_module": "experiments.qwen72b_fallback.train",
+    "qwen72b_attention_backend": "sdpa_math",
+    "flash_attention_2_packaged": False,
     "runtime_uid": 1000,
     "torch_version": "2.4.1",
     "torch_cuda_version": "12.4",

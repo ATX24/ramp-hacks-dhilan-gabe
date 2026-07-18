@@ -113,6 +113,7 @@ def test_stage_context_is_reproducible_and_complete(tmp_path: Path) -> None:
         ".dockerignore",
         "experiments/__init__.py",
         "experiments/aws_smoke/train.py",
+        "experiments/qwen72b_fallback/train.py",
         "containers/training/Dockerfile",
         "containers/training/container_entrypoint.py",
         "containers/training/ml-compatibility.json",
@@ -121,11 +122,13 @@ def test_stage_context_is_reproducible_and_complete(tmp_path: Path) -> None:
     assert any(path.startswith("src/distillery/") for path in staged_paths)
     stage_module = load_module(STAGE_TOOL, "distillery_stage_context_allowlist")
     expected_emergency = {
-        f"experiments/{relative}"
-        for relative in stage_module.EMERGENCY_TRAINER_FILES
+        f"experiments/{relative}" for relative in stage_module.EMERGENCY_TRAINER_FILES
+    }
+    expected_qwen72b = {
+        f"experiments/{relative}" for relative in stage_module.QWEN72B_TRAINER_FILES
     }
     assert {path for path in staged_paths if path.startswith("experiments/")} == (
-        expected_emergency
+        expected_emergency | expected_qwen72b
     )
     assert "experiments/aws_smoke/campaign_launch.py" not in staged_paths
     assert not any("__pycache__" in path for path in staged_paths)
@@ -135,14 +138,10 @@ def test_stage_context_is_reproducible_and_complete(tmp_path: Path) -> None:
         expected_mode = 0o755 if path.is_dir() else 0o644
         assert stat.S_IMODE(path.stat().st_mode) == expected_mode
 
-    train_source = (first / "experiments" / "aws_smoke" / "train.py").read_text(
-        encoding="utf-8"
-    )
+    train_source = (first / "experiments" / "aws_smoke" / "train.py").read_text(encoding="utf-8")
     tree = ast.parse(train_source, filename="train.py")
     defined = {
-        node.name
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     assert "run_training" in defined
     assert "main" in defined
@@ -329,6 +328,7 @@ def test_real_build_stages_reviewed_commit_not_ignored_worktree_content(
         repo / "scripts" / "container",
         repo / "src" / "distillery",
         repo / "experiments" / "aws_smoke",
+        repo / "experiments" / "qwen72b_fallback",
     ):
         directory.mkdir(parents=True)
     for name in ("README.md", "LICENSE", "pyproject.toml", "uv.lock"):
@@ -343,6 +343,11 @@ def test_real_build_stages_reviewed_commit_not_ignored_worktree_content(
         destination = repo / "experiments" / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+        for relative in stage_module.QWEN72B_TRAINER_FILES:
+            source = REPO / "experiments" / relative
+            destination = repo / "experiments" / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
     for source in (REPO / "containers" / "training").iterdir():
         if source.is_file():
             shutil.copy2(source, repo / "containers" / "training" / source.name)

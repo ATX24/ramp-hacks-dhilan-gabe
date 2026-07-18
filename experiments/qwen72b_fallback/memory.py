@@ -1,229 +1,248 @@
-"""Memory plan: 4-bit QLoRA vs BF16 LoRA on 8×A100-80GB (ml.p4de.24xlarge)."""
+"""Measured-memory authorization for 72B QLoRA on 8×A100-80GB."""
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Literal
+from enum import StrEnum
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import Field, model_validator
 
-# Parameter count inferred from safetensors total_size / 2 (bf16).
-QWEN25_72B_PARAMS = 72_706_203_648
+from distillery.contracts.hashing import content_sha256
+from experiments.qwen72b_fallback.evidence import (
+    PREFIXED_SHA256_PATTERN,
+    REVISION_PATTERN,
+    SHA256_PATTERN,
+    HashBoundEvidence,
+    VerificationSource,
+)
+from experiments.qwen72b_fallback.pins import MODEL_ID, REVISION
+
+QWEN25_72B_PARAMETER_COUNT = 72_706_203_648
 A100_80GB_VRAM_BYTES = 80 * 1024**3
-A100_USABLE_FRACTION = 0.85
-SAFE_PEAK_BYTES = int(A100_80GB_VRAM_BYTES * A100_USABLE_FRACTION)
-HIDDEN = 8192
-LAYERS = 80
-N_LORA_MODULES = 7
-
-PrecisionMode = Literal["qlora_4bit", "bf16_lora"]
-DistributedStrategy = Literal["ddp", "fsdp2", "deepspeed_zero3"]
+SAFE_PEAK_BYTES = int(A100_80GB_VRAM_BYTES * 0.85)
+WORLD_SIZE = 8
 
 
-class Qwen72BMemoryProbeEvidence(BaseModel):
-    """Optional measured probe; required only to authorize FSDP2/ZeRO-3."""
+class PrecisionMode(StrEnum):
+    QLORA_NF4_BF16 = "qlora_nf4_bf16"
+    BF16_LORA = "bf16_lora"
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
-    schema_version: Literal["distillery.qwen72b_fallback.memory_probe.v1"] = (
-        "distillery.qwen72b_fallback.memory_probe.v1"
-    )
-    passed: bool
-    precision_mode: PrecisionMode
-    distributed_strategy: DistributedStrategy
-    device_type: Literal["NVIDIA A100-SXM4-80GB"]
-    peak_memory_bytes: int = Field(ge=1, le=A100_80GB_VRAM_BYTES)
-    capacity_memory_bytes: int = Field(ge=1, le=A100_80GB_VRAM_BYTES)
-    headroom_bytes: int = Field(ge=1, le=A100_80GB_VRAM_BYTES)
-    safe_peak_bytes: int = Field(ge=1, le=A100_80GB_VRAM_BYTES)
-    probe_id: str = Field(min_length=1)
-    model_id: str = Field(min_length=1)
-    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
-    max_length: int = Field(ge=1)
-    microbatch: int = Field(ge=1)
-    world_size: int = Field(ge=8, le=8)
-    runtime_image_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
-    instance_type: Literal["ml.p4de.24xlarge"]
-    flash_attention_2_attested: bool
+class DistributedStrategy(StrEnum):
+    DDP = "ddp"
+    FSDP2 = "fsdp2"
+    DEEPSPEED_ZERO3 = "deepspeed_zero3"
 
-    @model_validator(mode="after")
-    def _validate_measurement(self) -> Qwen72BMemoryProbeEvidence:
-        if self.headroom_bytes != self.capacity_memory_bytes - self.peak_memory_bytes:
-            raise ValueError("headroom_bytes must equal capacity_memory_bytes - peak")
-        if self.peak_memory_bytes >= self.capacity_memory_bytes:
-            raise ValueError("memory probe must retain positive measured headroom")
-        if self.safe_peak_bytes != SAFE_PEAK_BYTES:
-            raise ValueError(f"safe_peak_bytes must equal sealed {SAFE_PEAK_BYTES}")
-        if self.capacity_memory_bytes != A100_80GB_VRAM_BYTES:
-            raise ValueError("capacity must be exactly 80 GiB A100")
-        if self.passed and self.peak_memory_bytes > self.safe_peak_bytes:
-            raise ValueError("passed=true is incompatible with peak above safe threshold")
-        return self
+
+class AttentionBackend(StrEnum):
+    SDPA_MATH = "sdpa_math"
 
 
 @dataclass(frozen=True, slots=True)
-class MemoryEstimate:
-    base_weight_bytes: int
-    activation_bytes: int
-    lora_optimizer_bytes: int
-    cuda_context_bytes: int
-    total_bytes: int
-    device_bytes: int
-    safe_peak_bytes: int
-    fits: bool
+class PlanningEstimate:
     mode: PrecisionMode
     strategy: DistributedStrategy
-    expected_peak_gb: float
-    requires_fsdp_or_zero: bool
+    estimated_peak_bytes: int
+    estimated_peak_gib: float
+    authorizes_execution: Literal[False] = False
 
 
-def _bytes_for_params(n_params: int, bytes_per_param: float) -> int:
-    return int(math.ceil(n_params * bytes_per_param))
-
-
-def estimate_memory(
+def estimate_for_planning_only(
     *,
     precision_mode: PrecisionMode,
+    model_parameter_count: int = QWEN25_72B_PARAMETER_COUNT,
     max_length: int = 1024,
     microbatch: int = 1,
     lora_rank: int = 16,
-    student_params: int = QWEN25_72B_PARAMS,
-    device_bytes: int = A100_80GB_VRAM_BYTES,
-    strategy: DistributedStrategy = "ddp",
-) -> MemoryEstimate:
-    """Conservative per-GPU peak. Teacher/tool trajectories are offline."""
-    if precision_mode == "bf16_lora":
-        base_weight_bytes = _bytes_for_params(student_params, 2.0)
-    else:
-        # NF4 QLoRA ~0.5 byte/param plus double-quant overhead proxy.
-        base_weight_bytes = _bytes_for_params(student_params, 0.55)
-    # Gradient checkpointing activation proxy.
-    activation_bytes = microbatch * max_length * HIDDEN * 4 * 2
-    lora_params = 2 * lora_rank * HIDDEN * N_LORA_MODULES * LAYERS
-    lora_optimizer_bytes = lora_params * 2 * 2  # AdamW moments fp32
-    cuda_context = 2 * 1024**3
-    if strategy in {"fsdp2", "deepspeed_zero3"}:
-        # Shard base weights across 8 ranks; keep a communication buffer proxy.
-        base_weight_bytes = int(math.ceil(base_weight_bytes / 8)) + 4 * 1024**3
-    total = base_weight_bytes + activation_bytes + lora_optimizer_bytes + cuda_context
-    safe = int(device_bytes * A100_USABLE_FRACTION)
-    fits = total <= safe
-    requires_fsdp = precision_mode == "bf16_lora" and strategy == "ddp" and not fits
-    return MemoryEstimate(
-        base_weight_bytes=base_weight_bytes,
-        activation_bytes=activation_bytes,
-        lora_optimizer_bytes=lora_optimizer_bytes,
-        cuda_context_bytes=cuda_context,
-        total_bytes=total,
-        device_bytes=device_bytes,
-        safe_peak_bytes=safe,
-        fits=fits,
+) -> PlanningEstimate:
+    """Non-authoritative estimate retained only for QLoRA/BF16 comparison."""
+    bytes_per_parameter = 0.55 if precision_mode is PrecisionMode.QLORA_NF4_BF16 else 2.0
+    base = int(math.ceil(model_parameter_count * bytes_per_parameter))
+    activation_proxy = microbatch * max_length * 8192 * 4 * 2
+    lora_parameters = 2 * lora_rank * 8192 * 7 * 80
+    optimizer_proxy = lora_parameters * 4
+    total = base + activation_proxy + optimizer_proxy + (2 * 1024**3)
+    return PlanningEstimate(
         mode=precision_mode,
-        strategy=strategy,
-        expected_peak_gb=total / (1024**3),
-        requires_fsdp_or_zero=requires_fsdp,
+        strategy=DistributedStrategy.DDP,
+        estimated_peak_bytes=total,
+        estimated_peak_gib=total / (1024**3),
     )
 
 
-def choose_precision_plan(
+class Qwen72BMemoryProbeEvidence(HashBoundEvidence):
+    """Target-device measurement required before DDP rehearsal or training."""
+
+    schema_version: Literal["distillery.qwen72b_fallback.memory_probe.v2"] = (
+        "distillery.qwen72b_fallback.memory_probe.v2"
+    )
+    source: Literal[VerificationSource.TARGET_DEVICE] = VerificationSource.TARGET_DEVICE
+    probe_id: str = Field(min_length=1)
+    model_id: Literal["Qwen/Qwen2.5-72B-Instruct"] = MODEL_ID
+    revision: str = Field(pattern=REVISION_PATTERN)
+    model_identity_sha256: str = Field(pattern=SHA256_PATTERN)
+    runtime_image_uri: str = Field(
+        pattern=(
+            r"^225989358036\.dkr\.ecr\.us-east-1\.amazonaws\.com/"
+            r"distillery-training@sha256:[0-9a-f]{64}$"
+        )
+    )
+    runtime_image_digest: str = Field(pattern=PREFIXED_SHA256_PATTERN)
+    image_binding_sha256: str = Field(pattern=SHA256_PATTERN)
+    profile_sha256: str = Field(pattern=SHA256_PATTERN)
+    instance_type: Literal["ml.p4de.24xlarge"] = "ml.p4de.24xlarge"
+    world_size: Literal[8] = WORLD_SIZE
+    device_names: tuple[
+        Literal["NVIDIA A100-SXM4-80GB"],
+        Literal["NVIDIA A100-SXM4-80GB"],
+        Literal["NVIDIA A100-SXM4-80GB"],
+        Literal["NVIDIA A100-SXM4-80GB"],
+        Literal["NVIDIA A100-SXM4-80GB"],
+        Literal["NVIDIA A100-SXM4-80GB"],
+        Literal["NVIDIA A100-SXM4-80GB"],
+        Literal["NVIDIA A100-SXM4-80GB"],
+    ]
+    precision_mode: Literal[PrecisionMode.QLORA_NF4_BF16] = PrecisionMode.QLORA_NF4_BF16
+    distributed_strategy: Literal[DistributedStrategy.DDP] = DistributedStrategy.DDP
+    attention_backend: Literal[AttentionBackend.SDPA_MATH] = AttentionBackend.SDPA_MATH
+    max_length: Literal[1024] = 1024
+    microbatch: Literal[1] = 1
+    lora_rank: Literal[16] = 16
+    per_rank_peak_memory_bytes: tuple[int, int, int, int, int, int, int, int]
+    per_rank_capacity_bytes: tuple[int, int, int, int, int, int, int, int]
+    measured_batch_shapes: tuple[
+        tuple[int, int],
+        tuple[int, int],
+        tuple[int, int],
+        tuple[int, int],
+        tuple[int, int],
+        tuple[int, int],
+        tuple[int, int],
+        tuple[int, int],
+    ]
+    model_load_completed: Literal[True]
+    forward_completed: Literal[True]
+    backward_completed: Literal[True]
+    optimizer_step_completed: Literal[True]
+    all_rank_acknowledgements: tuple[
+        Literal[True],
+        Literal[True],
+        Literal[True],
+        Literal[True],
+        Literal[True],
+        Literal[True],
+        Literal[True],
+        Literal[True],
+    ]
+    peak_metric: Literal["torch.cuda.max_memory_reserved"] = "torch.cuda.max_memory_reserved"
+    sampler_order_sha256: str = Field(pattern=SHA256_PATTERN)
+    probe_artifact_sha256: str = Field(pattern=SHA256_PATTERN)
+
+    @model_validator(mode="after")
+    def _measurement_invariants(self) -> Qwen72BMemoryProbeEvidence:
+        if self.revision != REVISION:
+            raise ValueError("memory probe uses the wrong model revision")
+        if not self.runtime_image_uri.endswith(f"@{self.runtime_image_digest}"):
+            raise ValueError("memory probe image URI/digest mismatch")
+        if any(
+            capacity < 75 * 1024**3 or capacity > A100_80GB_VRAM_BYTES
+            for capacity in self.per_rank_capacity_bytes
+        ):
+            raise ValueError("memory probe capacity is outside the A100-80GB range")
+        if any(peak <= 0 for peak in self.per_rank_peak_memory_bytes):
+            raise ValueError("memory probe peak must be positive on every rank")
+        if any(
+            peak > int(capacity * 0.85)
+            for peak, capacity in zip(
+                self.per_rank_peak_memory_bytes,
+                self.per_rank_capacity_bytes,
+                strict=True,
+            )
+        ):
+            raise ValueError("memory probe exceeds the sealed 85% A100 safety threshold")
+        if any(shape != (1, 1024) for shape in self.measured_batch_shapes):
+            raise ValueError("memory probe must measure the exact fixed-shape profile batch")
+        expected_artifact = memory_probe_measurement_sha256(
+            profile_sha256=self.profile_sha256,
+            device_names=self.device_names,
+            peaks=self.per_rank_peak_memory_bytes,
+            capacities=self.per_rank_capacity_bytes,
+            shapes=self.measured_batch_shapes,
+            sampler_order_sha256=self.sampler_order_sha256,
+        )
+        if self.probe_artifact_sha256 != expected_artifact:
+            raise ValueError("memory probe measurement artifact hash mismatch")
+        return self
+
+
+def memory_probe_measurement_sha256(
     *,
-    max_length: int = 1024,
-    microbatch: int = 1,
-    lora_rank: int = 16,
-    measured_probe: Qwen72BMemoryProbeEvidence | None = None,
-) -> dict[str, Any]:
-    """Choose QLoRA vs BF16 LoRA from memory/throughput, not novelty."""
-    bf16_ddp = estimate_memory(
-        precision_mode="bf16_lora",
-        max_length=max_length,
-        microbatch=microbatch,
-        lora_rank=lora_rank,
-        strategy="ddp",
+    profile_sha256: str,
+    device_names: tuple[str, ...],
+    peaks: tuple[int, ...],
+    capacities: tuple[int, ...],
+    shapes: tuple[tuple[int, int], ...],
+    sampler_order_sha256: str,
+) -> str:
+    return content_sha256(
+        {
+            "profile_sha256": profile_sha256,
+            "peak_metric": "torch.cuda.max_memory_reserved",
+            "sampler_order_sha256": sampler_order_sha256,
+            "ranks": [
+                {
+                    "rank": rank,
+                    "device_name": device,
+                    "peak_memory_bytes": peak,
+                    "capacity_bytes": capacity,
+                    "batch_shape": list(shape),
+                }
+                for rank, (device, peak, capacity, shape) in enumerate(
+                    zip(
+                        device_names,
+                        peaks,
+                        capacities,
+                        shapes,
+                        strict=True,
+                    )
+                )
+            ],
+        }
     )
-    qlora_ddp = estimate_memory(
-        precision_mode="qlora_4bit",
-        max_length=max_length,
-        microbatch=microbatch,
-        lora_rank=lora_rank,
-        strategy="ddp",
-    )
-    bf16_fsdp = estimate_memory(
-        precision_mode="bf16_lora",
-        max_length=max_length,
-        microbatch=microbatch,
-        lora_rank=lora_rank,
-        strategy="fsdp2",
-    )
-
-    if qlora_ddp.fits:
-        chosen_mode: PrecisionMode = "qlora_4bit"
-        chosen_strategy: DistributedStrategy = "ddp"
-        rationale = (
-            "BF16 LoRA under DDP exceeds A100-80GB usable budget for 72B "
-            f"(~{bf16_ddp.expected_peak_gb:.1f} GiB peak). 4-bit QLoRA under DDP "
-            f"fits (~{qlora_ddp.expected_peak_gb:.1f} GiB) with FlashAttention + "
-            "gradient checkpointing, so FSDP2/ZeRO-3 are not required."
-        )
-    elif measured_probe is not None and measured_probe.passed:
-        chosen_mode = measured_probe.precision_mode
-        chosen_strategy = measured_probe.distributed_strategy
-        rationale = (
-            "Plan estimate did not fit; sealed measured probe authorizes "
-            f"{chosen_mode}/{chosen_strategy}."
-        )
-    elif bf16_fsdp.fits:
-        raise RuntimeError(
-            "BF16 LoRA only fits with FSDP2/ZeRO sharding estimates, but no measured "
-            "probe is sealed; refuse to enable FSDP2/DeepSpeed ZeRO-3 by novelty alone"
-        )
-    else:
-        raise RuntimeError("no feasible 72B memory plan on ml.p4de.24xlarge")
-
-    return {
-        "schema_version": "distillery.qwen72b_fallback.memory_plan.v1",
-        "chosen_precision_mode": chosen_mode,
-        "chosen_distributed_strategy": chosen_strategy,
-        "fsdp2_or_zero3_required": chosen_strategy != "ddp",
-        "rationale": rationale,
-        "estimates": {
-            "bf16_lora_ddp": _estimate_dict(bf16_ddp),
-            "qlora_4bit_ddp": _estimate_dict(qlora_ddp),
-            "bf16_lora_fsdp2": _estimate_dict(bf16_fsdp),
-        },
-        "safe_peak_gib": SAFE_PEAK_BYTES / (1024**3),
-        "device": "NVIDIA A100-SXM4-80GB",
-        "world_size": 8,
-        "teacher_or_tool_trajectories_on_warm_timer": False,
-    }
 
 
-def _estimate_dict(estimate: MemoryEstimate) -> dict[str, float | int | bool | str]:
-    return {
-        "mode": estimate.mode,
-        "strategy": estimate.strategy,
-        "base_weight_gib": estimate.base_weight_bytes / (1024**3),
-        "activation_proxy_gib": estimate.activation_bytes / (1024**3),
-        "lora_optimizer_gib": estimate.lora_optimizer_bytes / (1024**3),
-        "expected_peak_gib": estimate.expected_peak_gb,
-        "fits": estimate.fits,
-        "requires_fsdp_or_zero": estimate.requires_fsdp_or_zero,
-    }
-
-
-def assert_strategy_authorized(
+def require_measured_probe(
+    probe: Qwen72BMemoryProbeEvidence | None,
     *,
-    strategy: DistributedStrategy,
-    measured_probe: Qwen72BMemoryProbeEvidence | None,
-) -> None:
-    if strategy == "ddp":
-        return
-    if measured_probe is None or not measured_probe.passed:
-        raise RuntimeError(
-            f"{strategy} requires a passed measured memory probe; refusing closed"
-        )
-    if measured_probe.distributed_strategy != strategy:
-        raise RuntimeError(
-            "measured probe strategy mismatch: "
-            f"requested={strategy} probe={measured_probe.distributed_strategy}"
-        )
+    profile_sha256: str,
+    model_identity_sha256: str,
+    image_binding_sha256: str,
+    runtime_image_digest: str,
+) -> Qwen72BMemoryProbeEvidence:
+    if probe is None:
+        raise RuntimeError("DDP authorization requires a measured 72B QLoRA target-device probe")
+    if probe.profile_sha256 != profile_sha256:
+        raise RuntimeError("memory probe is bound to a different training profile")
+    if probe.model_identity_sha256 != model_identity_sha256:
+        raise RuntimeError("memory probe is bound to a different model identity")
+    if probe.image_binding_sha256 != image_binding_sha256:
+        raise RuntimeError("memory probe is bound to a different image binding")
+    if probe.runtime_image_digest != runtime_image_digest:
+        raise RuntimeError("memory probe is bound to a different image digest")
+    return probe
+
+
+def planning_comparison() -> dict[str, object]:
+    qlora = estimate_for_planning_only(precision_mode=PrecisionMode.QLORA_NF4_BF16)
+    bf16 = estimate_for_planning_only(precision_mode=PrecisionMode.BF16_LORA)
+    return {
+        "schema_version": "distillery.qwen72b_fallback.memory_comparison.v2",
+        "authorizes_execution": False,
+        "chosen_candidate": PrecisionMode.QLORA_NF4_BF16.value,
+        "reason": "BF16 LoRA cannot fit DDP; QLoRA still requires a measured probe.",
+        "qlora_estimated_peak_gib": qlora.estimated_peak_gib,
+        "bf16_estimated_peak_gib": bf16.estimated_peak_gib,
+        "mandatory_probe": True,
+    }

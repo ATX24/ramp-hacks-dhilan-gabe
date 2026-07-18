@@ -141,6 +141,7 @@ snapshot_reviewed_source() {
     src/distillery \
     experiments/__init__.py \
     experiments/aws_smoke \
+    experiments/qwen72b_fallback \
     containers/training \
     | tar -xf - -C "${destination}"
 }
