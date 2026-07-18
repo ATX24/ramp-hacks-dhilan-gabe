@@ -12,9 +12,11 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 CODE_ROOT = Path(__file__).resolve().parent
 WHEELS_DIR = CODE_ROOT / "wheels"
@@ -98,10 +100,11 @@ def _prepare_pythonpath() -> None:
 
 
 def _smoke_imports() -> None:
-    import experiments.aws_smoke.train as train  # noqa: F401
     import torch  # noqa: F401
     from peft import LoraConfig  # noqa: F401
     from transformers import AutoModelForCausalLM  # noqa: F401
+
+    import experiments.aws_smoke.train as train  # noqa: F401
 
     print(
         json.dumps(
@@ -116,8 +119,118 @@ def _smoke_imports() -> None:
     )
 
 
+def _require_regular_nonempty(path: Path) -> None:
+    mode = os.stat(path, follow_symlinks=False).st_mode
+    if not stat.S_ISREG(mode) or path.stat().st_size <= 0:
+        raise ValueError(f"snapshot file must be regular and nonempty: {path}")
+
+
+def _snapshot_manifest(snapshot_dir: Path) -> dict[str, Any]:
+    manifest_path = snapshot_dir / "snapshot-manifest.json"
+    _require_regular_nonempty(manifest_path)
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = payload.get("files")
+    if not isinstance(files, dict) or not files:
+        raise ValueError("snapshot-manifest.json lacks a nonempty files map")
+    return payload
+
+
+def verify_snapshot_tree(
+    snapshot_dir: Path,
+    *,
+    expected_model_id: str,
+    expected_revision: str,
+) -> dict[str, Any]:
+    """Verify a complete regular-file model snapshot against its manifest."""
+    if snapshot_dir.is_symlink() or not snapshot_dir.is_dir():
+        raise ValueError(f"snapshot directory must be a real directory: {snapshot_dir}")
+    for path in snapshot_dir.rglob("*"):
+        if path.is_symlink():
+            raise ValueError(f"snapshot tree contains forbidden symlink: {path}")
+
+    payload = _snapshot_manifest(snapshot_dir)
+    if payload.get("model_id") != expected_model_id:
+        raise ValueError("snapshot manifest model_id mismatch")
+    if payload.get("revision") != expected_revision:
+        raise ValueError("snapshot manifest revision mismatch")
+
+    files = payload["files"]
+    names = set(files)
+    if "config.json" not in names:
+        raise ValueError("snapshot manifest lacks config.json")
+    tokenizer_ok = (
+        "tokenizer.json" in names
+        or {"vocab.json", "merges.txt"} <= names
+    )
+    if not tokenizer_ok or "tokenizer_config.json" not in names:
+        raise ValueError("snapshot manifest lacks required tokenizer files")
+    weight_names = sorted(
+        name
+        for name in names
+        if name.endswith(".safetensors") or name.startswith("pytorch_model")
+    )
+    if not weight_names:
+        raise ValueError("snapshot manifest lacks model weight shards")
+
+    for relative, evidence in sorted(files.items()):
+        relative_path = Path(relative)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise ValueError(f"unsafe snapshot manifest path: {relative}")
+        if not isinstance(evidence, dict):
+            raise ValueError(f"invalid snapshot evidence: {relative}")
+        expected_size = evidence.get("size")
+        expected_sha256 = evidence.get("sha256")
+        if (
+            not isinstance(expected_size, int)
+            or expected_size <= 0
+            or not isinstance(expected_sha256, str)
+            or len(expected_sha256) != 64
+        ):
+            raise ValueError(f"invalid snapshot size/hash evidence: {relative}")
+        path = snapshot_dir / relative_path
+        _require_regular_nonempty(path)
+        if path.stat().st_size != expected_size:
+            raise ValueError(f"snapshot size mismatch: {relative}")
+        if _sha256(path) != expected_sha256:
+            raise ValueError(f"snapshot sha256 mismatch: {relative}")
+    return payload
+
+
+def copy_verified_snapshot(
+    source_dir: Path,
+    destination: Path,
+    *,
+    expected_model_id: str,
+    expected_revision: str,
+) -> dict[str, Any]:
+    """Copy a verified snapshot without preserving symlinks, then reverify."""
+    snapshot_manifest = verify_snapshot_tree(
+        source_dir,
+        expected_model_id=expected_model_id,
+        expected_revision=expected_revision,
+    )
+    destination.mkdir(parents=True, exist_ok=False)
+    for relative in sorted(snapshot_manifest["files"]):
+        source = source_dir / relative
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target, follow_symlinks=True)
+        _require_regular_nonempty(target)
+    shutil.copy2(
+        source_dir / "snapshot-manifest.json",
+        destination / "snapshot-manifest.json",
+        follow_symlinks=True,
+    )
+    verify_snapshot_tree(
+        destination,
+        expected_model_id=expected_model_id,
+        expected_revision=expected_revision,
+    )
+    return snapshot_manifest
+
+
 def _normalize_model_channel(manifest_path: Path, models_dir: Path) -> Path:
-    """Restore the trainer's org/name/revision tree from an exact S3 prefix."""
+    """Copy an exact-prefix channel into a verified org/name/revision tree."""
     if not (models_dir / "config.json").is_file():
         return models_dir
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -130,12 +243,26 @@ def _normalize_model_channel(manifest_path: Path, models_dir: Path) -> Path:
     root = Path("/tmp/distillery-rescue-models")
     shutil.rmtree(root, ignore_errors=True)
     destination = root / org / name / revision
-    destination.mkdir(parents=True)
-    for source in sorted(models_dir.iterdir()):
-        if source.is_file():
-            (destination / source.name).symlink_to(source)
-    if not (destination / "config.json").is_file():
-        raise FileNotFoundError("normalized student model channel lacks config.json")
+    destination.parent.mkdir(parents=True)
+    snapshot_manifest = copy_verified_snapshot(
+        models_dir,
+        destination,
+        expected_model_id=model_id,
+        expected_revision=revision,
+    )
+    print(
+        json.dumps(
+            {
+                "event": "rescue_model_snapshot_materialized",
+                "file_count": len(snapshot_manifest["files"]),
+                "model_id": model_id,
+                "revision": revision,
+                "regular_files_only": True,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
     return root
 
 

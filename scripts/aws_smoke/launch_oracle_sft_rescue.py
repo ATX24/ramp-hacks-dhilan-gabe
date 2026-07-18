@@ -34,8 +34,9 @@ from experiments.aws_smoke.channels import load_manifest  # noqa: E402
 from experiments.aws_smoke.dataset_subset import materialize_emergency_subset  # noqa: E402
 from experiments.aws_smoke.launch_plan import stage_manifest_for_job  # noqa: E402
 from experiments.aws_smoke.manifests import write_arm_manifests  # noqa: E402
-from experiments.aws_smoke.pins import EmergencyEvidence, load_evidence  # noqa: E402
+from experiments.aws_smoke.pins import load_evidence  # noqa: E402
 from experiments.aws_smoke.profile import DEFAULT_EMERGENCY_PROFILE  # noqa: E402
+from experiments.aws_smoke.rescue_entry import verify_snapshot_tree  # noqa: E402
 from experiments.aws_smoke.rescue_launch import (  # noqa: E402
     RESCUE_DLC_DIGEST,
     RESCUE_DLC_ECR_ARN,
@@ -52,6 +53,7 @@ BUCKET = "distillery-225989358036-us-east-1"
 ACCOUNT = "225989358036"
 ROLE_NAME = "distillery-sagemaker-training"
 STUDENT_REVISION = "7ae557604adf67be50417f59c2c2f167def9a775"
+STUDENT_MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
 TEACHER_REVISION = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
 STUDENT_CONFIG_SHA = "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45"
 TEACHER_CONFIG_SHA = "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670"
@@ -346,6 +348,49 @@ def _collect_log_evidence(logs: Any, job_name: str) -> list[str]:
     return evidence[:40]
 
 
+def _stage_and_verify_student_snapshot(
+    s3: Any,
+    models_dir: Path,
+) -> Path:
+    """Download and walk the exact launch snapshot before any submission."""
+    snapshot = models_dir / STUDENT_MODEL_ID / STUDENT_REVISION
+    snapshot.mkdir(parents=True, exist_ok=True)
+    prefix = f"models/{STUDENT_MODEL_ID}/{STUDENT_REVISION}"
+    manifest_path = snapshot / "snapshot-manifest.json"
+    s3.download_file(BUCKET, f"{prefix}/snapshot-manifest.json", str(manifest_path))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = manifest.get("files")
+    if not isinstance(files, dict) or not files:
+        raise ValueError("authoritative model manifest lacks files")
+    for relative in sorted(files):
+        relative_path = Path(relative)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise ValueError(f"unsafe model manifest path: {relative}")
+        target = snapshot / relative_path
+        if target.is_symlink():
+            raise ValueError(f"local launch snapshot contains symlink: {target}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        s3.download_file(BUCKET, f"{prefix}/{relative}", str(target))
+    verified = verify_snapshot_tree(
+        snapshot,
+        expected_model_id=STUDENT_MODEL_ID,
+        expected_revision=STUDENT_REVISION,
+    )
+    print(
+        json.dumps(
+            {
+                "event": "rescue_model_launch_archive_verified",
+                "file_count": len(verified["files"]),
+                "model_id": STUDENT_MODEL_ID,
+                "revision": STUDENT_REVISION,
+                "regular_files_only": True,
+            },
+            sort_keys=True,
+        )
+    )
+    return snapshot
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="launch_oracle_sft_rescue")
     parser.add_argument("--profile", default="gabriel-cli")
@@ -362,6 +407,16 @@ def main() -> int:
         raise SystemExit("profile must be gabriel-cli")
     source_revision = _git_head()
     _require_clean_tree()
+    if args.execute:
+        if os.environ.get("DISTILLERY_AWS_SMOKE_EXECUTE", "") != "1":
+            raise SystemExit("set DISTILLERY_AWS_SMOKE_EXECUTE=1 to submit")
+        if args.confirm != CONFIRM_PHRASE:
+            raise SystemExit(f"missing confirmation phrase {CONFIRM_PHRASE}")
+        preflight_s3 = boto3.Session(
+            profile_name=args.profile,
+            region_name=args.region,
+        ).client("s3")
+        _stage_and_verify_student_snapshot(preflight_s3, args.models_dir)
 
     tok_path = args.tokenization_evidence or Path(
         "/tmp/distillery-rescue/tokenizer_evidence.json"
@@ -388,7 +443,7 @@ def main() -> int:
         "model_materialization_sha256": MATERIALIZATION_SHA,
         "ecr_image_uri": RESCUE_DLC_IMAGE_URI,
         "image_digest": RESCUE_DLC_DIGEST,
-        "student_model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+        "student_model_id": STUDENT_MODEL_ID,
         "student_revision": STUDENT_REVISION,
         "student_model_config_sha256": STUDENT_CONFIG_SHA,
         "teacher_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
