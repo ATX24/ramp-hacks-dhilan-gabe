@@ -97,7 +97,7 @@ def _require_clean_tree() -> None:
         )
 
 
-def _build_source_bundle(work_dir: Path, *, source_revision: str) -> Path:
+def _build_source_bundle(work_dir: Path, *, source_revision: str) -> tuple[Path, str]:
     bundle_root = work_dir / "code"
     if bundle_root.exists():
         shutil.rmtree(bundle_root)
@@ -134,12 +134,70 @@ def _build_source_bundle(work_dir: Path, *, source_revision: str) -> Path:
         )
     wheels_dst = bundle_root / "wheels"
     shutil.copytree(wheels_src, wheels_dst)
-    # Local staged import/argument smoke against the sealed bundle.
+    marker = bundle_root / "SOURCE_REVISION.txt"
+    marker.write_text(source_revision + "\n", encoding="utf-8")
+    files = {
+        path.relative_to(bundle_root).as_posix(): sha256_hex(path.read_bytes())
+        for path in sorted(bundle_root.rglob("*"))
+        if path.is_file() and path.name != "SOURCE_BUNDLE_MANIFEST.json"
+    }
+    bundle_manifest = bundle_root / "SOURCE_BUNDLE_MANIFEST.json"
+    bundle_manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "distillery.rescue.source_bundle.v1",
+                "source_revision": source_revision,
+                "files": files,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bundle_sha256 = sha256_hex(bundle_manifest.read_bytes())
+
+    # Real local staged import/argument smoke against the sealed bundle.
+    smoke_root = work_dir / "local-smoke"
+    shutil.rmtree(smoke_root, ignore_errors=True)
+    (smoke_root / "dataset").mkdir(parents=True)
+    (smoke_root / "models").mkdir()
+    (smoke_root / "models" / "config.json").write_text("{}\n", encoding="utf-8")
+    (smoke_root / "responses.jsonl").write_text("{}\n", encoding="utf-8")
+    (smoke_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "models": {
+                    "student": {
+                        "id": "Qwen/Qwen2.5-0.5B-Instruct",
+                        "revision": STUDENT_REVISION,
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     subprocess.check_call(
         [
-            sys.executable,
+            str(_REPO_ROOT / ".venv-synth" / "bin" / "python"),
             str(bundle_root / "rescue_entry.py"),
-            "--help",
+            "--arm",
+            "oracle_sft",
+            "--manifest",
+            str(smoke_root / "manifest.json"),
+            "--dataset-dir",
+            str(smoke_root / "dataset"),
+            "--models-dir",
+            str(smoke_root / "models"),
+            "--responses",
+            str(smoke_root / "responses.jsonl"),
+            "--output-dir",
+            str(smoke_root / "output"),
+            "--model-output-dir",
+            str(smoke_root / "model-output"),
+            "--import-smoke-only",
+            "--skip-wheel-install",
         ],
         cwd=str(bundle_root),
         env={
@@ -147,9 +205,7 @@ def _build_source_bundle(work_dir: Path, *, source_revision: str) -> Path:
             "PYTHONPATH": f"{bundle_root}:{bundle_root / 'src'}",
         },
     )
-    marker = bundle_root / "SOURCE_REVISION.txt"
-    marker.write_text(source_revision + "\n", encoding="utf-8")
-    return bundle_root
+    return bundle_root, bundle_sha256
 
 
 def _upload_prefix(s3: Any, local_dir: Path, bucket: str, prefix: str) -> str:
@@ -183,8 +239,10 @@ def _apply_scoped_role_policy(
         ),
         run_artifact_prefix=run_artifact_prefix,
         dataset_prefix=dataset_prefix,
-        model_channel_prefix="models",
-        model_prefix="models/Qwen",
+        model_channel_prefix=(
+            f"models/Qwen/Qwen2.5-0.5B-Instruct/{STUDENT_REVISION}"
+        ),
+        model_prefix=f"models/Qwen/Qwen2.5-0.5B-Instruct/{STUDENT_REVISION}",
         model_materialization_key="models/materialization.json",
         code_prefix=code_prefix,
         additional_ecr_repository_arns=(RESCUE_DLC_ECR_ARN,),
@@ -323,7 +381,7 @@ def main() -> int:
         "aws_region": args.region,
         "aws_profile": "gabriel-cli",
         "iam_role_arn": f"arn:aws:iam::{ACCOUNT}:role/{ROLE_NAME}",
-        "artifact_s3_prefix": f"s3://{BUCKET}/artifacts/rescue",
+        "artifact_s3_prefix": f"s3://{BUCKET}/artifacts/rescue/{source_revision}",
         "dataset_s3_uri": f"s3://{BUCKET}/datasets/ds_awssmoke01",
         "models_s3_uri": f"s3://{BUCKET}/models",
         "model_materialization_uri": f"s3://{BUCKET}/models/materialization.json",
@@ -435,15 +493,19 @@ def main() -> int:
     shutil.copy2(subset.validation_path, dataset_upload / "validation.jsonl")
     shutil.copy2(subset.subset_manifest_path, dataset_upload / "subset_manifest.json")
 
-    code_root = _build_source_bundle(work_dir, source_revision=source_revision)
+    code_root, source_bundle_sha256 = _build_source_bundle(
+        work_dir,
+        source_revision=source_revision,
+    )
     code_prefix = f"artifacts/rescue/code/{source_revision[:12]}-{manifest_sha[:12]}"
-    run_prefix = f"artifacts/rescue/runs/{manifest.run_id}"
+    run_prefix = urlparse(manifest.output.prefix).path.strip("/")
     dataset_prefix = "datasets/ds_awssmoke01"
 
     request = build_rescue_create_training_job_request(
         manifest=manifest,
         evidence=evidence,
         code_s3_uri=f"s3://{BUCKET}/{code_prefix}",
+        source_bundle_sha256=source_bundle_sha256,
     )
     plan = {
         "dry_run": not args.execute,
@@ -457,6 +519,7 @@ def main() -> int:
         "max_run_usd": max_cost,
         "max_runtime_seconds": DEFAULT_EMERGENCY_PROFILE.max_runtime_seconds,
         "source_revision": source_revision,
+        "source_bundle_sha256": source_bundle_sha256,
         "code_s3_uri": f"s3://{BUCKET}/{code_prefix}/",
         "create_training_job_request": request,
     }

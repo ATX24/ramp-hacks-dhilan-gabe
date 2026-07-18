@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -43,6 +44,7 @@ def build_rescue_create_training_job_request(
     manifest: SealedRunManifest,
     evidence: EmergencyEvidence,
     code_s3_uri: str,
+    source_bundle_sha256: str,
     profile: EmergencyTrainingProfile | None = None,
 ) -> dict[str, Any]:
     """Build one finite, network-isolated Script Mode request without calling AWS."""
@@ -87,9 +89,15 @@ def build_rescue_create_training_job_request(
     parsed_code = urlparse(code_s3_uri)
     if parsed_code.scheme != "s3" or not parsed_code.netloc or not parsed_code.path.strip("/"):
         raise ValueError(f"invalid code S3 URI: {code_s3_uri}")
+    if re.fullmatch(r"[0-9a-f]{64}", source_bundle_sha256) is None:
+        raise ValueError("source_bundle_sha256 must be 64 lowercase hex")
 
     job_name = rescue_job_name(manifest_sha256=manifest.seal_sha256())
     output_prefix = manifest.output.prefix.rstrip("/") + "/"
+    student_model_uri = (
+        evidence.models_s3_uri.rstrip("/")
+        + f"/{manifest.models.student.id}/{manifest.models.student.revision}/"
+    )
     return {
         "TrainingJobName": job_name,
         "AlgorithmSpecification": {
@@ -169,7 +177,7 @@ def build_rescue_create_training_job_request(
                 "DataSource": {
                     "S3DataSource": {
                         "S3DataType": "S3Prefix",
-                        "S3Uri": evidence.models_s3_uri.rstrip("/") + "/",
+                        "S3Uri": student_model_uri,
                         "S3DataDistributionType": "FullyReplicated",
                     }
                 },
@@ -197,6 +205,7 @@ def build_rescue_create_training_job_request(
             "rescue_path": "script_mode_hf_dlc",
             "rescue_dlc_tag": RESCUE_DLC_TAG,
             "source_revision": evidence.source_revision,
+            "source_bundle_sha256": source_bundle_sha256,
         },
         "EnableNetworkIsolation": True,
         "EnableManagedSpotTraining": False,
@@ -218,26 +227,25 @@ def build_rescue_create_training_job_request(
 def list_active_distillery_jobs(client: Any) -> list[dict[str, str]]:
     """Return Starting/InProgress Distillery jobs (any naming convention)."""
     active: list[dict[str, str]] = []
-    for status in ("InProgress", "Starting"):
-        response = client.list_training_jobs(
-            StatusEquals=status,
-            MaxResults=100,
-            SortBy="CreationTime",
-            SortOrder="Descending",
-        )
-        for summary in response.get("TrainingJobSummaries", []):
-            name = str(summary.get("TrainingJobName", ""))
-            lowered = name.lower()
-            if (
-                lowered.startswith("rescue-")
-                or lowered.startswith("aws-smoke-")
-                or lowered.startswith("distillery-")
-            ):
-                active.append(
-                    {
-                        "name": name,
-                        "status": str(summary.get("TrainingJobStatus", status)),
-                        "creation_time": str(summary.get("CreationTime", "")),
-                    }
-                )
+    response = client.list_training_jobs(
+        MaxResults=100,
+        SortBy="CreationTime",
+        SortOrder="Descending",
+    )
+    for summary in response.get("TrainingJobSummaries", []):
+        name = str(summary.get("TrainingJobName", ""))
+        status = str(summary.get("TrainingJobStatus", ""))
+        lowered = name.lower()
+        if status == "InProgress" and (
+            lowered.startswith("rescue-")
+            or lowered.startswith("aws-smoke-")
+            or lowered.startswith("distillery-")
+        ):
+            active.append(
+                {
+                    "name": name,
+                    "status": status,
+                    "creation_time": str(summary.get("CreationTime", "")),
+                }
+            )
     return active
