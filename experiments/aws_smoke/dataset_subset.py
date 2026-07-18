@@ -17,10 +17,12 @@ from experiments.aws_smoke.profile import DEFAULT_EMERGENCY_PROFILE, EmergencyTr
 # transaction_review prompts currently embed full policy/COA payloads and exceed
 # the sealed 640-token emergency max_length. Keep the smoke corpus on short tasks.
 _EMERGENCY_TASK_MIXTURE: dict[TaskId, float] = {
+    TaskId.TRANSACTION_REVIEW: 0.0,
     TaskId.VARIANCE_ANALYSIS: 0.8,
     TaskId.CASH_RECONCILIATION: 0.2,
 }
 _EMERGENCY_TASK_ORDER: tuple[TaskId, ...] = (
+    TaskId.TRANSACTION_REVIEW,
     TaskId.VARIANCE_ANALYSIS,
     TaskId.CASH_RECONCILIATION,
 )
