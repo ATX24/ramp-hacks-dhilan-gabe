@@ -28,6 +28,7 @@ def _counts() -> TaskDifficultyCounts:
             TaskId.TRANSACTION_REVIEW: 1,
             TaskId.VARIANCE_ANALYSIS: 0,
             TaskId.CASH_RECONCILIATION: 0,
+            TaskId.MERCHANT_TAGGING: 0,
         },
         by_difficulty={
             Difficulty.EASY: 1,
@@ -161,6 +162,7 @@ def test_dataset_count_breakdowns_are_complete_and_consistent() -> None:
                 TaskId.TRANSACTION_REVIEW: 1,
                 TaskId.VARIANCE_ANALYSIS: 1,
                 TaskId.CASH_RECONCILIATION: 0,
+                TaskId.MERCHANT_TAGGING: 0,
             },
             by_difficulty={
                 Difficulty.EASY: 1,
