@@ -34,6 +34,7 @@ const links = [
   ["Research", "/research"],
   ["Papers", "/papers"],
   ["Docs", "/docs"],
+  ["Compare", "/compare"],
   ["Experiment", "/experiment"],
   ["TinyFable", "/tinyfable"],
 ] as const;

@@ -1,0 +1,2128 @@
+[
+ {
+  "i": 0,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "206940"
+    }
+   ],
+   "gl_account": "6400",
+   "journal_entry": [
+    {
+     "account": "6400",
+     "amount_minor": 206940,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 206940,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-DEFAULT-000"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 1500,\n    \"marketing_advertising\": 10000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 206940\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n     ",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 8.8
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":206940},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Staples\"}],\"gl_account\":\"6400\",\"journal_entry\":[{\"account\":\"6400\",\"amount_minor\":206940,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":206940,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-CAPEX-001\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 3.3
+  }
+ },
+ {
+  "i": 1,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1254344,\"budget_minor\":1000000,\"driver_id\":\"headcount\"},{\"actual_minor\":1413096,\"budget_minor\":1000000,\"driver_id\":\"cloud_usage\"},{\"actual_minor\":703095,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":1229318,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"}],\"evidence_index\":[\"actual_headcount\",\"actual_cloud_usage\",\"actual_fx_effect\",\"actual_license_sales\",\"budget_headcount\",\"budget_cloud_usage\",\"budget_fx_effect\",\"budget_license_sales\"],\"mater",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_cloud_usage",
+    "actual_fx_effect",
+    "actual_headcount",
+    "actual_license_sales"
+   ],
+   "other_impact_minor": 7039,
+   "profit_impact_minor": -592814,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "cloud_usage",
+     "impact_minor": -413096,
+     "rank": 1
+    },
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": 296905,
+     "rank": 2
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": -254344,
+     "rank": 3
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": -229318,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -7039,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 1229318,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"cloud_usage\",\n      \"impact_minor\": 1413096,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": 703095,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": 7039,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.7
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":7039,\"top_drivers\":[{\"driver_id\":\"headcount\",\"impact_minor\":1254344,\"rank\":0},{\"driver_id\":\"cloud_usage\",\"impact_minor\":1413096,\"rank\":1},{\"driver_id\":\"fx_effect\",\"impact_minor\":703095,\"rank\":2},{\"driver_id\":\"license_sales\",\"impact_minor\":1229318,\"rank\":3}],\"scheme\":\"major\",\"schema_version\":\"variance_analysis.v1\",\"score\":0.85,\"confidence\":0.95,\"profit_impact_minor\":7039,\"direction\":\"favorable\",\"other_impact_minor\":10000,\"schema_object\":\"profit_impact_minor\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  }
+ },
+ {
+  "i": 2,
+  "task": "cash_reconciliation",
+  "difficulty": "easy",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":-2081,\"id\":\"k2\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":6389269,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":82369,\"id\":\"b_dit\",\"memo\":\"deposit in transit\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 6387188,
+   "adjusted_book_balance_minor": 6387188,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 2081,
+     "event_ids": [
+      "k2"
+     ],
+     "type": "bank_fee"
+    },
+    {
+     "amount_minor": 82369,
+     "event_ids": [
+      "b_dit"
+     ],
+     "type": "deposit_in_transit"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\"],\n      \"bank_ids\": [\"k0\", \"k1\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k2\", \"b_dit\"],\n      \"amount_minor\": -2081,\n      \"confidence\": 0.95\n    }\n  ],\n  \"adjusted_book_balance_minor\": 6389247,\n  \"adjusted_bank_balance_minor\": 6389269,\n  \"difference_minor\": 100,\n  \"confidence\": 0.95\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.3
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":27989,\"adjusted_book_balance_minor\":6389269,\"confidence\":0.857,\"difference_minor\":6361270,\"exceptions\":[{\"amount_minor\":2081,\"event_ids\":[\"k2\"],\"type\":\"fee\"},{\"amount_minor\":82369,\"event_ids\":[\"b_dit\"],\"type\":\"deposit_in_transit\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\"],\"book_ids\":[\"b0\",\"b1\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.0
+  }
+ },
+ {
+  "i": 3,
+  "task": "transaction_review",
+  "difficulty": "medium",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "43083"
+    }
+   ],
+   "gl_account": "6300",
+   "journal_entry": [
+    {
+     "account": "6300",
+     "amount_minor": 43083,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 43083,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-SAAS-002"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1,\n    \"travel_lodging\": 1,\n    \"travel_meals_entertainment\": 1,\n    \"software_subscriptions\": 1,\n    \"cloud_infrastructure\": 1,\n    \"office_supplies\": 1,\n    \"professional_services\": 1,\n    \"computer_equipment_capex\": 1,\n    \"accounts_payable\": 1,\n    \"corporate_card_payable\": 1\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 43083\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 43083\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\n    \"POL-TRAVEL-017\"\n  ],\n  \"evidence\": [],\n  \"confidence\": 1\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.3
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Notion\"}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":43083,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":43083,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 2.6
+  }
+ },
+ {
+  "i": 4,
+  "task": "variance_analysis",
+  "difficulty": "medium",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":674835,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"},{\"actual_minor\":681074,\"budget_minor\":1000000,\"driver_id\":\"headcount\"},{\"actual_minor\":1141398,\"budget_minor\":1000000,\"driver_id\":\"support_volume\"}],\"evidence_index\":[\"actual_services_rev\",\"actual_headcount\",\"actual_support_volume\",\"budget_services_rev\",\"budget_headcount\",\"budget_support_volume\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":11491,\"period\":\"2026-",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "favorable",
+   "evidence_ids": [
+    "actual_services_rev",
+    "actual_headcount",
+    "actual_support_volume"
+   ],
+   "other_impact_minor": 11491,
+   "profit_impact_minor": 514184,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "services_rev",
+     "impact_minor": 325165,
+     "rank": 1
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": 318926,
+     "rank": 2
+    },
+    {
+     "driver_id": "support_volume",
+     "impact_minor": -141398,
+     "rank": 3
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -11491,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"services_rev\",\n      \"impact_minor\": 674835,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 681074,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"support_volume\",\n      \"impact_minor\": 1141398,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": 11491,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.4
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":11491,\"top_drivers\":[{\"driver_id\":\"services_rev\",\"impact_minor\":674835,\"rank\":0},{\"driver_id\":\"headcount\",\"impact_minor\":681074,\"rank\":1},{\"driver_id\":\"support_volume\",\"impact_minor\":1141398,\"rank\":2}],\"scheme\":\"major\",\"schema_version\":\"variance_analysis.v1\",\"score\":10000,\"profit_impact_minor\":11491,\"direction\":\"favorable\",\"schema_object\":\"profit_impact_minor\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.3
+  }
+ },
+ {
+  "i": 5,
+  "task": "cash_reconciliation",
+  "difficulty": "medium",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":30000,\"id\":\"k2\"},{\"amount_minor\":40000,\"id\":\"k3\"},{\"amount_minor\":-4862,\"id\":\"k4\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":6088989,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":30000,\"id\":\"b2\"},{\"amount_minor\":40000,\"id\":\"b3\"},{\"amount_minor\":46608,\"id\":\"b_dit\",\"memo\":\"deposit in transit\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 6084127,
+   "adjusted_book_balance_minor": 6084127,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 4862,
+     "event_ids": [
+      "k4"
+     ],
+     "type": "bank_fee"
+    },
+    {
+     "amount_minor": 46608,
+     "event_ids": [
+      "b_dit"
+     ],
+     "type": "deposit_in_transit"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k2"
+     ],
+     "book_ids": [
+      "b2"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k3"
+     ],
+     "book_ids": [
+      "b3"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\", \"b2\", \"b3\"],\n      \"bank_ids\": [\"k0\", \"k1\", \"k2\", \"k3\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k4\", \"k4\", \"k4\", \"k4\", \"k4\"],\n      \"amount_minor\": -4862,\n      \"confidence\": 0.95\n    }\n  ],\n  \"adjusted_book_balance_minor\": 6088989 + (-4862) = 6084127,\n  \"adjusted_bank_balance_minor\": 6088989,\n  \"difference_minor\": 6084127 - 6088989 = -4862,\n  \"confidence\": 0.95\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":55138,\"adjusted_book_balance_minor\":6088989,\"confidence\":0.75,\"difference_minor\":5533851,\"exceptions\":[{\"amount_minor\":4862,\"event_ids\":[\"k4\"],\"type\":\"fee\"},{\"amount_minor\":46608,\"event_ids\":[\"b_dit\"],\"type\":\"deposit_in_transit\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\",\"k2\",\"k3\"],\"book_ids\":[\"b0\",\"b1\",\"b2\",\"b3\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.2
+  }
+ },
+ {
+  "i": 6,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "99913"
+    }
+   ],
+   "gl_account": "6300",
+   "journal_entry": [
+    {
+     "account": "6300",
+     "amount_minor": 99913,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 99913,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-SAAS-002"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1,\n    \"travel_lodging\": 1,\n    \"travel_meals_entertainment\": 1,\n    \"software_subscriptions\": 1,\n    \"cloud_infrastructure\": 1,\n    \"office_supplies\": 1,\n    \"professional_services\": 1,\n    \"computer_equipment_capex\": 1,\n    \"accounts_payable\": 1,\n    \"corporate_card_payable\": 1\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 99913\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 99913\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\"POL-TRAVEL-017\"],\n  \"evidence\": [],\n  \"confidence\": 1\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.2
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Figma\"},{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":99913}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":99913,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":99913,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 3.0
+  }
+ },
+ {
+  "i": 7,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1260382,\"budget_minor\":1000000,\"driver_id\":\"headcount\"},{\"actual_minor\":1164497,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":1117978,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"}],\"evidence_index\":[\"actual_headcount\",\"actual_fx_effect\",\"actual_services_rev\",\"budget_headcount\",\"budget_fx_effect\",\"budget_services_rev\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":-657,\"period\":\"2026-06\",\"sign_conv",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_headcount",
+    "actual_fx_effect",
+    "actual_services_rev"
+   ],
+   "other_impact_minor": -657,
+   "profit_impact_minor": -543514,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "headcount",
+     "impact_minor": -260382,
+     "rank": 1
+    },
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": -164497,
+     "rank": 2
+    },
+    {
+     "driver_id": "services_rev",
+     "impact_minor": -117978,
+     "rank": 3
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -657,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 1260382,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": 1164497,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"services_rev\",\n      \"impact_minor\": 1117978,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": -657,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 0.9999999999999999\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.7
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-657,\"top_drivers\":[{\"driver_id\":\"headcount\",\"impact_minor\":1260382,\"rank\":0},{\"driver_id\":\"fx_effect\",\"impact_minor\":1164497,\"rank\":1},{\"driver_id\":\"services_rev\",\"impact_minor\":1117978,\"rank\":2}],\"score\":100,\"schema_version\":\"variance_analysis.v1\",\"other_impact_minor\":(-657),\"profit_impact_minor\":1260382+\"1000000\"+\"1164497\"+\"1117978\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.6
+  }
+ },
+ {
+  "i": 8,
+  "task": "cash_reconciliation",
+  "difficulty": "easy",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":30000,\"id\":\"k2\"},{\"amount_minor\":40000,\"id\":\"k3\"},{\"amount_minor\":-2690,\"id\":\"k4\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":6126447,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":30000,\"id\":\"b2\"},{\"amount_minor\":40000,\"id\":\"b3\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 6123757,
+   "adjusted_book_balance_minor": 6123757,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 2690,
+     "event_ids": [
+      "k4"
+     ],
+     "type": "bank_fee"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k2"
+     ],
+     "book_ids": [
+      "b2"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k3"
+     ],
+     "book_ids": [
+      "b3"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\", \"b2\", \"b3\"],\n      \"bank_ids\": [\"k0\", \"k1\", \"k2\", \"k3\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k4\", \"k4\", \"k4\", \"k4\"],\n      \"amount_minor\": -2690,\n      \"confidence\": 0.95\n    }\n  ],\n  \"adjusted_book_balance_minor\": 6126447 + (-2690) * 4,\n  \"adjusted_bank_balance_minor\": 6126447 + (2690 * 4),\n  \"difference_minor\": 6126447 + (-2690) * 4,\n  \"confidence\": 0.95\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.0
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":57300,\"adjusted_book_balance_minor\":6126447,\"confidence\":0.875,\"difference_minor\":6069147,\"exceptions\":[{\"amount_minor\":2690,\"event_ids\":[\"k4\"],\"type\":\"fee\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\",\"k2\",\"k3\"],\"book_ids\":[\"b0\",\"b1\",\"b2\",\"b3\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.2
+  }
+ },
+ {
+  "i": 9,
+  "task": "transaction_review",
+  "difficulty": "hard",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "156541"
+    }
+   ],
+   "gl_account": "6400",
+   "journal_entry": [
+    {
+     "account": "6400",
+     "amount_minor": 156541,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 156541,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-DEFAULT-000"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 156541,\n    \"lodging\": 0,\n    \"meals_entertainment\": 0,\n    \"software_subscriptions\": 0,\n    \"cloud_infrastructure\": 0,\n    \"office_supplies\": 0,\n    \"professional_services\": 0,\n    \"marketing_advertising\": 0,\n    \"computer_equipment_capex\": 0,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 156541\n    },\n    {\n      \"account\": \"lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 0\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\n    \"POL-TRAVEL-017\"\n  ],\n  \"evidence\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.5
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":156541},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Staples\"}],\"gl_account\":\"6400\",\"journal_entry\":[{\"account\":\"6400\",\"amount_minor\":156541,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":156541,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-MKTG-011\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 10,
+  "task": "variance_analysis",
+  "difficulty": "hard",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1335547,\"budget_minor\":1000000,\"driver_id\":\"cloud_usage\"},{\"actual_minor\":975029,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"},{\"actual_minor\":1324805,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":1380930,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"}],\"evidence_index\":[\"actual_cloud_usage\",\"actual_ad_spend\",\"actual_fx_effect\",\"actual_license_sales\",\"budget_cloud_usage\",\"budget_ad_spend\",\"budget_fx_effect\",\"budget_license_sales\"],\"material",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_license_sales",
+    "actual_cloud_usage",
+    "actual_fx_effect",
+    "actual_ad_spend"
+   ],
+   "other_impact_minor": 27885,
+   "profit_impact_minor": -988426,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "license_sales",
+     "impact_minor": -380930,
+     "rank": 1
+    },
+    {
+     "driver_id": "cloud_usage",
+     "impact_minor": -335547,
+     "rank": 2
+    },
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": -324805,
+     "rank": 3
+    },
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": 24971,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -27885,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"cloud_usage\",\n      \"impact_minor\": 1335547,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"ad_spend\",\n      \"impact_minor\": 975029,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": 1324805,\n      \"rank\": 3\n    },\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 1380930,\n      \"rank\": 4\n    }\n  ],\n  \"other_impact_minor\": 27885,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":27885,\"top_drivers\":[{\"driver_id\":\"cloud_usage\",\"impact_minor\":1335547,\"rank\":0},{\"driver_id\":\"ad_spend\",\"impact_minor\":975029,\"rank\":1},{\"driver_id\":\"fx_effect\",\"impact_minor\":1324805,\"rank\":2},{\"driver_id\":\"license_sales\",\"impact_minor\":1380930,\"rank\":3}],\"scheme\":\"major\",\"schema_version\":\"variance_analysis.v1\",\"score\":0.85,\"confidence\":0.95,\"profit_impact_minor\":1000000,\"direction\":\"favorable\",\"other_impact_minor\":27885,\"schema_object\":\"profit_impact_minor\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.2
+  }
+ },
+ {
+  "i": 11,
+  "task": "cash_reconciliation",
+  "difficulty": "hard",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":30000,\"id\":\"k2\"},{\"amount_minor\":-3424,\"id\":\"k3\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":7029825,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":30000,\"id\":\"b2\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 7026401,
+   "adjusted_book_balance_minor": 7026401,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 3424,
+     "event_ids": [
+      "k3"
+     ],
+     "type": "bank_fee"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k2"
+     ],
+     "book_ids": [
+      "b2"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\", \"b2\"],\n      \"bank_ids\": [\"k0\", \"k1\", \"k2\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k3\", \"k3\", \"k3\"],\n      \"amount_minor\": -3424,\n      \"confidence\": 0.99\n    }\n  ],\n  \"adjusted_book_balance_minor\": 6995373,\n  \"adjusted_bank_balance_minor\": 7029825,\n  \"difference_minor\": 245,\n  \"confidence\": 0.99\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.3
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":96576,\"adjusted_book_balance_minor\":7029825,\"confidence\":0.875,\"difference_minor\":6933249,\"exceptions\":[{\"amount_minor\":3424,\"event_ids\":[\"k3\"],\"type\":\"fee\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\",\"k2\"],\"book_ids\":[\"b0\",\"b1\",\"b2\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 2.6
+  }
+ },
+ {
+  "i": 12,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "52193"
+    }
+   ],
+   "gl_account": "6205",
+   "journal_entry": [
+    {
+     "account": "6205",
+     "amount_minor": 52193,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 52193,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-TRAVEL-017"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 52193,\n    \"lodging\": 0,\n    \"meals_entertainment\": 0,\n    \"software_subscriptions\": 0,\n    \"cloud_infrastructure\": 0,\n    \"office_supplies\": 0,\n    \"professional_services\": 0,\n    \"computer_equipment_capex\": 0,\n    \"accounts_payable\": 0,\n    \"corporate_card_payable\": 0\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 52193\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\"POL-TRAVEL-017\"],\n  \"evidence\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.6
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"descriptor\",\"source_id\":\"transaction\",\"value\":\"UBER *TRIP\"},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Uber\"}],\"gl_account\":\"6205\",\"journal_entry\":[{\"account\":\"6205\",\"amount_minor\":52193,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":52193,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-TRAVEL-017\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 3.0
+  }
+ },
+ {
+  "i": 13,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":597818,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"},{\"actual_minor\":1350108,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"},{\"actual_minor\":699350,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":956397,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"}],\"evidence_index\":[\"actual_services_rev\",\"actual_ad_spend\",\"actual_fx_effect\",\"actual_license_sales\",\"budget_services_rev\",\"budget_ad_spend\",\"budget_fx_effect\",\"budget_license_sales\"],\"materia",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "favorable",
+   "evidence_ids": [
+    "actual_services_rev",
+    "actual_ad_spend",
+    "actual_fx_effect",
+    "actual_license_sales"
+   ],
+   "other_impact_minor": -39078,
+   "profit_impact_minor": 357249,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "services_rev",
+     "impact_minor": 402182,
+     "rank": 1
+    },
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": -350108,
+     "rank": 2
+    },
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": 300650,
+     "rank": 3
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": 43603,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -39078,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": -39078,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": -39078,\n      \"rank\": 2\n    }\n  ],\n  \"other_impact_minor\": 0,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 0.9999999999999999\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-39078,\"top_drivers\":[{\"driver_id\":\"services_rev\",\"impact_minor\":597818,\"rank\":0},{\"driver_id\":\"ad_spend\",\"impact_minor\":1350108,\"rank\":1},{\"driver_id\":\"fx_effect\",\"impact_minor\":699350,\"rank\":2},{\"driver_id\":\"license_sales\",\"impact_minor\":956397,\"rank\":3}],\"schema_version\":\"variance_analysis.v1\",\"score\":54253,\"version\":\"v1\",\"profit_impact_minor\":1000000,\"task\":\"variance_analysis\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.7
+  }
+ },
+ {
+  "i": 14,
+  "task": "cash_reconciliation",
+  "difficulty": "easy",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":30000,\"id\":\"k2\"},{\"amount_minor\":40000,\"id\":\"k3\"},{\"amount_minor\":-4629,\"id\":\"k4\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":6308649,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":30000,\"id\":\"b2\"},{\"amount_minor\":40000,\"id\":\"b3\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 6304020,
+   "adjusted_book_balance_minor": 6304020,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 4629,
+     "event_ids": [
+      "k4"
+     ],
+     "type": "bank_fee"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k2"
+     ],
+     "book_ids": [
+      "b2"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k3"
+     ],
+     "book_ids": [
+      "b3"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\", \"b2\", \"b3\"],\n      \"bank_ids\": [\"k0\", \"k1\", \"k2\", \"k3\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k4\", \"k4\", \"k4\", \"k4\"],\n      \"amount_minor\": -4629,\n      \"confidence\": 0.95\n    }\n  ],\n  \"adjusted_book_balance_minor\": 6308649 + (-4629) = 6308197,\n  \"adjusted_bank_balance_minor\": 6308649,\n  \"difference_minor\": 6308197 - 6308649 = -444,\n  \"confidence\": 0.95\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.0
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":55371,\"adjusted_book_balance_minor\":6308649,\"confidence\":0.875,\"difference_minor\":6253278,\"exceptions\":[{\"amount_minor\":4629,\"event_ids\":[\"k4\"],\"type\":\"fee\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\",\"k2\",\"k3\"],\"book_ids\":[\"b0\",\"b1\",\"b2\",\"b3\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 2.7
+  }
+ },
+ {
+  "i": 15,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "50708"
+    }
+   ],
+   "gl_account": "6300",
+   "journal_entry": [
+    {
+     "account": "6300",
+     "amount_minor": 50708,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 50708,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-SAAS-002"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 50708,\n    \"lodging\": 0,\n    \"meals_entertainment\": 0,\n    \"software_subscriptions\": 0,\n    \"cloud_infrastructure\": 0,\n    \"office_supplies\": 0,\n    \"professional_services\": 0,\n    \"marketing_advertising\": 0,\n    \"computer_equipment_capex\": 0,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 50708\n    },\n    {\n      \"account\": \"lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 0\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\n    \"POL-TRAVEL-017\"\n  ],\n  \"evidence\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.5
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Notion\"}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":50708,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":50708,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 2.6
+  }
+ },
+ {
+  "i": 16,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1089213,\"budget_minor\":1000000,\"driver_id\":\"cloud_usage\"},{\"actual_minor\":656018,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"},{\"actual_minor\":636364,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"},{\"actual_minor\":1363168,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"}],\"evidence_index\":[\"actual_cloud_usage\",\"actual_services_rev\",\"actual_ad_spend\",\"actual_license_sales\",\"budget_cloud_usage\",\"budget_services_rev\",\"budget_ad_spend\",\"budget_license_sales\"],\"",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "favorable",
+   "evidence_ids": [
+    "actual_ad_spend",
+    "actual_license_sales",
+    "actual_services_rev",
+    "actual_cloud_usage"
+   ],
+   "other_impact_minor": -5033,
+   "profit_impact_minor": 250204,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": 363636,
+     "rank": 1
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": -363168,
+     "rank": 2
+    },
+    {
+     "driver_id": "services_rev",
+     "impact_minor": 343982,
+     "rank": 3
+    },
+    {
+     "driver_id": "cloud_usage",
+     "impact_minor": -89213,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -5033,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"cloud_usage\",\n      \"impact_minor\": 1089213,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"services_rev\",\n      \"impact_minor\": 656018,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"ad_spend\",\n      \"impact_minor\": 636364,\n      \"rank\": 3\n    },\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 1363168,\n      \"rank\": 4\n    }\n  ],\n  \"other_impact_minor\": 0,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-5033,\"top_drivers\":[{\"driver_id\":\"cloud_usage\",\"impact_minor\":1089213,\"rank\":0},{\"driver_id\":\"services_rev\",\"impact_minor\":656018,\"rank\":1},{\"driver_id\":\"ad_spend\",\"impact_minor\":636364,\"rank\":2},{\"driver_id\":\"license_sales\",\"impact_minor\":1363168,\"rank\":3}],\"schema_version\":\"variance_analysis.v1\",\"score\":0.75,\"direction\":\"favorable\",\"profit_impact_minor\":1000000,\"schema_object\":\"profit_impact\",\"other_impact_minor\":5033,\"verification\":\"verify\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  }
+ },
+ {
+  "i": 17,
+  "task": "cash_reconciliation",
+  "difficulty": "easy",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":-3850,\"id\":\"k2\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":5962840,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 5958990,
+   "adjusted_book_balance_minor": 5958990,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 3850,
+     "event_ids": [
+      "k2"
+     ],
+     "type": "bank_fee"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\"],\n      \"bank_ids\": [\"k0\", \"k1\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k2\", \"k0\"],\n      \"amount_minor\": -3850,\n      \"confidence\": 0.99\n    }\n  ],\n  \"adjusted_book_balance_minor\": 5962840 + (-3850) * 2,\n  \"adjusted_bank_balance_minor\": 5962840 + (20000 * 2),\n  \"difference_minor\": 5962840 + (-3850) * 2 - (20000 * 2),\n  \"confidence\": 0.99\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.0
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":26145,\"adjusted_book_balance_minor\":5962840,\"confidence\":0.875,\"difference_minor\":5936695,\"exceptions\":[{\"amount_minor\":3850,\"event_ids\":[\"k2\"],\"type\":\"fee\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\"],\"book_ids\":[\"b0\",\"b1\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 2.5
+  }
+ },
+ {
+  "i": 18,
+  "task": "transaction_review",
+  "difficulty": "medium",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "121393"
+    }
+   ],
+   "gl_account": "6205",
+   "journal_entry": [
+    {
+     "account": "6205",
+     "amount_minor": 121393,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 121393,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-TRAVEL-017"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 121393,\n    \"lodging\": 0,\n    \"meals_entertainment\": 0,\n    \"software_subscriptions\": 0,\n    \"cloud_infrastructure\": 0,\n    \"office_supplies\": 0,\n    \"professional_services\": 0,\n    \"marketing_advertising\": 0,\n    \"computer_equipment_capex\": 0,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 121393\n    },\n    {\n      \"account\": \"lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 0\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\n    \"POL-TRAVEL-017\"\n  ],\n  \"evidence\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.5
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":121393},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"United Airlines\"}],\"gl_account\":\"6205\",\"journal_entry\":[{\"account\":\"6205\",\"amount_minor\":121393,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":121393,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-TRAVEL-017\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 19,
+  "task": "variance_analysis",
+  "difficulty": "medium",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1257485,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":1060791,\"budget_minor\":1000000,\"driver_id\":\"headcount\"}],\"evidence_index\":[\"actual_fx_effect\",\"actual_headcount\",\"budget_fx_effect\",\"budget_headcount\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":23547,\"period\":\"2026-06\",\"sign_convention\":\"negative profit_impact_minor is unfavorable\"}",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_fx_effect",
+    "actual_headcount"
+   ],
+   "other_impact_minor": 23547,
+   "profit_impact_minor": -294729,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": -257485,
+     "rank": 1
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": -60791,
+     "rank": 2
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -23547,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": 1257485,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 1060791,\n      \"rank\": 2\n    }\n  ],\n  \"other_impact_minor\": 23547,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 0.9999999999999999\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.2
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":23547,\"top_drivers\":[{\"driver_id\":\"fx_effect\",\"impact_minor\":1257485,\"rank\":0},{\"driver_id\":\"headcount\",\"impact_minor\":1060791,\"rank\":1}],\"score\":abs(1257485-1000000)+abs(1060791-1000000),\"schema_version\":\"variance_analysis.v1\",\"task\":\"variance_analysis\",\"profit_impact_minor\":1000000,\"side\":\"favorable\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.4
+  }
+ },
+ {
+  "i": 20,
+  "task": "cash_reconciliation",
+  "difficulty": "medium",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":30000,\"id\":\"k2\"},{\"amount_minor\":40000,\"id\":\"k3\"},{\"amount_minor\":-4588,\"id\":\"k4\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":8929201,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":30000,\"id\":\"b2\"},{\"amount_minor\":40000,\"id\":\"b3\"},{\"amount_minor\":12975,\"id\":\"b_dit\",\"memo\":\"deposit in transit\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 8924613,
+   "adjusted_book_balance_minor": 8924613,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 4588,
+     "event_ids": [
+      "k4"
+     ],
+     "type": "bank_fee"
+    },
+    {
+     "amount_minor": 12975,
+     "event_ids": [
+      "b_dit"
+     ],
+     "type": "deposit_in_transit"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k2"
+     ],
+     "book_ids": [
+      "b2"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k3"
+     ],
+     "book_ids": [
+      "b3"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\", \"b2\", \"b3\"],\n      \"bank_ids\": [\"k0\", \"k1\", \"k2\", \"k3\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k4\", \"k4\", \"k4\", \"k4\", \"k4\"],\n      \"amount_minor\": -4588,\n      \"confidence\": 0.99\n    }\n  ],\n  \"adjusted_book_balance_minor\": 8929201 + (-4588) * 6,\n  \"adjusted_bank_balance_minor\": 8929201 + (40000 * 6),\n  \"difference_minor\": 8929201 + (-4588) * 6,\n  \"confidence\": 0.99\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":95416,\"adjusted_book_balance_minor\":8929201,\"confidence\":0.8,\"difference_minor\":8833785,\"exceptions\":[{\"amount_minor\":4588,\"event_ids\":[\"k4\"],\"type\":\"fee\"},{\"amount_minor\":12975,\"event_ids\":[\"b_dit\"],\"type\":\"deposit_in_transit\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\",\"k2\",\"k3\"],\"book_ids\":[\"b0\",\"b1\",\"b2\",\"b3\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.2
+  }
+ },
+ {
+  "i": 21,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "398531"
+    }
+   ],
+   "gl_account": "6310",
+   "journal_entry": [
+    {
+     "account": "6310",
+     "amount_minor": 398531,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 398531,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-DEFAULT-000"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 1500,\n    \"marketing_advertising\": 10000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2100,\n    \"corporate_card_payable\": 2110\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 398531\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n     ",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 7.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":398531},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"AWS\"}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":398531,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":398531,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.0
+  }
+ },
+ {
+  "i": 22,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1052110,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":967122,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"}],\"evidence_index\":[\"actual_fx_effect\",\"actual_license_sales\",\"budget_fx_effect\",\"budget_license_sales\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":2499,\"period\":\"2026-06\",\"sign_convention\":\"negative profit_impact_minor is unfavorable\"}",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_fx_effect",
+    "actual_license_sales"
+   ],
+   "other_impact_minor": 2499,
+   "profit_impact_minor": -16733,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": -52110,
+     "rank": 1
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": 32878,
+     "rank": 2
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -2499,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 967122,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": 1052110,\n      \"rank\": 2\n    }\n  ],\n  \"other_impact_minor\": 2499,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 0.8\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 2.9
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.875,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":2499,\"top_drivers\":[{\"driver_id\":\"fx_effect\",\"impact_minor\":1052110,\"rank\":0},{\"driver_id\":\"license_sales\",\"impact_minor\":967122,\"rank\":1}],\"score\":abs(1052110-967122),\"scheme\":\"profit_impact_minor\",\"schema_version\":\"variance_analysis.v1\",\"strategy\":\"favorable\",\"visualizer\":\"schema_json\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 2.8
+  }
+ },
+ {
+  "i": 23,
+  "task": "cash_reconciliation",
+  "difficulty": "easy",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":30000,\"id\":\"k2\"},{\"amount_minor\":-3012,\"id\":\"k3\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":6598762,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":30000,\"id\":\"b2\"},{\"amount_minor\":29098,\"id\":\"b_dit\",\"memo\":\"deposit in transit\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 6595750,
+   "adjusted_book_balance_minor": 6595750,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 3012,
+     "event_ids": [
+      "k3"
+     ],
+     "type": "bank_fee"
+    },
+    {
+     "amount_minor": 29098,
+     "event_ids": [
+      "b_dit"
+     ],
+     "type": "deposit_in_transit"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k2"
+     ],
+     "book_ids": [
+      "b2"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\", \"b2\"],\n      \"bank_ids\": [\"k0\", \"k1\", \"k2\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k3\", \"k3.memo\"],\n      \"amount_minor\": -3012,\n      \"confidence\": 0.99\n    },\n    {\n      \"type\": \"DEPOSIT IN TRANSIT\",\n      \"event_ids\": [\"b_dit\"],\n      \"amount_minor\": 29098,\n      \"confidence\": 0.99\n    }\n  ],\n  \"adjusted_book_balance_minor\": 6598762 + (-3012) + (29098),\n  \"adjusted_bank_balance_minor\": 6598762,\n  \"difference_minor\": 6598762 + (-3012) + (29098) - 10000 - 20000 - 30000 - 20000,\n  \"confidence\": 0.99\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 5.1
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":56688,\"adjusted_book_balance_minor\":6598762,\"confidence\":0.85,\"difference_minor\":6542074,\"exceptions\":[{\"amount_minor\":3012,\"event_ids\":[\"k3\"],\"type\":\"fee\"},{\"amount_minor\":29098,\"event_ids\":[\"b_dit\"],\"type\":\"deposit_in_transit\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\",\"k2\"],\"book_ids\":[\"b0\",\"b1\",\"b2\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 24,
+  "task": "transaction_review",
+  "difficulty": "hard",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "312654"
+    }
+   ],
+   "gl_account": "6300",
+   "journal_entry": [
+    {
+     "account": "6300",
+     "amount_minor": 312654,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 312654,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "review",
+   "rule_ids": [
+    "POL-SAAS-002"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 1500,\n    \"marketing_advertising\": 10000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 312654\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n     ",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 7.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Figma\"},{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":312654}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":312654,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":312654,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 25,
+  "task": "variance_analysis",
+  "difficulty": "hard",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":717513,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"},{\"actual_minor\":1436486,\"budget_minor\":1000000,\"driver_id\":\"headcount\"},{\"actual_minor\":979715,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"},{\"actual_minor\":1171950,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"}],\"evidence_index\":[\"actual_services_rev\",\"actual_headcount\",\"actual_license_sales\",\"actual_ad_spend\",\"budget_services_rev\",\"budget_headcount\",\"budget_license_sales\",\"budget_ad_spend\"],\"materi",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_headcount",
+    "actual_services_rev",
+    "actual_ad_spend",
+    "actual_license_sales"
+   ],
+   "other_impact_minor": -35406,
+   "profit_impact_minor": -341070,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "headcount",
+     "impact_minor": -436486,
+     "rank": 1
+    },
+    {
+     "driver_id": "services_rev",
+     "impact_minor": 282487,
+     "rank": 2
+    },
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": -171950,
+     "rank": 3
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": 20285,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -35406,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"services_rev\",\n      \"impact_minor\": 717513,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 1436486,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 979715,\n      \"rank\": 3\n    },\n    {\n      \"driver_id\": \"ad_spend\",\n      \"impact_minor\": 1171950,\n      \"rank\": 4\n    }\n  ],\n  \"other_impact_minor\": -35406,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-35406,\"top_drivers\":[{\"driver_id\":\"services_rev\",\"impact_minor\":717513,\"rank\":0},{\"driver_id\":\"headcount\",\"impact_minor\":1436486,\"rank\":1},{\"driver_id\":\"license_sales\",\"impact_minor\":979715,\"rank\":2},{\"driver_id\":\"ad_spend\",\"impact_minor\":1171950,\"rank\":3}],\"schema_version\":\"variance_analysis.v1\",\"score\":0.85,\"direction\":\"favorable\",\"profit_impact_minor\":1000000,\"schema_object\":\"profit_impact\",\"other_impact_minor\":35406,\"schema_name\":\"variance_analysis\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  }
+ },
+ {
+  "i": 26,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "15000"
+    }
+   ],
+   "gl_account": "6215",
+   "journal_entry": [
+    {
+     "account": "6215",
+     "amount_minor": 15000,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 15000,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "review",
+   "rule_ids": [
+    "POL-MEALS-009"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 15000,\n    \"lodging\": 0,\n    \"meals_entertainment\": 0,\n    \"software_subscriptions\": 0,\n    \"cloud_infrastructure\": 0,\n    \"office_supplies\": 0,\n    \"professional_services\": 0,\n    \"marketing_advertising\": 0,\n    \"computer_equipment_capex\": 0,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 15000\n    },\n    {\n      \"account\": \"lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 0\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\n    \"POL-TRAVEL-017\"\n  ],\n  \"evidence\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.6
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"DoorDash\"},{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":15000}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":15000,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":15000,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.0
+  }
+ },
+ {
+  "i": 27,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":761106,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"},{\"actual_minor\":850057,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"}],\"evidence_index\":[\"actual_ad_spend\",\"actual_license_sales\",\"budget_ad_spend\",\"budget_license_sales\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":13251,\"period\":\"2026-06\",\"sign_convention\":\"negative profit_impact_minor is unfavorable\"}",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "favorable",
+   "evidence_ids": [
+    "actual_ad_spend",
+    "actual_license_sales"
+   ],
+   "other_impact_minor": 13251,
+   "profit_impact_minor": 402088,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": 238894,
+     "rank": 1
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": 149943,
+     "rank": 2
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -13251,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"ad_spend\",\n      \"impact_minor\": 761106,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 850057,\n      \"rank\": 2\n    }\n  ],\n  \"other_impact_minor\": 13251,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 0.9999999999999999\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.2
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":13251,\"top_drivers\":[{\"driver_id\":\"ad_spend\",\"impact_minor\":761106,\"rank\":0},{\"driver_id\":\"license_sales\",\"impact_minor\":850057,\"rank\":1}],\"score\":abs(761106-850057),\"schema_version\":\"variance_analysis.v1\",\"strategy\":\"favorable\",\"direction\":\"favorable\",\"profit_impact_minor\":13251,\"other_impact_minor\":13251,\"schema_object\":\"profit_impact_minor\",\"verification\":\"verify_driver_line\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.4
+  }
+ },
+ {
+  "i": 28,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "310549"
+    }
+   ],
+   "gl_account": "6500",
+   "journal_entry": [
+    {
+     "account": "6500",
+     "amount_minor": 310549,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 310549,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-DEFAULT-000"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 5000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2100,\n    \"corporate_card_payable\": 2110\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 310549\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amount_minor\": 5000\n    },\n    {\n      \"account\": \"computer_equipment_capex\",\n      \"side",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 7.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":310549},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Deloitte\"}],\"gl_account\":\"6500\",\"journal_entry\":[{\"account\":\"6500\",\"amount_minor\":310549,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":310549,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-MKTG-011\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 3.2
+  }
+ },
+ {
+  "i": 29,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1198312,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":1076031,\"budget_minor\":1000000,\"driver_id\":\"cloud_usage\"},{\"actual_minor\":651383,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"},{\"actual_minor\":1154924,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"}],\"evidence_index\":[\"actual_fx_effect\",\"actual_cloud_usage\",\"actual_license_sales\",\"actual_ad_spend\",\"budget_fx_effect\",\"budget_cloud_usage\",\"budget_license_sales\",\"budget_ad_spend\"],\"material",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_license_sales",
+    "actual_fx_effect",
+    "actual_ad_spend",
+    "actual_cloud_usage"
+   ],
+   "other_impact_minor": 39143,
+   "profit_impact_minor": -41507,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "license_sales",
+     "impact_minor": 348617,
+     "rank": 1
+    },
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": -198312,
+     "rank": 2
+    },
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": -154924,
+     "rank": 3
+    },
+    {
+     "driver_id": "cloud_usage",
+     "impact_minor": -76031,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -39143,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": 1198312,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"cloud_usage\",\n      \"impact_minor\": 1076031,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 651383,\n      \"rank\": 3\n    },\n    {\n      \"driver_id\": \"ad_spend\",\n      \"impact_minor\": 1154924,\n      \"rank\": 4\n    }\n  ],\n  \"other_impact_minor\": 39143,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.1
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":39143,\"top_drivers\":[{\"driver_id\":\"fx_effect\",\"impact_minor\":1198312,\"rank\":0},{\"driver_id\":\"cloud_usage\",\"impact_minor\":1076031,\"rank\":1},{\"driver_id\":\"license_sales\",\"impact_minor\":651383,\"rank\":2},{\"driver_id\":\"ad_spend\",\"impact_minor\":1154924,\"rank\":3}],\"scheme\":\"major\",\"schema_version\":\"variance_analysis.v1\",\"score\":1,\"scheme_score\":1,\"profit_impact_minor\":10000,\"schema_object\":\"profit_impact_minor\",\"task\":\"variance_analysis\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.9
+  }
+ },
+ {
+  "i": 30,
+  "task": "transaction_review",
+  "difficulty": "medium",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "275189"
+    }
+   ],
+   "gl_account": "1500",
+   "journal_entry": [
+    {
+     "account": "1500",
+     "amount_minor": 275189,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 275189,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "review",
+   "rule_ids": [
+    "POL-CAPEX-001"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 5000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 275189\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amount_minor\": 5000\n    },\n    {\n      \"account\": \"computer_equipment_capex\",\n      \"side",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 7.2
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Apple\"},{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":275189}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":275189,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":275189,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 31,
+  "task": "variance_analysis",
+  "difficulty": "medium",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":726613,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"},{\"actual_minor\":1365847,\"budget_minor\":1000000,\"driver_id\":\"headcount\"},{\"actual_minor\":1435960,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"},{\"actual_minor\":620963,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"}],\"evidence_index\":[\"actual_license_sales\",\"actual_headcount\",\"actual_ad_spend\",\"actual_services_rev\",\"budget_license_sales\",\"budget_headcount\",\"budget_ad_spend\",\"budget_services_rev\"],\"materi",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_ad_spend",
+    "actual_services_rev",
+    "actual_headcount",
+    "actual_license_sales"
+   ],
+   "other_impact_minor": -27866,
+   "profit_impact_minor": -177249,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": -435960,
+     "rank": 1
+    },
+    {
+     "driver_id": "services_rev",
+     "impact_minor": 379037,
+     "rank": 2
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": -365847,
+     "rank": 3
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": 273387,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -27866,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 726613,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 1365847,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"ad_spend\",\n      \"impact_minor\": 1435960,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": -27866,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.5
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-27866,\"top_drivers\":[{\"driver_id\":\"license_sales\",\"impact_minor\":726613,\"rank\":0},{\"driver_id\":\"headcount\",\"impact_minor\":1365847,\"rank\":1},{\"driver_id\":\"ad_spend\",\"impact_minor\":1435960,\"rank\":2},{\"driver_id\":\"services_rev\",\"impact_minor\":620963,\"rank\":3}],\"scheme\":\"major\",\"schema_version\":\"variance_analysis.v1\",\"score\":0.85,\"confidence\":0.95,\"evidence_ids\":[\"actual_license_sales\",\"actual_headcount\",\"actual_ad_spend\",\"actual_services_rev\"],\"profit_impact_minor\":1000000,\"direction\":\"favorable\",\"schema_object\":\"profit_impact_minor\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.5
+  }
+ },
+ {
+  "i": 32,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "200241"
+    }
+   ],
+   "gl_account": "6600",
+   "journal_entry": [
+    {
+     "account": "6600",
+     "amount_minor": 200241,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 200241,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "review",
+   "rule_ids": [
+    "POL-MKTG-011"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1,\n    \"travel_lodging\": 1,\n    \"travel_meals_entertainment\": 1,\n    \"software_subscriptions\": 1,\n    \"cloud_infrastructure\": 1,\n    \"office_supplies\": 1,\n    \"professional_services\": 1,\n    \"computer_equipment_capex\": 1,\n    \"accounts_payable\": 1,\n    \"corporate_card_payable\": 1\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 200241\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 0\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\n    \"POL-TRAVEL-017\"\n  ],\n  \"evidence\": [],\n  \"confidence\": 1\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.2
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Google Ads\"},{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":200241}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":200241,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":200241,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 33,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1053961,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"},{\"actual_minor\":712356,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"},{\"actual_minor\":1086419,\"budget_minor\":1000000,\"driver_id\":\"headcount\"}],\"evidence_index\":[\"actual_services_rev\",\"actual_license_sales\",\"actual_headcount\",\"budget_services_rev\",\"budget_license_sales\",\"budget_headcount\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":-3061,\"period\":\"2026-06",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "favorable",
+   "evidence_ids": [
+    "actual_license_sales",
+    "actual_headcount",
+    "actual_services_rev"
+   ],
+   "other_impact_minor": -3061,
+   "profit_impact_minor": 144203,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "license_sales",
+     "impact_minor": 287644,
+     "rank": 1
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": -86419,
+     "rank": 2
+    },
+    {
+     "driver_id": "services_rev",
+     "impact_minor": -53961,
+     "rank": 3
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -3061,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"services_rev\",\n      \"impact_minor\": 1053961,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 712356,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 1086419,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": -3061,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.5
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-3061,\"top_drivers\":[{\"driver_id\":\"services_rev\",\"impact_minor\":1053961,\"rank\":0},{\"driver_id\":\"license_sales\",\"impact_minor\":712356,\"rank\":1},{\"driver_id\":\"headcount\",\"impact_minor\":1086419,\"rank\":2}],\"score\":1053961,\"schema_version\":\"variance_analysis.v1\",\"task\":\"variance_analysis\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 2.8
+  }
+ },
+ {
+  "i": 34,
+  "task": "transaction_review",
+  "difficulty": "hard",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "268828"
+    }
+   ],
+   "gl_account": "6500",
+   "journal_entry": [
+    {
+     "account": "6500",
+     "amount_minor": 268828,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 268828,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-DEFAULT-000"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 5000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2100,\n    \"corporate_card_payable\": 2110\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 268828\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amount_minor\": 5000\n    },\n    {\n      \"account\": \"computer_equipment_capex\",\n      \"side",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 7.0
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":268828},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Deloitte\"}],\"gl_account\":\"6500\",\"journal_entry\":[{\"account\":\"6500\",\"amount_minor\":268828,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":268828,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-MKTG-011\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 35,
+  "task": "variance_analysis",
+  "difficulty": "hard",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1440578,\"budget_minor\":1000000,\"driver_id\":\"cloud_usage\"},{\"actual_minor\":1428179,\"budget_minor\":1000000,\"driver_id\":\"headcount\"}],\"evidence_index\":[\"actual_cloud_usage\",\"actual_headcount\",\"budget_cloud_usage\",\"budget_headcount\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":-6392,\"period\":\"2026-06\",\"sign_convention\":\"negative profit_impact_minor is unfavorable\"}",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_cloud_usage",
+    "actual_headcount"
+   ],
+   "other_impact_minor": -6392,
+   "profit_impact_minor": -875149,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "cloud_usage",
+     "impact_minor": -440578,
+     "rank": 1
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": -428179,
+     "rank": 2
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -6392,\n  \"direction\": \"unfavorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"cloud_usage\",\n      \"impact_minor\": 1440578,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 1428179,\n      \"rank\": 2\n    }\n  ],\n  \"other_impact_minor\": -6392,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 2.9
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-6392,\"top_drivers\":[{\"driver_id\":\"cloud_usage\",\"impact_minor\":1440578,\"rank\":0},{\"driver_id\":\"headcount\",\"impact_minor\":1428179,\"rank\":1}],\"score\":abs(1440578-1000000)+abs(1428179-1000000)-6392,\"schema_version\":\"variance_analysis.v1\",\"task\":\"variance_analysis\",\"profit_impact_minor\":1000000,\"side\":\"favorable\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.5
+  }
+ },
+ {
+  "i": 36,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "4694"
+    }
+   ],
+   "gl_account": "6300",
+   "journal_entry": [
+    {
+     "account": "6300",
+     "amount_minor": 4694,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 4694,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-SAAS-002"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 1500,\n    \"marketing_advertising\": 10000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 4694\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 7.0
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Notion\"}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":4694,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":4694,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": true,
+   "latency_s": 2.6
+  }
+ },
+ {
+  "i": 37,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":648339,\"budget_minor\":1000000,\"driver_id\":\"support_volume\"},{\"actual_minor\":577939,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"},{\"actual_minor\":1069556,\"budget_minor\":1000000,\"driver_id\":\"headcount\"}],\"evidence_index\":[\"actual_support_volume\",\"actual_services_rev\",\"actual_headcount\",\"budget_support_volume\",\"budget_services_rev\",\"budget_headcount\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":34196,\"period\":\"2026-",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "favorable",
+   "evidence_ids": [
+    "actual_services_rev",
+    "actual_support_volume",
+    "actual_headcount"
+   ],
+   "other_impact_minor": 34196,
+   "profit_impact_minor": 738362,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "services_rev",
+     "impact_minor": 422061,
+     "rank": 1
+    },
+    {
+     "driver_id": "support_volume",
+     "impact_minor": 351661,
+     "rank": 2
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": -69556,
+     "rank": 3
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -34196,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"support_volume\",\n      \"impact_minor\": 648339,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"services_rev\",\n      \"impact_minor\": 577939,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"headcount\",\n      \"impact_minor\": 1069556,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": 34196,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.7
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":34196,\"top_drivers\":[{\"driver_id\":\"support_volume\",\"impact_minor\":648339,\"rank\":0},{\"driver_id\":\"services_rev\",\"impact_minor\":577939,\"rank\":1},{\"driver_id\":\"headcount\",\"impact_minor\":1069556,\"rank\":2}],\"scheme\":\"major\",\"schema_version\":\"variance_analysis.v1\",\"score\":10000,\"profit_impact_minor\":1000000,-34196,\"solution\":\"{\"driver_id\":\"support_volume\",\"impact_minor\":648339,\"rank\":0\",\"other_impact_minor\":34196,\"confidence\":0.95\",\"evidence_ids\":[\"actual_support_volume\"],\"formula\":\"actual_minor-budget_minor\",\"schema\":\"major\",\"strategy\":\"analyze\",\"task\":\"variance_analysis\"}\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.7
+  }
+ },
+ {
+  "i": 38,
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"expense\"},{\"account\":\"6500\",\"name\":\"Professional Services\",\"type\":\"expense\"},{\"account\":\"6600\",\"name\":",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "199931"
+    }
+   ],
+   "gl_account": "6600",
+   "journal_entry": [
+    {
+     "account": "6600",
+     "amount_minor": 199931,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 199931,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-MKTG-011"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 199931,\n    \"lodging\": 0,\n    \"meals_entertainment\": 0,\n    \"software_subscriptions\": 0,\n    \"cloud_infrastructure\": 0,\n    \"office_supplies\": 0,\n    \"professional_services\": 0,\n    \"marketing_advertising\": 0,\n    \"computer_equipment_capex\": 0,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 199931\n    },\n    {\n      \"account\": \"lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 0\n    }\n  ],\n  \"policy_action\": \"approve\",\n  \"rule_ids\": [\n    \"POL-TRAVEL-017\"\n  ],\n  \"evidence\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 4.5
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Google Ads\"},{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":199931}],\"gl_account\":\"6300\",\"journal_entry\":[{\"account\":\"6300\",\"amount_minor\":199931,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":199931,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-SAAS-002\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "key_fields_correct": false,
+   "latency_s": 3.1
+  }
+ },
+ {
+  "i": 39,
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1446149,\"budget_minor\":1000000,\"driver_id\":\"cloud_usage\"},{\"actual_minor\":886354,\"budget_minor\":1000000,\"driver_id\":\"ad_spend\"},{\"actual_minor\":896688,\"budget_minor\":1000000,\"driver_id\":\"services_rev\"}],\"evidence_index\":[\"actual_cloud_usage\",\"actual_ad_spend\",\"actual_services_rev\",\"budget_cloud_usage\",\"budget_ad_spend\",\"budget_services_rev\"],\"materiality\":{\"rule_id\":\"VAR-MATERIAL-005\",\"threshold_minor\":10000},\"other_impact_minor\":-27765,\"period\":\"2026-06\",\"sign_c",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_cloud_usage",
+    "actual_ad_spend",
+    "actual_services_rev"
+   ],
+   "other_impact_minor": -27765,
+   "profit_impact_minor": -256956,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "cloud_usage",
+     "impact_minor": -446149,
+     "rank": 1
+    },
+    {
+     "driver_id": "ad_spend",
+     "impact_minor": 113646,
+     "rank": 2
+    },
+    {
+     "driver_id": "services_rev",
+     "impact_minor": 103312,
+     "rank": 3
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"impact_minor\",\n  \"profit_impact_minor\": -27765,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"cloud_usage\",\n      \"impact_minor\": 1446149,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"ad_spend\",\n      \"impact_minor\": 886354,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"services_rev\",\n      \"impact_minor\": 896688,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": -27765,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 3.5
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\",-27765,\"top_drivers\":[{\"driver_id\":\"cloud_usage\",\"impact_minor\":1446149,\"rank\":0},{\"driver_id\":\"ad_spend\",\"impact_minor\":886354,\"rank\":1},{\"driver_id\":\"services_rev\",\"impact_minor\":896688,\"rank\":2}],\"score\":0.875,\"schema_version\":\"variance_analysis.v1\",\"task\":\"variance_analysis\"}",
+   "schema_valid": false,
+   "key_fields_correct": false,
+   "latency_s": 2.8
+  }
+ }
+]
