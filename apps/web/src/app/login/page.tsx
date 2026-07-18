@@ -7,7 +7,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,9 +53,9 @@ export default async function LoginPage({
             <div className="mb-4 grid size-10 place-items-center rounded-xl bg-[#141413] text-white">
               <LockKeyhole className="size-4" aria-hidden />
             </div>
-            <CardTitle className="font-serif text-3xl font-normal tracking-[-0.035em]">
+            <h1 className="font-serif text-3xl font-normal tracking-[-0.035em]">
               Sign in to Distillery
-            </CardTitle>
+            </h1>
             <CardDescription>
               Enter the shared demo password to continue.
             </CardDescription>

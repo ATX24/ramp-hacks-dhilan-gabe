@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getAuthSecret, getDemoPassword } from "@/lib/auth/config";
-import { safeNextPath } from "@/lib/auth/redirect";
+import { requestOrigin, safeNextPath } from "@/lib/auth/redirect";
 import {
   createSessionToken,
   SESSION_COOKIE_NAME,
@@ -62,7 +62,7 @@ function passwordsMatch(candidate: string, expected: string): boolean {
 }
 
 function failedResponse(request: NextRequest, nextPath: string): NextResponse {
-  const loginUrl = new URL("/login", request.url);
+  const loginUrl = new URL("/login", requestOrigin(request));
   loginUrl.searchParams.set("error", "1");
   if (nextPath !== "/") loginUrl.searchParams.set("next", nextPath);
   return NextResponse.redirect(loginUrl, 303);
@@ -97,7 +97,10 @@ export async function POST(request: NextRequest) {
 
   attempts.delete(key);
   const session = await createSessionToken(signingSecret, now);
-  const response = NextResponse.redirect(new URL(nextPath, request.url), 303);
+  const response = NextResponse.redirect(
+    new URL(nextPath, requestOrigin(request)),
+    303,
+  );
   response.cookies.set(SESSION_COOKIE_NAME, session.token, {
     httpOnly: true,
     secure: true,

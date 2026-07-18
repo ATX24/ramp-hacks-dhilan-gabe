@@ -441,6 +441,15 @@ table.data th {
   .shell {
     width: min(var(--max), calc(100% - 1.25rem));
   }
+
+  .site-header {
+    min-height: 5rem;
+    margin-bottom: 1rem;
+  }
+
+  .site-header .tagline {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
