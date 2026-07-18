@@ -1,92 +1,21 @@
 {
-  "schema_version": "distillery.demo_model_registry.v1",
-  "run_id": "run_finance_agent_demo_001",
-  "dataset_id": "ds_finance_agent_smoke_001",
+  "schema_version": "finance_agent.model_registry_metadata.v1",
   "mode_id": "finance_agent",
-  "models": [
-    {
-      "model_id": "model_finance_agent_generalist_001",
-      "arm_id": "finance_agent_generalist",
-      "display_name": "TinyFable Finance Agent Generalist",
-      "purpose": "Multi-turn finance Q&A with sandbox tools (fixture preview only)",
-      "excluded": false,
-      "exclusion_reason": null,
-      "serving": {
-        "availability": "fixture_preview",
-        "endpoint_id": null,
-        "artifact_id": null,
-        "reason": "Finance Agent mode is contract-only; no live serving path yet"
-      },
-      "stats": {
-        "advertised_parameter_count": 1500000000,
-        "adapter_parameter_count": null,
-        "compression_ratio": null,
-        "recipe": "agent_trajectory.v1",
-        "teacher": {
-          "id": "Qwen/Qwen2.5-72B-Instruct",
-          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        },
-        "student": {
-          "id": "Qwen/Qwen2.5-1.5B-Instruct",
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        },
-        "seed": 17,
-        "data_hash": null,
-        "manifest_hash": null,
-        "artifact_hash": null,
-        "training_duration_seconds": null,
-        "training_cost_usd": null,
-        "iid_primary_index": null,
-        "iid_ci_low": null,
-        "iid_ci_high": null,
-        "ood_retention": null,
-        "ood_ci_low": null,
-        "ood_ci_high": null,
-        "proof_status": null,
-        "promotion_status": "not_promoted"
-      }
-    },
-    {
-      "model_id": "model_finance_agent_policy_specialist_001",
-      "arm_id": "finance_agent_specialist_policy",
-      "display_name": "TinyFable Finance Agent Policy Specialist",
-      "purpose": "Policy lookup and stale-policy refusal specialist (fixture preview)",
-      "excluded": false,
-      "exclusion_reason": null,
-      "serving": {
-        "availability": "fixture_preview",
-        "endpoint_id": null,
-        "artifact_id": null,
-        "reason": "Finance Agent mode is contract-only; no live serving path yet"
-      },
-      "stats": {
-        "advertised_parameter_count": 1500000000,
-        "adapter_parameter_count": null,
-        "compression_ratio": null,
-        "recipe": "agent_trajectory.v1",
-        "teacher": {
-          "id": "Qwen/Qwen2.5-72B-Instruct",
-          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        },
-        "student": {
-          "id": "Qwen/Qwen2.5-1.5B-Instruct",
-          "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        },
-        "seed": 17,
-        "data_hash": null,
-        "manifest_hash": null,
-        "artifact_hash": null,
-        "training_duration_seconds": null,
-        "training_cost_usd": null,
-        "iid_primary_index": null,
-        "iid_ci_low": null,
-        "iid_ci_high": null,
-        "ood_retention": null,
-        "ood_ci_low": null,
-        "ood_ci_high": null,
-        "proof_status": null,
-        "promotion_status": "not_promoted"
-      }
-    }
-  ]
+  "availability": "not_materialized",
+  "default_model_arm": null,
+  "models": [],
+  "required_before_registration": [
+    "pinned_model_revision",
+    "model_artifact_sha256",
+    "tokenizer_sha256",
+    "chat_template_sha256",
+    "approved_license_output_use_disposition",
+    "measured_cost_artifact",
+    "ready_finance-agent-proof.v1"
+  ],
+  "routing": {
+    "kind": "none",
+    "specialist_routes": []
+  },
+  "integration_status": "contract_only_not_wired"
 }

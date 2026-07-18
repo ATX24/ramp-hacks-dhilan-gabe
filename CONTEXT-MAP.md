@@ -9,5 +9,8 @@
 ## Relationships
 
 - **Finance Agent → TinyFable finance world**: Shared finance vocabulary (accounts, policies, ledgers) but **separate envelopes**. Finance Agent must not extend `TaskId` or `FinanceTaskEnvelope`.
-- **Finance Agent → BYODT**: Distillation uses technique id `agent_trajectory.v1`. Integration into `TechniqueRegistry.with_builtins()` waits for BYODT review. Until then the plan adapter stays under `src/distillery/finance_agent/technique/`.
+- **Finance Agent → BYODT**: The planned role-masked objective uses technique id
+  `agent_trajectory.v1`. Integration into `TechniqueRegistry.with_builtins()` waits
+  for BYODT review. Until then the objective/collator and plan adapter stay under
+  `src/distillery/finance_agent/technique/`.
 - **Finance Agent ↛ live systems**: No real Ramp/ERP/bank APIs, shell, or network tool I/O.

@@ -41,5 +41,7 @@ A corpus partition that withholds tools and/or domain facets from training to me
 _Avoid_: Test set (when tool/domain hold-out is the intent)
 
 **agent_trajectory.v1**:
-The distillation technique that supervises student models on Oracle Trajectories from a large teacher. It is not `sequence.v1` and not `logit.v1`.
-_Avoid_: sequence KD, SFT recipe (as technique identity)
+The role-masked causal objective that supervises assistant-authored Trajectory
+tokens while masking system, user, and Tool Result tokens. Current labels are
+Oracle Trajectories. Teacher labels require separate rollout evidence.
+_Avoid_: sequence KD, logit KD, generic completion mask

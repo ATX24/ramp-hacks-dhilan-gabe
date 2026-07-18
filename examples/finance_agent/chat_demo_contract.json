@@ -1,15 +1,16 @@
 {
-  "schema_version": "finance_agent.chat_demo.v1",
+  "schema_version": "finance_agent.chat_demo.v2",
   "mode_id": "finance_agent",
   "display_name": "Finance Agent",
-  "description": "Conversational finance Q&A with sandboxed synthetic tools. Not live ERP/bank access.",
+  "description": "Synthetic finance Q&A with deterministic sandbox tools; no live finance access.",
   "technique_id": "agent_trajectory.v1",
   "envelope_schema_version": "finance_agent.v1",
+  "proof_protocol_id": "finance-agent-proof.v1",
   "ui_hints": {
     "show_tool_calls": true,
     "show_provenance": true,
     "allow_live_tools": false,
-    "default_model_arm": "finance_agent_generalist"
+    "default_model_arm": null
   },
   "tools": [
     "chart_of_accounts_lookup",
@@ -20,13 +21,14 @@
     "variance_drill_down"
   ],
   "sample_user_messages": [
-    "What is the current meal expense policy action?",
-    "Which GL account should I use for travel meals?",
-    "Reconcile the open book entry to the bank deposit."
+    "Review the posted amount for the public account and period.",
+    "Inspect a historical policy version, then answer for the current as-of date.",
+    "Match the public book and bank IDs, then verify the returned difference."
   ],
-  "integration_status": "contract_only",
+  "model_availability": "not_materialized",
+  "integration_status": "contract_only_not_wired",
   "notes": [
-    "Do not wire into active DemoStage until inference/API review.",
-    "Scoring uses finance_agent.metrics.v1, not finance-proof.v1 primary index."
+    "Do not wire active UI, API, BYODT, or training paths before re-review.",
+    "Model registry metadata intentionally contains no model or specialist entries."
   ]
 }

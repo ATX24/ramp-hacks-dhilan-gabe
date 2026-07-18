@@ -174,9 +174,9 @@ _recipe_catalog: dict[RecipeId, RecipeCapability] = {
 for _rid in CATALOG_ONLY_RECIPES:
     if _rid is RecipeId.AGENT_TRAJECTORY:
         summary = (
-            "Catalog stub for Finance Agent trajectory distillation. "
-            "Implemented technique id is agent_trajectory.v1 (isolated adapter; "
-            "not sequence.v1/logit.v1). BYODT registry integration pending review."
+            "Catalog stub for Finance Agent role-masked trajectory supervision. "
+            "agent_trajectory.v1 has an isolated objective/collator contract but no "
+            "BYODT registration or training artifact; integration is pending review."
         )
     else:
         summary = f"Cataloged capability {_rid.value}; not implemented in MVP."

@@ -1,35 +1,38 @@
 # agent_trajectory.v1 (isolated)
 
-Finance Agent trajectory distillation from a 72B teacher into TinyFable Generalist
-and task specialists.
+Role-masked causal supervision over Finance Agent trajectories. System, user, tool
+result, and padding tokens use `ignore_index`; assistant messages, tool calls, and
+final answers are supervised.
 
-**Status:** plan adapter only. Not registered in `TechniqueRegistry.with_builtins()`.
-Do not treat this as `sequence.v1` or `logit.v1`.
+Current labels are deterministic oracle trajectories. No teacher rollout, model
+artifact, specialist route, measured cost, or training readiness is claimed.
 
-## Local plan
+**Status:** objective/collator and plan adapter only. Not registered in
+`TechniqueRegistry.with_builtins()`.
+
+## Inspect the sealed plan
 
 ```bash
-uv run python -c "
+uv run python - <<'PY'
+import json
+from pathlib import Path
 from distillery.finance_agent.technique import AgentTrajectoryPlanAdapter
-plan = AgentTrajectoryPlanAdapter().plan({
-  'max_length': 4096,
-  'max_completion': 1024,
-  'seed': 17,
-  'teacher_model_id': 'Qwen/Qwen2.5-72B-Instruct',
-  'teacher_revision': 'a' * 40,
-  'student_model_id': 'Qwen/Qwen2.5-1.5B-Instruct',
-  'student_revision': 'b' * 40,
-  'trajectory_corpus_sha256': 'c' * 64,
-  'specialist_task': 'generalist',
-})
-print(plan.technique_id, plan.plan_hash())
-"
+
+config = json.loads(
+    Path("examples/byodt/agent_trajectory_v1/sample_config.json").read_text()
+)
+plan = AgentTrajectoryPlanAdapter().plan(config)
+print(plan.model_dump_json(indent=2))
+PY
 ```
 
-## BYODT integration (later)
+The sample binds the deterministic smoke corpus and intentionally leaves model,
+tokenizer, chat-template, license, and cost evidence null. The resulting plan is
+`not_materialized` and `training_ready=false`.
 
-After review:
+## Later integration gates
 
-1. Seal an external or builtin descriptor under technique id `agent_trajectory.v1`
-2. Register via `TechniqueRegistry.register` / `byodt_ctl.py register`
-3. Wire Demo mode using `examples/finance_agent/chat_demo_contract.json`
+1. Independent review of the objective and exact role masks.
+2. Pinned model/tokenizer/template artifacts and reviewed license/output use.
+3. Measured cost evidence and a ready paired proof protocol.
+4. Explicit BYODT registration. Never alias this objective to another technique.

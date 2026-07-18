@@ -1,47 +1,57 @@
 # Finance Agent task
 
-Isolated conversational finance Q&A task with sandboxed synthetic tools.
+Isolated conversational finance Q&A over deterministic synthetic tools. It does
+not extend TinyFable `TaskId` / `finance_world.*`, call live finance systems, or
+expose shell/network capabilities.
 
-## Package
+## Data boundary
 
-`src/distillery/finance_agent/` — contracts, sandbox, oracle trajectories, corpus
-generation, metrics, and an isolated `agent_trajectory.v1` plan adapter.
+Every `finance_agent.v1` envelope has two sealed parts:
 
-Does **not** extend TinyFable `TaskId` / `finance_world.*` envelopes.
+- `model_input`: system prompt, public world facts/IDs, user turns, canonical tool
+  JSON Schemas, and component hashes.
+- `gold`: ordered oracle trajectory, exact tool results/provenance, expected answer,
+  and latent-world hash.
+
+Materialization writes `model/`, `gold/`, and `oracle/` separately. Model and
+inference processes receive only `model/`. Validation requires the private world,
+replays every call, and compares canonical result bytes including provenance.
 
 ## Corpora
 
-| Corpus | Count | Splits |
-| --- | --- | --- |
-| smoke | 48 | train 24 / validation 8 / test 16 |
-| planned | 2200 | train 1200 / validation 200 / iid_test 400 / ood_test 400 |
+- Smoke: 48 episodes. Train 24, validation 8, test 8, OOD test 8.
+- Planned: 2,200 episodes. Train 1,200, validation 200, IID test 400,
+  OOD test 400.
 
-OOD holds out tools `variance_drill_down`, `transaction_matching` and domain `payroll`.
+`transaction_matching`, `variance_drill_down`, and payroll semantics occur only in
+OOD. Payroll changes the exposed COA, ledger account/memo, policy, and merchant.
+Prompt leakage checks cover identity, model-input hash, normalized text, template
+family, and semantic fingerprint across every split pair.
 
-## Metrics (`finance_agent.metrics.v1`)
+## Metrics and proof
 
-- tool_selection_accuracy
-- argument_exactness
-- tool_result_use
-- final_answer_correctness
-- unnecessary_calls
-- latency_ms / cost_usd_micros
-- end_to_end_success
+`finance_agent.metrics.v2` scores ordered tool names, arguments, result bytes,
+result-to-answer bindings, final answers, skipped/extra calls, and end-to-end
+success. Latency and cost remain null until measured.
 
-## Integration steps (after review)
+`finance-agent-proof.v1` binds corpus seed/content/order, system prompts, tool
+schemas, render template, model, tokenizer, chat template, license/output-use
+disposition, and measured cost. Generated corpora have honest `not_ready` proof
+state because model/tokenizer/license/cost artifacts do not exist.
 
-1. Keep active UI/API/training paths untouched until review.
-2. Seal/register `agent_trajectory.v1` through BYODT (`examples/byodt/agent_trajectory_v1/`).
-3. Point Demo mode at `examples/finance_agent/chat_demo_contract.json` and
-   `examples/finance_agent/model_registry_finance_agent.json`.
-4. Generate smoke/planned corpora; seal manifests; wire proof arms to agent metrics.
-5. Distill 72B teacher trajectories into TinyFable Generalist + specialists via the
-   isolated adapter (never alias to `sequence.v1` / `logit.v1`).
+## agent_trajectory.v1
 
-## Commands
+The isolated objective supervises assistant messages, tool calls, and final
+answers. System, user, tool-result, and padding tokens use `ignore_index`.
+Current labels are oracle labels, not teacher labels. No model, teacher rollout,
+specialist, or training artifact is claimed.
+
+Do not register through BYODT or wire UI/API/training until independent re-review.
+
+## Checks
 
 ```bash
 uv run pytest tests/finance_agent -q
-uv run ruff check src/distillery/finance_agent tests/finance_agent
+uv run ruff check src/distillery/finance_agent tests/finance_agent scripts/finance_agent
 uv run python scripts/finance_agent/generate_smoke.py
 ```

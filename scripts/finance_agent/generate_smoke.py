@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from distillery.finance_agent.baselines import always_refuse_baseline
 from distillery.finance_agent.generate import generate_agent_corpus
 from distillery.finance_agent.metrics import aggregate_metrics, score_episode
 
@@ -21,14 +22,24 @@ def main() -> None:
     args = parser.parse_args()
     corpus = generate_agent_corpus("smoke", seed=args.seed)
     hashes = corpus.write(args.out)
-    metrics = aggregate_metrics([score_episode(example) for example in corpus.examples])
+    baseline_metrics = aggregate_metrics(
+        [
+            score_episode(
+                example,
+                predicted=always_refuse_baseline(example),
+            )
+            for example in corpus.examples
+        ]
+    )
     print(
         {
             "n": corpus.manifest["n_examples"],
             "splits": corpus.manifest["splits"],
             "case_family_counts": corpus.manifest["case_family_counts"],
-            "content_sha256": corpus.manifest["content_sha256"],
-            "oracle_end_to_end_success_rate": metrics["end_to_end_success_rate"],
+            "corpus_sha256": corpus.manifest["corpus_sha256"],
+            "corpus_order_sha256": corpus.manifest["corpus_order_sha256"],
+            "proof_status": corpus.proof_protocol.proof_status,
+            "always_refuse_baseline": baseline_metrics,
             "files": hashes,
         }
     )
