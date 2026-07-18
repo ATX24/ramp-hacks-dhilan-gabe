@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from distillery.proof.metrics import (
     compute_arm_metrics,
     compute_primary_index,
@@ -273,3 +275,193 @@ def test_raw_text_json_roundtrip() -> None:
         raw_text=json.dumps(gold),
     )
     assert score_prediction(rec).joint_exact is True
+
+
+def test_invalid_raw_text_cannot_be_rescued_by_parsed_cache() -> None:
+    gold = txn_gold()
+    rec = make_pred(
+        example_id="ex_raw_invalid",
+        world_id="world_raw",
+        task="transaction_review",
+        expected=gold,
+        parsed=gold,
+        raw_text="{not-json",
+    )
+    score = score_prediction(rec)
+    assert score.json_parse_ok is False
+    assert score.json_schema_valid is False
+    assert score.joint_exact is False
+
+
+def test_valid_raw_text_rejects_inconsistent_parsed_cache() -> None:
+    gold = txn_gold()
+    inconsistent = {**gold, "gl_account": "9999"}
+    with pytest.raises(ValueError, match="parsed cache does not match"):
+        make_pred(
+            example_id="ex_cache_mismatch",
+            world_id="world_raw",
+            task="transaction_review",
+            expected=gold,
+            parsed=inconsistent,
+            raw_text=json.dumps(gold),
+        )
+
+
+def test_adaptive_ece_never_splits_equal_confidence_ties() -> None:
+    gold = txn_gold(confidence=0.5)
+    records = []
+    for index in range(4):
+        pred = dict(gold)
+        if index >= 2:
+            pred["gl_account"] = "9999"
+            pred["journal_entry"] = [
+                {
+                    "account": "9999",
+                    "side": "debit",
+                    "amount_minor": 4500,
+                },
+                {
+                    "account": "2100",
+                    "side": "credit",
+                    "amount_minor": 4500,
+                },
+            ]
+        records.append(
+            make_pred(
+                example_id=f"ex_tie_{index}",
+                world_id=f"world_tie_{index}",
+                task="transaction_review",
+                expected=gold,
+                parsed=pred,
+            )
+        )
+    first = compute_arm_metrics("ties", records).calibration.adaptive_ece
+    second = compute_arm_metrics("ties", list(reversed(records))).calibration.adaptive_ece
+    # One confidence-tie bin: accuracy=0.5 and confidence=0.5.
+    assert first == 0.0
+    assert second == first
+
+
+def test_arm_metrics_aggregate_explicit_seed_replicates() -> None:
+    gold = txn_gold()
+    wrong = {
+        **gold,
+        "gl_account": "9999",
+        "journal_entry": [
+            {
+                "account": "9999",
+                "side": "debit",
+                "amount_minor": 4500,
+            },
+            {
+                "account": "2100",
+                "side": "credit",
+                "amount_minor": 4500,
+            },
+        ],
+    }
+    records = [
+        make_pred(
+            example_id="seeded_example",
+            world_id="seeded_world",
+            task="transaction_review",
+            expected=gold,
+            parsed=gold,
+            seed=17,
+        ),
+        make_pred(
+            example_id="seeded_example",
+            world_id="seeded_world",
+            task="transaction_review",
+            expected=gold,
+            parsed=wrong,
+            seed=23,
+        ),
+    ]
+    metrics = compute_arm_metrics("seeded", records)
+    assert metrics.seeds == (17, 23)
+    assert metrics.transaction_joint_exact == 0.5
+    assert metrics.seed_metrics[17]["transaction_joint_exact"] == 1.0
+    assert metrics.seed_metrics[23]["transaction_joint_exact"] == 0.0
+
+
+def test_cash_multilabel_exception_macro_f1_hand_calculated() -> None:
+    base = cash_gold()
+    gold_one = {
+        **base,
+        "exceptions": [
+            {"type": "bank_fee", "event_ids": ["a"], "amount_minor": 1},
+            {"type": "stale_check", "event_ids": ["b"], "amount_minor": 2},
+        ],
+    }
+    pred_one = {
+        **gold_one,
+        "exceptions": [
+            {"type": "bank_fee", "event_ids": ["a"], "amount_minor": 1},
+        ],
+    }
+    gold_two = {
+        **base,
+        "exceptions": [
+            {"type": "stale_check", "event_ids": ["c"], "amount_minor": 3},
+        ],
+    }
+    pred_two = {
+        **gold_two,
+        "exceptions": [
+            {"type": "stale_check", "event_ids": ["c"], "amount_minor": 3},
+            {"type": "duplicate", "event_ids": ["d"], "amount_minor": 4},
+        ],
+    }
+    records = [
+        make_pred(
+            example_id="cash_multi_1",
+            world_id="world_cash_1",
+            task="cash_reconciliation",
+            expected=gold_one,
+            parsed=pred_one,
+        ),
+        make_pred(
+            example_id="cash_multi_2",
+            world_id="world_cash_2",
+            task="cash_reconciliation",
+            expected=gold_two,
+            parsed=pred_two,
+        ),
+    ]
+    metrics = compute_arm_metrics("cash", records)
+    # bank_fee=1, stale_check=2/3, duplicate=0 => macro 5/9.
+    actual = metrics.task_metrics["cash_reconciliation"][
+        "exception_type_macro_f1"
+    ]
+    assert actual is not None
+    assert abs(actual - (5.0 / 9.0)) < 1e-12
+
+
+def test_cash_matched_edge_f1_hand_calculated() -> None:
+    gold = {
+        **cash_gold(),
+        "matched_groups": [
+            {"book_ids": ["b1", "b2"], "bank_ids": ["k1"]}
+        ],
+    }
+    pred = {
+        **gold,
+        "matched_groups": [
+            {"book_ids": ["b1", "b3"], "bank_ids": ["k1"]}
+        ],
+    }
+    score = score_prediction(
+        make_pred(
+            example_id="cash_edges",
+            world_id="world_cash_edges",
+            task="cash_reconciliation",
+            expected=gold,
+            parsed=pred,
+        )
+    )
+    # One shared edge out of two predicted and two gold.
+    assert score.components["matched_edge_precision"] == 0.5
+    assert score.components["matched_edge_recall"] == 0.5
+    assert score.components["matched_edge_f1"] == 0.5
+    assert score.components["matched_group_f1"] == 0.0

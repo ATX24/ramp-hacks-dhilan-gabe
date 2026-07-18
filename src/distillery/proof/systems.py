@@ -3,29 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
-ValueKind = Literal["measured", "projected", "missing"]
+from distillery.contracts.budgets import EvaluationBudget
+from distillery.contracts.tasks import TaskId
+from distillery.proof.evidence import EvidenceKind, LabeledValue, evidence_kind
 
-
-@dataclass(frozen=True)
-class LabeledValue:
-    value: float | int | str | None
-    kind: ValueKind
-    unit: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"value": self.value, "kind": self.kind, "unit": self.unit}
+PRIMARY_TASKS = (
+    TaskId.TRANSACTION_REVIEW.value,
+    TaskId.VARIANCE_ANALYSIS.value,
+)
 
 
 @dataclass(frozen=True)
 class SystemsSummary:
-    """Systems metrics with explicit measured vs projected labeling."""
+    """One arm/batch systems profile with explicit evidence provenance."""
 
     hardware: str | None
+    runtime: str | None
     batch_size: int
     warmup_requests: int
     timed_examples: int
+    warmup_requests_by_task: dict[str, int]
+    timed_examples_by_task: dict[str, int]
     latency_p50_ms: LabeledValue
     latency_p95_ms: LabeledValue
     requests_per_second: LabeledValue
@@ -39,12 +39,62 @@ class SystemsSummary:
     gpu_hours: LabeledValue
     notes: tuple[str, ...] = ()
 
+    def proof_evidence_gaps(self) -> tuple[str, ...]:
+        """Return every reason this profile cannot support a proof claim."""
+
+        budget = EvaluationBudget()
+        gaps: list[str] = []
+        if not self.hardware:
+            gaps.append("hardware_missing")
+        if not self.runtime:
+            gaps.append("runtime_missing")
+        if self.batch_size not in (1, 8):
+            gaps.append("batch_size_must_be_1_or_8")
+        for task in PRIMARY_TASKS:
+            if self.warmup_requests_by_task.get(task, 0) < budget.warmup_requests:
+                gaps.append(f"{task}_warmups_below_{budget.warmup_requests}")
+            if (
+                self.timed_examples_by_task.get(task, 0)
+                < budget.timed_examples_per_primary_task
+            ):
+                gaps.append(
+                    f"{task}_timed_examples_below_"
+                    f"{budget.timed_examples_per_primary_task}"
+                )
+        if self.warmup_requests < sum(self.warmup_requests_by_task.values()):
+            gaps.append("aggregate_warmups_below_per_task_sum")
+        if self.timed_examples < sum(self.timed_examples_by_task.values()):
+            gaps.append("aggregate_timed_examples_below_per_task_sum")
+        required_measurements = {
+            "latency_p50_ms": self.latency_p50_ms,
+            "latency_p95_ms": self.latency_p95_ms,
+            "requests_per_second": self.requests_per_second,
+            "output_tokens_per_second": self.output_tokens_per_second,
+            "failure_rate": self.failure_rate,
+        }
+        for name, value in required_measurements.items():
+            if value.kind is not EvidenceKind.MEASURED:
+                gaps.append(f"{name}_not_measured")
+        if (
+            self.requests_per_second.kind is EvidenceKind.MEASURED
+            and float(self.requests_per_second.value) <= 0
+        ):
+            gaps.append("requests_per_second_nonpositive")
+        return tuple(gaps)
+
+    @property
+    def proof_ready(self) -> bool:
+        return not self.proof_evidence_gaps()
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "hardware": self.hardware,
+            "runtime": self.runtime,
             "batch_size": self.batch_size,
             "warmup_requests": self.warmup_requests,
             "timed_examples": self.timed_examples,
+            "warmup_requests_by_task": dict(self.warmup_requests_by_task),
+            "timed_examples_by_task": dict(self.timed_examples_by_task),
             "latency_p50_ms": self.latency_p50_ms.to_dict(),
             "latency_p95_ms": self.latency_p95_ms.to_dict(),
             "requests_per_second": self.requests_per_second.to_dict(),
@@ -56,6 +106,8 @@ class SystemsSummary:
             "wall_time_seconds": self.wall_time_seconds.to_dict(),
             "billed_training_seconds": self.billed_training_seconds.to_dict(),
             "gpu_hours": self.gpu_hours.to_dict(),
+            "proof_ready": self.proof_ready,
+            "proof_evidence_gaps": list(self.proof_evidence_gaps()),
             "notes": list(self.notes),
         }
 
@@ -74,10 +126,40 @@ def _percentile(values: list[float], p: float) -> float | None:
     return xs[f] + (xs[c] - xs[f]) * (k - f)
 
 
-def _measured(value: float | int | None, unit: str | None = None) -> LabeledValue:
+def _labeled(
+    value: Any,
+    unit: str | None = None,
+    *,
+    label: str | None = None,
+) -> LabeledValue:
     if value is None:
-        return LabeledValue(value=None, kind="missing", unit=unit)
-    return LabeledValue(value=value, kind="measured", unit=unit)
+        return LabeledValue(
+            value=None,
+            kind=EvidenceKind.MISSING,
+            unit=unit,
+            label=label,
+        )
+    if isinstance(value, dict):
+        raw_value = value.get("value")
+        kind = evidence_kind(value.get("kind", EvidenceKind.MISSING))
+        normalized_value = (
+            float(raw_value)
+            if raw_value is not None and isinstance(raw_value, (int, float, str))
+            else raw_value
+        )
+        return LabeledValue(
+            value=normalized_value,
+            kind=kind,
+            unit=str(value.get("unit", unit)) if value.get("unit", unit) else None,
+            label=str(value.get("label", label)) if value.get("label", label) else None,
+            reason=str(value["reason"]) if value.get("reason") else None,
+        )
+    return LabeledValue(
+        value=float(value),
+        kind=EvidenceKind.MEASURED,
+        unit=unit,
+        label=label,
+    )
 
 
 def summarize_systems(
@@ -92,8 +174,17 @@ def summarize_systems(
     """
     notes: list[str] = []
     hardware = profile.get("hardware") or profile.get("instance_type")
-    warmup = int(profile.get("warmup_requests", 0) or 0)
-    timed = int(profile.get("timed_examples", 0) or 0)
+    runtime = profile.get("runtime")
+    warmups_by_task = {
+        str(k): int(v)
+        for k, v in (profile.get("warmup_requests_by_task") or {}).items()
+    }
+    timed_by_task = {
+        str(k): int(v)
+        for k, v in (profile.get("timed_examples_by_task") or {}).items()
+    }
+    warmup = int(profile.get("warmup_requests", sum(warmups_by_task.values())) or 0)
+    timed = int(profile.get("timed_examples", sum(timed_by_task.values())) or 0)
 
     lats = latencies_ms
     if lats is None and "latencies_ms" in profile:
@@ -107,10 +198,6 @@ def summarize_systems(
     else:
         p50 = profile.get("latency_p50_ms")
         p95 = profile.get("latency_p95_ms")
-        if p50 is not None:
-            p50 = float(p50)
-        if p95 is not None:
-            p95 = float(p95)
 
     rps = profile.get("requests_per_second")
     tok_s = profile.get("output_tokens_per_second")
@@ -118,50 +205,80 @@ def summarize_systems(
     if failure is None and "failures" in profile and timed:
         failure = float(profile["failures"]) / float(timed)
 
-    if timed < 200:
-        notes.append("timed_examples_below_protocol_minimum_200")
-    if warmup < 20:
-        notes.append("warmup_requests_below_protocol_minimum_20")
+    budget = EvaluationBudget()
+    if timed < budget.timed_examples_per_primary_task:
+        notes.append(
+            "timed_examples_below_protocol_minimum_"
+            f"{budget.timed_examples_per_primary_task}"
+        )
+    if warmup < budget.warmup_requests:
+        notes.append(
+            f"warmup_requests_below_protocol_minimum_{budget.warmup_requests}"
+        )
 
     wall = profile.get("wall_time_seconds")
     billed = profile.get("billed_training_seconds")
     gpu_hours = profile.get("gpu_hours")
     if gpu_hours is None and billed is not None:
-        gpu_hours = float(billed) / 3600.0
-        notes.append("gpu_hours_derived_from_billed_training_seconds")
+        billed_value = _labeled(
+            billed,
+            "s",
+            label="billed_training_seconds",
+        )
+        if billed_value.kind is EvidenceKind.MEASURED:
+            gpu_hours = float(billed_value.value) / 3600.0
+            notes.append("gpu_hours_derived_from_billed_training_seconds")
 
     return SystemsSummary(
         hardware=str(hardware) if hardware is not None else None,
+        runtime=str(runtime) if runtime is not None else None,
         batch_size=int(profile.get("batch_size", batch_size)),
         warmup_requests=warmup,
         timed_examples=timed,
-        latency_p50_ms=_measured(p50, "ms"),
-        latency_p95_ms=_measured(p95, "ms"),
-        requests_per_second=_measured(float(rps) if rps is not None else None, "req/s"),
-        output_tokens_per_second=_measured(
-            float(tok_s) if tok_s is not None else None, "tok/s"
+        warmup_requests_by_task=warmups_by_task,
+        timed_examples_by_task=timed_by_task,
+        latency_p50_ms=_labeled(p50, "ms", label="latency_p50_ms"),
+        latency_p95_ms=_labeled(p95, "ms", label="latency_p95_ms"),
+        requests_per_second=_labeled(
+            rps,
+            "req/s",
+            label="requests_per_second",
         ),
-        failure_rate=_measured(float(failure) if failure is not None else None, "rate"),
-        peak_vram_allocated_gb=_measured(
-            float(profile["peak_vram_allocated_gb"])
-            if profile.get("peak_vram_allocated_gb") is not None
-            else None,
+        output_tokens_per_second=_labeled(
+            tok_s,
+            "tok/s",
+            label="output_tokens_per_second",
+        ),
+        failure_rate=_labeled(failure, "rate", label="failure_rate"),
+        peak_vram_allocated_gb=_labeled(
+            profile.get("peak_vram_allocated_gb"),
             "GiB",
+            label="peak_vram_allocated_gb",
         ),
-        peak_vram_reserved_gb=_measured(
-            float(profile["peak_vram_reserved_gb"])
-            if profile.get("peak_vram_reserved_gb") is not None
-            else None,
+        peak_vram_reserved_gb=_labeled(
+            profile.get("peak_vram_reserved_gb"),
             "GiB",
+            label="peak_vram_reserved_gb",
         ),
-        peak_cpu_ram_gb=_measured(
-            float(profile["peak_cpu_ram_gb"])
-            if profile.get("peak_cpu_ram_gb") is not None
-            else None,
+        peak_cpu_ram_gb=_labeled(
+            profile.get("peak_cpu_ram_gb"),
             "GiB",
+            label="peak_cpu_ram_gb",
         ),
-        wall_time_seconds=_measured(float(wall) if wall is not None else None, "s"),
-        billed_training_seconds=_measured(float(billed) if billed is not None else None, "s"),
-        gpu_hours=_measured(float(gpu_hours) if gpu_hours is not None else None, "GPU-h"),
+        wall_time_seconds=_labeled(
+            wall,
+            "s",
+            label="wall_time_seconds",
+        ),
+        billed_training_seconds=_labeled(
+            billed,
+            "s",
+            label="billed_training_seconds",
+        ),
+        gpu_hours=_labeled(
+            gpu_hours,
+            "GPU-h",
+            label="gpu_hours",
+        ),
         notes=tuple(notes),
     )

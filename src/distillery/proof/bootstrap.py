@@ -1,4 +1,4 @@
-"""Paired 95% bootstrap CIs clustered by world_id (10,000 resamples default)."""
+"""Strict paired multi-seed bootstrap clustered by world_id."""
 
 from __future__ import annotations
 
@@ -12,16 +12,34 @@ from distillery.contracts.budgets import ProofGates
 from distillery.contracts.tasks import TaskId
 from distillery.proof.metrics import ExampleScore, compute_primary_index
 
+PRIMARY_METRICS: tuple[str, ...] = (
+    "transaction_joint_exact",
+    "variance_joint_exact",
+    "json_schema_validity",
+    "primary_index",
+    "ood_primary_index",
+)
+PERCENTILE_METHOD = "percentile_linear_interpolation"
+PERCENTILE_LIMITATIONS: tuple[str, ...] = (
+    "percentile_intervals_are_not_bias_corrected_or_accelerated",
+    "finite_resamples_add_monte_carlo_error",
+    "coverage_can_be_unreliable_with_few_clusters_or_boundary_metrics",
+    "world_id_is_the_resampling_unit_and_seed_replicates_stay_with_their_world",
+)
+Statistic = Callable[[Sequence[ExampleScore]], float | None]
+
 
 @dataclass(frozen=True)
 class BootstrapCI:
-    """Bootstrap confidence interval for a scalar metric or arm difference."""
+    """A scalar clustered-bootstrap interval with validity accounting."""
 
-    estimate: float
-    lower: float
-    upper: float
+    estimate: float | None
+    lower: float | None
+    upper: float | None
     level: float
     n_resamples: int
+    valid_resamples: int
+    excluded_resamples: int
     n_clusters: int
     n_examples: int
     underpowered: bool
@@ -29,66 +47,325 @@ class BootstrapCI:
     arm_a: str | None = None
     arm_b: str | None = None
     seed: int | None = None
+    undefined_reason: str | None = None
+    percentile_method: str = PERCENTILE_METHOD
+    limitations: tuple[str, ...] = PERCENTILE_LIMITATIONS
+
+    def __post_init__(self) -> None:
+        if not 0.0 < self.level < 1.0:
+            raise ValueError("bootstrap confidence level must be in (0, 1)")
+        if self.n_resamples <= 0:
+            raise ValueError("bootstrap n_resamples must be positive")
+        if self.valid_resamples < 0 or self.excluded_resamples < 0:
+            raise ValueError("bootstrap resample counts must be nonnegative")
+        if self.valid_resamples + self.excluded_resamples != self.n_resamples:
+            raise ValueError(
+                "valid_resamples + excluded_resamples must equal n_resamples"
+            )
+        if self.n_clusters < 0 or self.n_examples < 0:
+            raise ValueError("cluster and example counts must be nonnegative")
+        if (self.lower is None) != (self.upper is None):
+            raise ValueError("bootstrap bounds must both be defined or missing")
+        if self.estimate is None and self.lower is not None:
+            raise ValueError("undefined point estimate cannot have CI bounds")
+
+    @property
+    def defined(self) -> bool:
+        return (
+            self.estimate is not None
+            and self.lower is not None
+            and self.upper is not None
+        )
+
+    @property
+    def proof_ready(self) -> bool:
+        return (
+            self.defined
+            and not self.underpowered
+            and self.excluded_resamples == 0
+            and self.valid_resamples == self.n_resamples
+            and self.n_resamples == ProofGates().bootstrap_resamples
+            and self.level == 0.95
+            and self.percentile_method == PERCENTILE_METHOD
+        )
+
+    @property
+    def interval_id(self) -> str:
+        if self.arm_a is None:
+            return self.metric
+        if self.arm_b is None:
+            return f"arm::{self.arm_a}::{self.metric}"
+        return f"pair::{self.arm_a}::{self.arm_b}::{self.metric}"
 
     def excludes_zero(self) -> bool:
+        if self.lower is None or self.upper is None:
+            return False
         return self.lower > 0.0 or self.upper < 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "interval_id": self.interval_id,
             "estimate": self.estimate,
             "lower": self.lower,
             "upper": self.upper,
+            "defined": self.defined,
             "level": self.level,
             "n_resamples": self.n_resamples,
+            "valid_resamples": self.valid_resamples,
+            "excluded_resamples": self.excluded_resamples,
             "n_clusters": self.n_clusters,
             "n_examples": self.n_examples,
             "underpowered": self.underpowered,
+            "proof_ready": self.proof_ready,
             "metric": self.metric,
             "arm_a": self.arm_a,
             "arm_b": self.arm_b,
             "seed": self.seed,
+            "undefined_reason": self.undefined_reason,
+            "percentile_method": self.percentile_method,
+            "limitations": list(self.limitations),
             "excludes_zero": self.excludes_zero(),
         }
 
 
 def _percentile(sorted_vals: list[float], p: float) -> float:
-    """Linear interpolation percentile on a sorted list (inclusive)."""
+    """Linear-interpolation percentile on a sorted finite sample."""
+
     if not sorted_vals:
         raise ValueError("empty sample for percentile")
     if len(sorted_vals) == 1:
         return sorted_vals[0]
     k = (len(sorted_vals) - 1) * p
-    f = int(k)
-    c = min(f + 1, len(sorted_vals) - 1)
-    if f == c:
-        return sorted_vals[f]
-    return sorted_vals[f] + (sorted_vals[c] - sorted_vals[f]) * (k - f)
+    floor = int(k)
+    ceil = min(floor + 1, len(sorted_vals) - 1)
+    if floor == ceil:
+        return sorted_vals[floor]
+    return sorted_vals[floor] + (
+        sorted_vals[ceil] - sorted_vals[floor]
+    ) * (k - floor)
 
 
-def _cluster_map(scores: Sequence[ExampleScore]) -> dict[str, list[ExampleScore]]:
+def _validate_unique_scores(
+    scores: Sequence[ExampleScore],
+    *,
+    arm: str,
+) -> None:
+    seen: set[tuple[int, str]] = set()
+    example_metadata: dict[str, tuple[str, str, str]] = {}
+    for score in scores:
+        key = (score.seed, score.example_id)
+        if key in seen:
+            raise ValueError(
+                f"{arm}: duplicate seed/example record {key}"
+            )
+        seen.add(key)
+        metadata = (score.world_id, score.task, score.split)
+        previous = example_metadata.setdefault(score.example_id, metadata)
+        if previous != metadata:
+            raise ValueError(
+                f"{arm}: example_id {score.example_id} changes "
+                "world_id/task/split across seeds"
+            )
+
+
+def validate_paired_scores(
+    scores_a: Sequence[ExampleScore],
+    scores_b: Sequence[ExampleScore],
+    *,
+    arm_a: str,
+    arm_b: str,
+) -> None:
+    """Require exact seed/example/world/task/split identity across two arms."""
+
+    _validate_unique_scores(scores_a, arm=arm_a)
+    _validate_unique_scores(scores_b, arm=arm_b)
+
+    def identities(scores: Sequence[ExampleScore]) -> set[tuple[int, str, str, str, str]]:
+        return {
+            (
+                score.seed,
+                score.example_id,
+                score.world_id,
+                score.task,
+                score.split,
+            )
+            for score in scores
+        }
+
+    ids_a = identities(scores_a)
+    ids_b = identities(scores_b)
+    if ids_a != ids_b:
+        raise ValueError(
+            f"{arm_a}/{arm_b}: paired prediction identities differ "
+            f"(only_{arm_a}={len(ids_a - ids_b)}, "
+            f"only_{arm_b}={len(ids_b - ids_a)})"
+        )
+
+
+def _cluster_map(
+    scores: Sequence[ExampleScore],
+    *,
+    arm: str,
+) -> dict[str, list[ExampleScore]]:
+    _validate_unique_scores(scores, arm=arm)
     clusters: dict[str, list[ExampleScore]] = defaultdict(list)
-    for s in scores:
-        clusters[s.world_id].append(s)
-    return dict(clusters)
+    for score in scores:
+        clusters[score.world_id].append(score)
+    return {
+        world_id: sorted(
+            members,
+            key=lambda score: (score.seed, score.example_id),
+        )
+        for world_id, members in clusters.items()
+    }
+
+
+def metric_value(
+    scores: Sequence[ExampleScore],
+    metric: str,
+) -> float | None:
+    """Compute a primary metric using the same point-estimate semantics."""
+
+    selected = list(scores)
+    if metric == "ood_primary_index":
+        selected = [score for score in selected if score.split == "ood_test"]
+        metric = "primary_index"
+    if not selected:
+        return None
+
+    if metric == "transaction_joint_exact":
+        values = [
+            float(score.joint_exact)
+            for score in selected
+            if score.task == TaskId.TRANSACTION_REVIEW.value
+        ]
+        return sum(values) / len(values) if values else None
+    if metric == "variance_joint_exact":
+        values = [
+            float(score.joint_exact)
+            for score in selected
+            if score.task == TaskId.VARIANCE_ANALYSIS.value
+        ]
+        return sum(values) / len(values) if values else None
+    if metric == "json_schema_validity":
+        return sum(
+            float(score.json_schema_valid) for score in selected
+        ) / len(selected)
+    if metric == "primary_index":
+        transaction = metric_value(
+            selected,
+            "transaction_joint_exact",
+        )
+        variance = metric_value(selected, "variance_joint_exact")
+        if transaction is None or variance is None:
+            return None
+        schema = metric_value(selected, "json_schema_validity")
+        assert schema is not None
+        return compute_primary_index(transaction, variance, schema)
+    raise ValueError(f"unsupported bootstrap metric: {metric}")
+
+
+def _build_ci(
+    *,
+    point: float | None,
+    samples: list[float],
+    level: float,
+    n_resamples: int,
+    n_clusters: int,
+    n_examples: int,
+    min_clusters_powered: int,
+    metric: str,
+    arm_a: str | None,
+    arm_b: str | None,
+    seed: int,
+    undefined_reason: str | None = None,
+) -> BootstrapCI:
+    valid = len(samples)
+    excluded = n_resamples - valid
+    samples.sort()
+    if point is None or not samples:
+        lower = None
+        upper = None
+        reason = undefined_reason or "point_or_all_bootstrap_draws_undefined"
+    else:
+        alpha = 1.0 - level
+        lower = _percentile(samples, alpha / 2.0)
+        upper = _percentile(samples, 1.0 - alpha / 2.0)
+        reason = (
+            undefined_reason
+            or (
+                "some_bootstrap_draws_undefined"
+                if excluded
+                else None
+            )
+        )
+    return BootstrapCI(
+        estimate=point,
+        lower=lower,
+        upper=upper,
+        level=level,
+        n_resamples=n_resamples,
+        valid_resamples=valid,
+        excluded_resamples=excluded,
+        n_clusters=n_clusters,
+        n_examples=n_examples,
+        underpowered=n_clusters < min_clusters_powered or valid == 0,
+        metric=metric,
+        arm_a=arm_a,
+        arm_b=arm_b,
+        seed=seed,
+        undefined_reason=reason,
+    )
+
+
+def _empty_ci(
+    *,
+    metric: str,
+    arm_a: str,
+    arm_b: str | None,
+    n_resamples: int | None,
+    level: float,
+    seed: int,
+    reason: str,
+    min_clusters_powered: int = 10,
+) -> BootstrapCI:
+    resolved_resamples = (
+        ProofGates().bootstrap_resamples
+        if n_resamples is None
+        else n_resamples
+    )
+    return _build_ci(
+        point=None,
+        samples=[],
+        level=level,
+        n_resamples=resolved_resamples,
+        n_clusters=0,
+        n_examples=0,
+        min_clusters_powered=min_clusters_powered,
+        metric=metric,
+        arm_a=arm_a,
+        arm_b=arm_b,
+        seed=seed,
+        undefined_reason=reason,
+    )
 
 
 def paired_cluster_bootstrap(
     scores: Sequence[ExampleScore],
-    statistic: Callable[[Sequence[ExampleScore]], float],
+    statistic: Statistic,
     *,
     n_resamples: int | None = None,
     level: float = 0.95,
     seed: int = 17,
     metric: str = "metric",
+    arm_id: str = "arm",
     min_clusters_powered: int = 10,
 ) -> BootstrapCI:
-    """Cluster bootstrap by ``world_id`` with replacement.
+    """Cluster bootstrap one arm; all seed replicates stay in each world."""
 
-    Entire worlds are resampled so examples sharing a world stay together.
-    """
     gates = ProofGates()
     n_resamples = gates.bootstrap_resamples if n_resamples is None else n_resamples
-    clusters = _cluster_map(scores)
+    clusters = _cluster_map(scores, arm=arm_id)
     world_ids = sorted(clusters)
     if not world_ids:
         raise ValueError("no scores for bootstrap")
@@ -98,133 +375,262 @@ def paired_cluster_bootstrap(
     samples: list[float] = []
     for _ in range(n_resamples):
         drawn = [rng.choice(world_ids) for _ in world_ids]
-        resampled: list[ExampleScore] = []
-        for wid in drawn:
-            resampled.extend(clusters[wid])
-        samples.append(statistic(resampled))
-
-    samples.sort()
-    alpha = 1.0 - level
-    lower = _percentile(samples, alpha / 2.0)
-    upper = _percentile(samples, 1.0 - alpha / 2.0)
-    return BootstrapCI(
-        estimate=point,
-        lower=lower,
-        upper=upper,
+        resampled = [
+            score
+            for world_id in drawn
+            for score in clusters[world_id]
+        ]
+        value = statistic(resampled)
+        if value is not None:
+            samples.append(value)
+    return _build_ci(
+        point=point,
+        samples=samples,
         level=level,
         n_resamples=n_resamples,
         n_clusters=len(world_ids),
         n_examples=len(scores),
-        underpowered=len(world_ids) < min_clusters_powered,
+        min_clusters_powered=min_clusters_powered,
         metric=metric,
+        arm_a=arm_id,
+        arm_b=None,
         seed=seed,
     )
 
 
-def _mean_joint(scores: Sequence[ExampleScore]) -> float:
-    if not scores:
-        return 0.0
-    return sum(1.0 if s.joint_exact else 0.0 for s in scores) / len(scores)
-
-
-def _mean_schema(scores: Sequence[ExampleScore]) -> float:
-    if not scores:
-        return 0.0
-    return sum(1.0 if s.json_schema_valid else 0.0 for s in scores) / len(scores)
-
-
-def _primary_from_scores(scores: Sequence[ExampleScore]) -> float:
-    if not scores:
-        return 0.0
-    txn = [s for s in scores if s.task == TaskId.TRANSACTION_REVIEW.value]
-    var = [s for s in scores if s.task == TaskId.VARIANCE_ANALYSIS.value]
-    txn_j = _mean_joint(txn) if txn else None
-    var_j = _mean_joint(var) if var else None
-    schema = _mean_schema(scores)
-    return compute_primary_index(txn_j, var_j, schema)
+def arm_metric_ci(
+    scores: Sequence[ExampleScore],
+    metric: str,
+    *,
+    arm_id: str,
+    n_resamples: int | None = None,
+    level: float = 0.95,
+    seed: int = 17,
+    min_clusters_powered: int = 10,
+) -> BootstrapCI:
+    metric_scores = (
+        [score for score in scores if score.split == "ood_test"]
+        if metric == "ood_primary_index"
+        else scores
+    )
+    statistic_metric = (
+        "primary_index" if metric == "ood_primary_index" else metric
+    )
+    if not metric_scores:
+        return _empty_ci(
+            metric=metric,
+            arm_a=arm_id,
+            arm_b=None,
+            n_resamples=n_resamples,
+            level=level,
+            seed=seed,
+            reason="no_examples_for_metric",
+            min_clusters_powered=min_clusters_powered,
+        )
+    return paired_cluster_bootstrap(
+        metric_scores,
+        lambda sample: metric_value(sample, statistic_metric),
+        n_resamples=n_resamples,
+        level=level,
+        seed=seed,
+        metric=metric,
+        arm_id=arm_id,
+        min_clusters_powered=min_clusters_powered,
+    )
 
 
 def paired_difference_ci(
     scores_a: Sequence[ExampleScore],
     scores_b: Sequence[ExampleScore],
     *,
-    statistic: Callable[[Sequence[ExampleScore]], float] | None = None,
+    statistic: Statistic | None = None,
+    score_metric: str = "primary_index",
     n_resamples: int | None = None,
     level: float = 0.95,
     seed: int = 17,
-    metric: str = "primary_index_diff",
+    metric: str = "primary_index_difference",
     arm_a: str = "a",
     arm_b: str = "b",
     min_clusters_powered: int = 10,
 ) -> BootstrapCI:
-    """Paired cluster bootstrap of ``stat(A) - stat(B)`` on shared world_ids.
+    """Strict paired difference with no intersections or fallback means."""
 
-    Pairing is by ``world_id`` (and within-world example_id alignment when both
-    arms share the same example ids). Worlds missing from either arm are dropped.
-    """
+    if score_metric == "ood_primary_index":
+        scores_a = [
+            score for score in scores_a if score.split == "ood_test"
+        ]
+        scores_b = [
+            score for score in scores_b if score.split == "ood_test"
+        ]
+        score_metric = "primary_index"
+    if not scores_a and not scores_b:
+        return _empty_ci(
+            metric=metric,
+            arm_a=arm_a,
+            arm_b=arm_b,
+            n_resamples=n_resamples,
+            level=level,
+            seed=seed,
+            reason="no_paired_examples_for_metric",
+            min_clusters_powered=min_clusters_powered,
+        )
+    validate_paired_scores(
+        scores_a,
+        scores_b,
+        arm_a=arm_a,
+        arm_b=arm_b,
+    )
     gates = ProofGates()
     n_resamples = gates.bootstrap_resamples if n_resamples is None else n_resamples
-    stat = statistic or _primary_from_scores
-
-    by_a = _cluster_map(scores_a)
-    by_b = _cluster_map(scores_b)
-    world_ids = sorted(set(by_a) & set(by_b))
+    stat = statistic or (lambda sample: metric_value(sample, score_metric))
+    by_a = _cluster_map(scores_a, arm=arm_a)
+    by_b = _cluster_map(scores_b, arm=arm_b)
+    world_ids = sorted(by_a)
     if not world_ids:
-        raise ValueError("no overlapping world_id clusters for paired bootstrap")
+        raise ValueError("no paired world_id clusters")
 
-    # Align example-level pairs within each world when example_ids match.
-    aligned_a: list[ExampleScore] = []
-    aligned_b: list[ExampleScore] = []
-    for wid in world_ids:
-        map_a = {s.example_id: s for s in by_a[wid]}
-        map_b = {s.example_id: s for s in by_b[wid]}
-        shared_ex = sorted(set(map_a) & set(map_b))
-        if shared_ex:
-            for eid in shared_ex:
-                aligned_a.append(map_a[eid])
-                aligned_b.append(map_b[eid])
-        else:
-            # Fall back to full world contents (same cluster membership).
-            aligned_a.extend(by_a[wid])
-            aligned_b.extend(by_b[wid])
-
-    point = stat(aligned_a) - stat(aligned_b)
+    point_a = stat(scores_a)
+    point_b = stat(scores_b)
+    point = (
+        point_a - point_b
+        if point_a is not None and point_b is not None
+        else None
+    )
     rng = random.Random(seed)
     samples: list[float] = []
     for _ in range(n_resamples):
         drawn = [rng.choice(world_ids) for _ in world_ids]
-        ra: list[ExampleScore] = []
-        rb: list[ExampleScore] = []
-        for wid in drawn:
-            map_a = {s.example_id: s for s in by_a[wid]}
-            map_b = {s.example_id: s for s in by_b[wid]}
-            shared_ex = sorted(set(map_a) & set(map_b))
-            if shared_ex:
-                for eid in shared_ex:
-                    ra.append(map_a[eid])
-                    rb.append(map_b[eid])
-            else:
-                ra.extend(by_a[wid])
-                rb.extend(by_b[wid])
-        samples.append(stat(ra) - stat(rb))
-
-    samples.sort()
-    alpha = 1.0 - level
-    lower = _percentile(samples, alpha / 2.0)
-    upper = _percentile(samples, 1.0 - alpha / 2.0)
-    return BootstrapCI(
-        estimate=point,
-        lower=lower,
-        upper=upper,
+        resampled_a = [
+            score
+            for world_id in drawn
+            for score in by_a[world_id]
+        ]
+        resampled_b = [
+            score
+            for world_id in drawn
+            for score in by_b[world_id]
+        ]
+        value_a = stat(resampled_a)
+        value_b = stat(resampled_b)
+        if value_a is not None and value_b is not None:
+            samples.append(value_a - value_b)
+    return _build_ci(
+        point=point,
+        samples=samples,
         level=level,
         n_resamples=n_resamples,
         n_clusters=len(world_ids),
-        n_examples=len(aligned_a),
-        underpowered=len(world_ids) < min_clusters_powered,
+        n_examples=len(scores_a),
+        min_clusters_powered=min_clusters_powered,
         metric=metric,
         arm_a=arm_a,
         arm_b=arm_b,
         seed=seed,
+    )
+
+
+def ratio_metric_ci(
+    numerator_scores: Sequence[ExampleScore],
+    denominator_scores: Sequence[ExampleScore],
+    *,
+    score_metric: str,
+    metric: str,
+    arm_a: str,
+    arm_b: str,
+    n_resamples: int | None = None,
+    level: float = 0.95,
+    seed: int = 17,
+    min_clusters_powered: int = 10,
+) -> BootstrapCI:
+    """Strict paired ratio; nonpositive denominators are undefined."""
+
+    if score_metric == "ood_primary_index":
+        numerator_scores = [
+            score
+            for score in numerator_scores
+            if score.split == "ood_test"
+        ]
+        denominator_scores = [
+            score
+            for score in denominator_scores
+            if score.split == "ood_test"
+        ]
+        score_metric = "primary_index"
+    if not numerator_scores and not denominator_scores:
+        return _empty_ci(
+            metric=metric,
+            arm_a=arm_a,
+            arm_b=arm_b,
+            n_resamples=n_resamples,
+            level=level,
+            seed=seed,
+            reason="no_paired_examples_for_metric",
+            min_clusters_powered=min_clusters_powered,
+        )
+    validate_paired_scores(
+        numerator_scores,
+        denominator_scores,
+        arm_a=arm_a,
+        arm_b=arm_b,
+    )
+    gates = ProofGates()
+    n_resamples = gates.bootstrap_resamples if n_resamples is None else n_resamples
+    by_num = _cluster_map(numerator_scores, arm=arm_a)
+    by_den = _cluster_map(denominator_scores, arm=arm_b)
+    world_ids = sorted(by_num)
+    if not world_ids:
+        raise ValueError("no paired world_id clusters")
+
+    numerator = metric_value(numerator_scores, score_metric)
+    denominator = metric_value(denominator_scores, score_metric)
+    point = (
+        numerator / denominator
+        if numerator is not None
+        and denominator is not None
+        and denominator > 0
+        else None
+    )
+    rng = random.Random(seed)
+    samples: list[float] = []
+    for _ in range(n_resamples):
+        drawn = [rng.choice(world_ids) for _ in world_ids]
+        num_sample = [
+            score
+            for world_id in drawn
+            for score in by_num[world_id]
+        ]
+        den_sample = [
+            score
+            for world_id in drawn
+            for score in by_den[world_id]
+        ]
+        num_value = metric_value(num_sample, score_metric)
+        den_value = metric_value(den_sample, score_metric)
+        if (
+            num_value is not None
+            and den_value is not None
+            and den_value > 0
+        ):
+            samples.append(num_value / den_value)
+    undefined_reason = (
+        "nonpositive_or_missing_point_denominator"
+        if point is None
+        and (denominator is None or denominator <= 0)
+        else None
+    )
+    return _build_ci(
+        point=point,
+        samples=samples,
+        level=level,
+        n_resamples=n_resamples,
+        n_clusters=len(world_ids),
+        n_examples=len(numerator_scores),
+        min_clusters_powered=min_clusters_powered,
+        metric=metric,
+        arm_a=arm_a,
+        arm_b=arm_b,
+        seed=seed,
+        undefined_reason=undefined_reason,
     )
 
 
@@ -234,56 +640,18 @@ def quality_retention_ci(
     *,
     n_resamples: int | None = None,
     seed: int = 17,
+    arm_a: str = "student",
+    arm_b: str = "teacher",
 ) -> BootstrapCI:
-    """Bootstrap CI for student_primary / teacher_primary (paired by world)."""
+    """Bootstrap student-primary / teacher-primary with undefined ratios."""
 
-    def retention(pair_scores: Sequence[ExampleScore]) -> float:
-        # Not used directly; we bootstrap via paired_difference-style resampling.
-        raise NotImplementedError
-
-    _ = retention
-    gates = ProofGates()
-    n_resamples = gates.bootstrap_resamples if n_resamples is None else n_resamples
-    by_s = _cluster_map(student_scores)
-    by_t = _cluster_map(teacher_scores)
-    world_ids = sorted(set(by_s) & set(by_t))
-    if not world_ids:
-        raise ValueError("no overlapping worlds for retention CI")
-
-    def _align(worlds: list[str]) -> tuple[list[ExampleScore], list[ExampleScore]]:
-        sa: list[ExampleScore] = []
-        ta: list[ExampleScore] = []
-        for wid in worlds:
-            sa.extend(by_s[wid])
-            ta.extend(by_t[wid])
-        return sa, ta
-
-    s0, t0 = _align(world_ids)
-    t_primary = _primary_from_scores(t0)
-    s_primary = _primary_from_scores(s0)
-    point = 0.0 if t_primary == 0.0 else s_primary / t_primary
-
-    rng = random.Random(seed)
-    samples: list[float] = []
-    for _ in range(n_resamples):
-        drawn = [rng.choice(world_ids) for _ in world_ids]
-        s_r, t_r = _align(drawn)
-        tp = _primary_from_scores(t_r)
-        sp = _primary_from_scores(s_r)
-        samples.append(0.0 if tp == 0.0 else sp / tp)
-    samples.sort()
-    alpha = 0.05
-    return BootstrapCI(
-        estimate=point,
-        lower=_percentile(samples, alpha / 2.0),
-        upper=_percentile(samples, 1.0 - alpha / 2.0),
-        level=0.95,
-        n_resamples=n_resamples,
-        n_clusters=len(world_ids),
-        n_examples=len(s0),
-        underpowered=len(world_ids) < 10,
+    return ratio_metric_ci(
+        student_scores,
+        teacher_scores,
+        score_metric="primary_index",
         metric="quality_retention",
-        arm_a="student",
-        arm_b="teacher",
+        arm_a=arm_a,
+        arm_b=arm_b,
+        n_resamples=n_resamples,
         seed=seed,
     )

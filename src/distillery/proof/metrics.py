@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from distillery.contracts.budgets import PRIMARY_INDEX_WEIGHTS, PrimaryIndexWeights
 from distillery.contracts.tasks import (
@@ -19,6 +19,7 @@ from distillery.contracts.tasks import (
 )
 
 JsonParseStatus = Literal["ok", "invalid_json", "empty", "refusal"]
+RawTextProvenance = Literal["captured_model_output", "fixture_serialization"]
 
 
 class PredictionRecord(BaseModel):
@@ -34,7 +35,9 @@ class PredictionRecord(BaseModel):
     split: str = "iid_test"
     template_family: str = ""
     arm_id: str = ""
-    raw_text: str | None = None
+    seed: int
+    raw_text: str
+    raw_text_provenance: RawTextProvenance
     parsed: dict[str, Any] | None = None
     refused: bool = False
     latency_ms: float | None = None
@@ -43,11 +46,24 @@ class PredictionRecord(BaseModel):
     # Optional slice dimensions (policy, GL, variance driver, renderer, etc.)
     slices: dict[str, str] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def _parsed_cache_matches_raw_text(self) -> PredictionRecord:
+        """A parser cache may never override captured raw model output."""
+
+        try:
+            decoded = json.loads(self.raw_text)
+        except json.JSONDecodeError:
+            return self
+        if self.parsed is not None and decoded != self.parsed:
+            raise ValueError("parsed cache does not match raw_text JSON")
+        return self
+
 
 @dataclass(frozen=True)
 class ExampleScore:
     example_id: str
     world_id: str
+    seed: int
     task: str
     split: str
     difficulty: str
@@ -95,6 +111,8 @@ class ArmMetrics:
     task_metrics: dict[str, dict[str, float | None]]
     calibration: CalibrationMetrics
     slices: list[SliceReport]
+    seeds: tuple[int, ...] = ()
+    seed_metrics: dict[int, dict[str, float | None]] = field(default_factory=dict)
     example_scores: list[ExampleScore] = field(default_factory=list)
     critical_invariant_violations: int = 0
 
@@ -150,6 +168,44 @@ def _macro_f1(y_true: list[str], y_pred: list[str]) -> float | None:
     return sum(f1s) / len(f1s) if f1s else None
 
 
+def _multilabel_macro_f1(
+    y_true: list[set[str]],
+    y_pred: list[set[str]],
+) -> float | None:
+    """Macro-average binary F1 independently across exception labels."""
+
+    if not y_true:
+        return None
+    labels = sorted(
+        set().union(*y_true, *y_pred)
+        if y_true or y_pred
+        else set()
+    )
+    if not labels:
+        return 1.0
+    f1s: list[float] = []
+    for label in labels:
+        tp = sum(
+            1
+            for truth, pred in zip(y_true, y_pred, strict=True)
+            if label in truth and label in pred
+        )
+        fp = sum(
+            1
+            for truth, pred in zip(y_true, y_pred, strict=True)
+            if label not in truth and label in pred
+        )
+        fn = sum(
+            1
+            for truth, pred in zip(y_true, y_pred, strict=True)
+            if label in truth and label not in pred
+        )
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / (tp + fn) if tp + fn else 0.0
+        f1s.append(_f1(precision, recall) or 0.0)
+    return sum(f1s) / len(f1s)
+
+
 def classify_raw_text(raw_text: str | None, refused: bool) -> JsonParseStatus:
     if refused:
         return "refusal"
@@ -174,18 +230,14 @@ def parse_prediction(
     """Return (parsed_dict, status, schema_valid)."""
     if record.refused:
         return None, "refusal", False
-    if record.parsed is not None:
-        parsed = record.parsed
-        status: JsonParseStatus = "ok"
-    elif record.raw_text is not None:
-        status = classify_raw_text(record.raw_text, refused=False)
-        if status != "ok":
-            return None, status, False
-        parsed = json.loads(record.raw_text)
-    else:
-        return None, "empty", False
-
-    schema_valid = _schema_valid(record.task, parsed)
+    status = classify_raw_text(record.raw_text, refused=False)
+    if status != "ok":
+        return None, status, False
+    decoded = json.loads(record.raw_text)
+    if not isinstance(decoded, dict):
+        return None, status, False
+    schema_valid = _schema_valid(record.task, decoded)
+    parsed = decoded
     return parsed, status, schema_valid
 
 
@@ -402,6 +454,16 @@ def _match_group_key(group: dict[str, Any]) -> tuple[frozenset[str], frozenset[s
     )
 
 
+def _matched_edges(groups: list[dict[str, Any]]) -> set[tuple[str, str]]:
+    return {
+        (str(book_id), str(bank_id))
+        for group in groups
+        if isinstance(group, dict)
+        for book_id in (group.get("book_ids") or [])
+        for bank_id in (group.get("bank_ids") or [])
+    }
+
+
 def _score_cash(
     gold: dict[str, Any], pred: dict[str, Any]
 ) -> tuple[dict[str, float], bool, bool]:
@@ -413,6 +475,13 @@ def _score_cash(
     _, _, group_f1 = _set_prf(pred_groups, gold_groups)
     components["matched_group_f1"] = group_f1
     components["matched_group_exact"] = float(gold_groups == pred_groups)
+    gold_edges = _matched_edges(list(gold.get("matched_groups") or []))
+    pred_edges = _matched_edges(list(pred.get("matched_groups") or []))
+    edge_precision, edge_recall, edge_f1 = _set_prf(pred_edges, gold_edges)
+    components["matched_edge_precision"] = edge_precision
+    components["matched_edge_recall"] = edge_recall
+    components["matched_edge_f1"] = edge_f1
+    components["matched_edge_exact"] = float(gold_edges == pred_edges)
 
     gold_exc_types = [e["type"] for e in (gold.get("exceptions") or [])]
     pred_exc_types = [
@@ -488,6 +557,7 @@ def score_prediction(record: PredictionRecord) -> ExampleScore:
     return ExampleScore(
         example_id=record.example_id,
         world_id=record.world_id,
+        seed=record.seed,
         task=record.task,
         split=record.split,
         difficulty=record.difficulty,
@@ -523,15 +593,25 @@ def _adaptive_ece(confidences: list[float], correct: list[float], n_bins: int = 
     n = len(confidences)
     if n == 0:
         return None
-    # Equal-count adaptive bins.
-    order = sorted(range(n), key=lambda i: confidences[i])
+    # Equal-count quantile bins with boundaries moved right so equal-confidence
+    # ties always remain in one bin.
+    order = sorted(range(n), key=lambda i: (confidences[i], i))
     bins = max(1, min(n_bins, n))
+    cuts = [0]
+    for b in range(1, bins):
+        cut = (b * n) // bins
+        while (
+            cut < n
+            and cut > 0
+            and confidences[order[cut - 1]] == confidences[order[cut]]
+        ):
+            cut += 1
+        if cut < n and cut > cuts[-1]:
+            cuts.append(cut)
+    cuts.append(n)
+
     ece = 0.0
-    for b in range(bins):
-        start = (b * n) // bins
-        end = ((b + 1) * n) // bins
-        if start >= end:
-            continue
+    for start, end in zip(cuts, cuts[1:], strict=False):
         idxs = order[start:end]
         bin_conf = sum(confidences[i] for i in idxs) / len(idxs)
         bin_acc = sum(correct[i] for i in idxs) / len(idxs)
@@ -614,6 +694,15 @@ def _slice_reports(scores: list[ExampleScore], min_n: int = 30) -> list[SliceRep
 
 
 def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetrics:
+    seen: set[tuple[int, str]] = set()
+    for record in records:
+        key = (record.seed, record.example_id)
+        if key in seen:
+            raise ValueError(
+                "duplicate prediction record for "
+                f"seed={record.seed}, example_id={record.example_id}"
+            )
+        seen.add(key)
     scores = [score_prediction(r) for r in records]
     n = len(scores)
     if n == 0:
@@ -631,6 +720,8 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
             task_metrics={},
             calibration=CalibrationMetrics(None, None, [], 0),
             slices=[],
+            seeds=(),
+            seed_metrics={},
             example_scores=[],
             critical_invariant_violations=0,
         )
@@ -660,40 +751,24 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
         policy_pred.append(str(parsed.get("policy_action")))
     policy_macro = _macro_f1(policy_true, policy_pred)
 
-    cash_exc_true: list[str] = []
-    cash_exc_pred: list[str] = []
-    for rec, score in zip(records, scores, strict=True):
-        if rec.task != TaskId.CASH_RECONCILIATION.value or not score.json_schema_valid:
+    cash_exc_true: list[set[str]] = []
+    cash_exc_pred: list[set[str]] = []
+    for rec, _score in zip(records, scores, strict=True):
+        if rec.task != TaskId.CASH_RECONCILIATION.value:
             continue
         parsed, _, _ = parse_prediction(rec)
-        if parsed is None:
-            continue
-        for e in rec.expected_output.get("exceptions") or []:
-            cash_exc_true.append(str(e["type"]))
-        for e in parsed.get("exceptions") or []:
-            if isinstance(e, dict) and "type" in e:
-                cash_exc_pred.append(str(e["type"]))
-    # Align lengths for macro-F1 by padding shorter with "__miss__" labels via set-union labels.
-    # Use per-example primary exception type when both sides non-empty; else skip.
-    aligned_true: list[str] = []
-    aligned_pred: list[str] = []
-    for rec, score in zip(records, scores, strict=True):
-        if rec.task != TaskId.CASH_RECONCILIATION.value or not score.json_schema_valid:
-            continue
-        parsed, _, _ = parse_prediction(rec)
-        if parsed is None:
-            continue
-        gtypes = sorted(str(e["type"]) for e in (rec.expected_output.get("exceptions") or []))
-        ptypes = sorted(
+        gtypes = {
             str(e["type"])
-            for e in (parsed.get("exceptions") or [])
+            for e in (rec.expected_output.get("exceptions") or [])
+        }
+        ptypes = {
+            str(e["type"])
+            for e in ((parsed or {}).get("exceptions") or [])
             if isinstance(e, dict) and "type" in e
-        )
-        # Multiset labels joined for macro contribution at example level.
-        aligned_true.append("|".join(gtypes) if gtypes else "__none__")
-        aligned_pred.append("|".join(ptypes) if ptypes else "__none__")
-    exception_macro = _macro_f1(aligned_true, aligned_pred)
-    _ = cash_exc_true, cash_exc_pred  # kept for clarity of intent above
+        }
+        cash_exc_true.append(gtypes)
+        cash_exc_pred.append(ptypes)
+    exception_macro = _multilabel_macro_f1(cash_exc_true, cash_exc_pred)
 
     task_metrics: dict[str, dict[str, float | None]] = {
         TaskId.TRANSACTION_REVIEW.value: {
@@ -722,6 +797,41 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
         "refusal_empty_rate": refusal_empty_rate,
         "primary_index": primary,
     }
+    seed_metrics: dict[int, dict[str, float | None]] = {}
+    for seed in sorted({score.seed for score in scores}):
+        seed_scores = [score for score in scores if score.seed == seed]
+        seed_txn = [
+            score
+            for score in seed_scores
+            if score.task == TaskId.TRANSACTION_REVIEW.value
+        ]
+        seed_var = [
+            score
+            for score in seed_scores
+            if score.task == TaskId.VARIANCE_ANALYSIS.value
+        ]
+        seed_schema = sum(
+            1.0 if score.json_schema_valid else 0.0
+            for score in seed_scores
+        ) / len(seed_scores)
+        seed_txn_joint = _mean(
+            [float(score.joint_exact) for score in seed_txn]
+        )
+        seed_var_joint = _mean(
+            [float(score.joint_exact) for score in seed_var]
+        )
+        seed_ood = iid_ood_primary(seed_scores).get("ood_primary_index")
+        seed_metrics[seed] = {
+            "transaction_joint_exact": seed_txn_joint,
+            "variance_joint_exact": seed_var_joint,
+            "json_schema_validity": seed_schema,
+            "primary_index": compute_primary_index(
+                seed_txn_joint,
+                seed_var_joint,
+                seed_schema,
+            ),
+            "ood_primary_index": seed_ood,
+        }
 
     return ArmMetrics(
         arm_id=arm_id,
@@ -737,6 +847,8 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
         task_metrics=task_metrics,
         calibration=compute_calibration(scores),
         slices=_slice_reports(scores),
+        seeds=tuple(sorted(seed_metrics)),
+        seed_metrics=seed_metrics,
         example_scores=scores,
         critical_invariant_violations=sum(1 for s in scores if s.invariant_violation),
     )

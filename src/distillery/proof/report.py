@@ -95,12 +95,33 @@ def render_html_report(
             "</tr>"
         )
 
+    uncertainty = doc.get("uncertainty") or {}
+    methodology = uncertainty.get("methodology") or {}
+    interval_rows = []
+    for interval in uncertainty.get("intervals") or []:
+        interval_rows.append(
+            "<tr>"
+            f"<td><code>{_esc(interval.get('interval_id'))}</code></td>"
+            f"<td>{_esc(interval.get('estimate'))}</td>"
+            f"<td>[{_esc(interval.get('lower'))}, "
+            f"{_esc(interval.get('upper'))}]</td>"
+            f"<td>{_esc(interval.get('n_clusters'))}</td>"
+            f"<td>{_esc(interval.get('underpowered'))}</td>"
+            f"<td>{_esc(interval.get('proof_ready'))}</td>"
+            "</tr>"
+        )
+    uncertainty_limitations = "".join(
+        f"<li>{_esc(item)}</li>"
+        for item in methodology.get("limitations") or []
+    )
+
     eco = doc.get("economics") or {}
     util_rows = []
     for row in eco.get("utilization_rows") or []:
         student = row.get("student_cost_per_request_usd") or {}
         util_rows.append(
             "<tr>"
+            f"<td>{_esc(row.get('batch_size'))}</td>"
             f"<td>{_esc(row.get('utilization'))}</td>"
             f"<td>{_esc(student.get('amount_usd'))} "
             f"<em>({_esc(student.get('kind'))})</em></td>"
@@ -115,6 +136,7 @@ def render_html_report(
             f"<h3>Systems · {_esc(arm_id)}</h3>"
             "<ul>"
             f"<li>hardware: {_esc(sys.get('hardware'))}</li>"
+            f"<li>runtime: {_esc(sys.get('runtime'))}</li>"
             f"<li>batch: {_esc(sys.get('batch_size'))}</li>"
             f"<li>p50 latency: {_esc((sys.get('latency_p50_ms') or {}).get('value'))} ms "
             f"({_esc((sys.get('latency_p50_ms') or {}).get('kind'))})</li>"
@@ -131,6 +153,10 @@ def render_html_report(
     evidence = "".join(
         f"<li>{_esc(x)}</li>"
         for x in (doc.get("gate_evaluation") or {}).get("evidence_needed") or []
+    )
+    break_even_25 = ", ".join(
+        f"batch {row.get('batch_size')}: {row.get('break_even_requests')}"
+        for row in eco.get("break_even_at_25pct") or []
     )
 
     # Embed full JSON for immutability / offline re-parse.
@@ -252,6 +278,25 @@ pre {{
 </section>
 
 <section>
+  <h2>Uncertainty</h2>
+  <p>Method: <strong>{_esc(methodology.get('method') or 'unevaluated')}</strong> ·
+     cluster unit: <strong>{_esc(methodology.get('cluster_unit') or 'unknown')}</strong>
+  </p>
+  <p class="note">{_esc(methodology.get('seed_handling'))}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Interval</th><th>Estimate</th><th>95% CI</th>
+        <th>Worlds</th><th>Underpowered</th><th>Proof-ready</th>
+      </tr>
+    </thead>
+    <tbody>{''.join(interval_rows) or '<tr><td colspan="6">No intervals</td></tr>'}</tbody>
+  </table>
+  <h3>Method limitations</h3>
+  <ul>{uncertainty_limitations or '<li>None recorded</li>'}</ul>
+</section>
+
+<section>
   <h2>Economics</h2>
   <p>Gross experiment cost:
     <strong>{_esc((eco.get('gross_experiment_cost_usd') or {}).get('amount_usd'))}</strong>
@@ -261,17 +306,16 @@ pre {{
      Recovered teacher gap: <strong>{_esc(eco.get('recovered_teacher_gap'))}</strong>
      (defined={_esc(eco.get('recovered_teacher_gap_defined'))})</p>
   <p>Break-even @25% util:
-     <strong>{_esc((eco.get('break_even_at_25pct') or {}).get('break_even_requests'))}</strong>
-     · student CPR kind:
-     <em>{_esc((eco.get('break_even_at_25pct') or {}).get('student_cost_kind'))}</em></p>
+     <strong>{_esc(break_even_25 or 'unevaluated')}</strong>
+  </p>
   <table>
     <thead>
       <tr>
-        <th>Utilization</th><th>Student CPR</th>
+        <th>Batch</th><th>Utilization</th><th>Student CPR</th>
         <th>Savings</th><th>Break-even</th>
       </tr>
     </thead>
-    <tbody>{''.join(util_rows) or '<tr><td colspan="4">No utilization rows</td></tr>'}</tbody>
+    <tbody>{''.join(util_rows) or '<tr><td colspan="5">No utilization rows</td></tr>'}</tbody>
   </table>
   <p class="note">Serving costs are <strong>projected</strong>, not measured production savings.</p>
 </section>
