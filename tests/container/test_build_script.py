@@ -274,14 +274,19 @@ def test_reviewed_sha_cannot_relabel_dirty_worktree(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["DISTILLERY_BUILD_MANIFEST"] = str(manifest)
     env.pop("AWS_PROFILE", None)
-    result = subprocess.run(
-        [str(BUILD_SCRIPT), "--dry-run", f"--reviewed-source-sha={head}"],
-        cwd=REPO,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    dirty_marker = REPO / f".pytest-dirty-{tmp_path.name}"
+    dirty_marker.write_text("test-only\n", encoding="utf-8")
+    try:
+        result = subprocess.run(
+            [str(BUILD_SCRIPT), "--dry-run", f"--reviewed-source-sha={head}"],
+            cwd=REPO,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        dirty_marker.unlink()
     assert result.returncode == 0, result.stderr
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["source"]["reviewed_commit_sha"] == head
@@ -306,14 +311,19 @@ def test_real_build_refuses_dirty_source_before_docker(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}:{env['PATH']}"
     env.pop("AWS_PROFILE", None)
-    result = subprocess.run(
-        [str(BUILD_SCRIPT), "--build", f"--reviewed-source-sha={head}"],
-        cwd=REPO,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    dirty_marker = REPO / f".pytest-dirty-{tmp_path.name}"
+    dirty_marker.write_text("test-only\n", encoding="utf-8")
+    try:
+        result = subprocess.run(
+            [str(BUILD_SCRIPT), "--build", f"--reviewed-source-sha={head}"],
+            cwd=REPO,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        dirty_marker.unlink()
     assert result.returncode != 0
     assert "clean committed source tree" in result.stderr
     assert not marker.exists()
