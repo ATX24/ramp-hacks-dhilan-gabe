@@ -55,6 +55,7 @@ from experiments.aws_smoke.channels import (
     load_manifest,
 )
 from experiments.aws_smoke.deadline import Deadline, build_deadline
+from experiments.aws_smoke.device_mapping import model_device_map
 from experiments.aws_smoke.manifests import (
     build_sampler_plan,
     completion_provenance_sha256,
@@ -384,7 +385,7 @@ def load_base_model(
         "pretrained_model_name_or_path": str(snapshot_dir),
         "local_files_only": True,
         "trust_remote_code": False,
-        "device_map": "auto",
+        "device_map": model_device_map(torch),
     }
     if precision_mode == "qlora_nf4":
         common["quantization_config"] = BitsAndBytesConfig(
@@ -502,7 +503,7 @@ def load_teacher(
         local_files_only=True,
         trust_remote_code=False,
         torch_dtype=torch.bfloat16,
-        device_map="auto",
+        device_map=model_device_map(torch),
     )
     guard = freeze_and_assert_runtime_teacher(teacher)
     return teacher, guard
@@ -1134,16 +1135,24 @@ def run_training(
         encoding="utf-8",
     )
     elapsed_seconds = clock() - deadline.started_monotonic
-    gross_cost = (
+    child_runtime_cost = (
         float(manifest.tags["HourlyUsd"]) * elapsed_seconds / 3600.0
     )
+    shared_campaign = os.environ.get("DISTILLERY_SHARED_CAMPAIGN") == "1"
+    gross_cost = 0.0 if shared_campaign else child_runtime_cost
     cost_payload = {
         "schema_version": "distillery.aws_smoke.cost.v1",
         "elapsed_seconds": elapsed_seconds,
         "hourly_usd": float(manifest.tags["HourlyUsd"]),
         "gross_cost_usd": gross_cost,
         "max_run_usd": manifest.cost.max_run_usd,
-        "cost_kind": "runtime_estimate_from_elapsed_wall_clock",
+        "cost_kind": (
+            "nonbillable_campaign_child_observation"
+            if shared_campaign
+            else "runtime_estimate_from_elapsed_wall_clock"
+        ),
+        "child_runtime_observation_usd": child_runtime_cost,
+        "parent_campaign_allocation_authoritative": shared_campaign,
         "teacher_load_seconds": teacher_load_seconds,
         "teacher_forward_seconds": teacher_forward_seconds,
         "teacher_treatment_overhead_included": teacher_required,
