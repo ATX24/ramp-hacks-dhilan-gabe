@@ -1,18 +1,10 @@
-import { StagePageClient } from "@/components/StagePageClient";
-import { loadStageRequest } from "@/lib/loadStage";
+import { redirect } from "next/navigation";
+import { buildCentralHref } from "@/lib/navigation";
 
 export default async function DemoPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const params = await searchParams;
-  const request = await loadStageRequest(params);
-  return (
-    <StagePageClient
-      stage="demo"
-      initialBundle={request.bundle}
-      runSelection={request.runSelection}
-    />
-  );
+  redirect(buildCentralHref("demo", await searchParams));
 }
