@@ -894,8 +894,14 @@ def run_training(
     if not 5 <= manifest.training.max_steps <= 10:
         raise ValueError("emergency trainer requires 5-10 optimizer steps")
 
+    tagged_runtime_seconds = int(manifest.tags["MaxRuntimeInSeconds"])
+    configured_runtime_seconds = int(config["max_runtime_seconds"])
+    if tagged_runtime_seconds != configured_runtime_seconds:
+        raise ValueError(
+            "sealed MaxRuntimeInSeconds tag differs from EmergencyConfig runtime"
+        )
     deadline = build_deadline(
-        max_runtime_seconds=int(manifest.tags["MaxRuntimeInSeconds"]),
+        max_runtime_seconds=tagged_runtime_seconds,
         artifact_reserve_seconds=int(config["artifact_reserve_seconds"]),
         shutdown_margin_seconds=int(config["shutdown_margin_seconds"]),
         clock=clock,
@@ -954,6 +960,18 @@ def run_training(
         source_file_sha256=source_file_sha256,
     )
     deadline.require_training_time("model load")
+    print(
+        json.dumps(
+            {
+                "event": "model_load_start",
+                "student_model_id": manifest.models.student.id,
+                "student_revision": manifest.models.student.revision,
+                "teacher_required": arm == "logit_kd",
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
     teacher_required = arm == "logit_kd"
     runtime_qlora = qlora.model_dump(mode="json")
@@ -986,6 +1004,19 @@ def run_training(
             (parameter for parameter in student.parameters() if parameter.requires_grad),
             lr=learning_rate,
         )
+    print(
+        json.dumps(
+            {
+                "event": "optimizer_ready",
+                "arm": arm,
+                "optimizer": "torch.optim.AdamW",
+                "student_model_loaded": True,
+                "teacher_model_loaded": teacher is not None,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
     temperature = float(qlora.logit_temperature)
     kd_weight = float(qlora.kd_weight)
@@ -1276,6 +1307,19 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None) -> 
     try:
         manifest_path = args.manifest or discover_manifest(manifest_channel)
         manifest = load_manifest(manifest_path)
+        print(
+            json.dumps(
+                {
+                    "event": "emergency_trainer_start",
+                    "arm": args.arm,
+                    "manifest_sha256": manifest.seal_sha256(),
+                    "run_id": manifest.run_id,
+                },
+                sort_keys=True,
+            ),
+            file=out,
+            flush=True,
+        )
         result = run_training(
             manifest=manifest,
             arm=args.arm,

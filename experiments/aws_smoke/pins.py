@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator, model_validator
 
@@ -94,6 +95,9 @@ class EmergencyEvidence(BaseModel):
     iam_role_arn: StrictStr
     artifact_s3_prefix: StrictStr
     dataset_s3_uri: StrictStr
+    models_s3_uri: StrictStr
+    model_materialization_uri: StrictStr
+    model_materialization_sha256: StrictStr
     ecr_image_uri: StrictStr
     image_digest: StrictStr
     student_model_id: StrictStr = Field(min_length=1)
@@ -128,6 +132,9 @@ class EmergencyEvidence(BaseModel):
         "iam_role_arn",
         "artifact_s3_prefix",
         "dataset_s3_uri",
+        "models_s3_uri",
+        "model_materialization_uri",
+        "model_materialization_sha256",
         "ecr_image_uri",
         "image_digest",
         "student_model_id",
@@ -174,6 +181,22 @@ class EmergencyEvidence(BaseModel):
             raise ValueError("artifact_s3_prefix must be an s3:// URI")
         if not _S3_URI_RE.fullmatch(self.dataset_s3_uri):
             raise ValueError("dataset_s3_uri must be an s3:// URI")
+        if not _S3_URI_RE.fullmatch(self.models_s3_uri):
+            raise ValueError("models_s3_uri must be an s3:// URI")
+        if not _S3_URI_RE.fullmatch(self.model_materialization_uri):
+            raise ValueError("model_materialization_uri must be an s3:// URI")
+        if not _SHA256_RE.fullmatch(self.model_materialization_sha256):
+            raise ValueError("model_materialization_sha256 must be 64 lowercase hex")
+        models = urlparse(self.models_s3_uri)
+        materialization = urlparse(self.model_materialization_uri)
+        if models.netloc != materialization.netloc:
+            raise ValueError("model prefix and materialization manifest must share a bucket")
+        if models.path.rstrip("/") != "/models":
+            raise ValueError("models_s3_uri must select the exact models channel root")
+        if materialization.path != "/models/materialization.json":
+            raise ValueError(
+                "model_materialization_uri must select models/materialization.json"
+            )
         require_pinned_revision(self.student_revision, role="student")
         require_pinned_revision(self.teacher_revision, role="teacher")
         if not _SHA256_RE.fullmatch(self.student_tokenizer_sha256):
@@ -259,6 +282,9 @@ def evidence_schema_template() -> dict[str, Any]:
         "iam_role_arn": "UNSET",
         "artifact_s3_prefix": "UNSET",
         "dataset_s3_uri": "UNSET",
+        "models_s3_uri": "UNSET",
+        "model_materialization_uri": "UNSET",
+        "model_materialization_sha256": "UNSET",
         "ecr_image_uri": "UNSET",
         "image_digest": "UNSET",
         "student_model_id": "Qwen/Qwen2.5-0.5B-Instruct",

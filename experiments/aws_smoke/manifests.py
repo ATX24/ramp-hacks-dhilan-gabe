@@ -263,6 +263,7 @@ def _emergency_config(
         ),
         "artifact_reserve_seconds": profile.artifact_reserve_seconds,
         "shutdown_margin_seconds": profile.shutdown_margin_seconds,
+        "max_runtime_seconds": profile.max_runtime_seconds,
         "protocol_deviation": (
             "DEVIATION:bf16_lora_no_nf4"
             if profile.precision_mode == "bf16_lora"

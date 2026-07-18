@@ -9,6 +9,7 @@ import pytest
 from experiments.aws_smoke.channels import discover_and_load_manifest
 from experiments.aws_smoke.launch_plan import (
     CONTAINER_MANIFEST_PATH,
+    CONTAINER_RESPONSES_PATH,
     ENTRYPOINT,
     build_create_training_job_request,
     discover_generated_manifest_paths,
@@ -21,6 +22,7 @@ from experiments.aws_smoke.profile import (
     CONTROL_LAUNCH_ORDER,
     DEFAULT_EMERGENCY_PROFILE,
     DEFAULT_UNIQUE_LAUNCH_ORDER,
+    EmergencyTrainingProfile,
 )
 from experiments.aws_smoke.safety import CONFIRM_PHRASE, CallerIdentity
 from tests.aws_smoke.support import build_campaign
@@ -60,14 +62,30 @@ def test_request_is_network_isolated_and_uses_canonical_manifest(
     assert request["StoppingCondition"]["MaxRuntimeInSeconds"] == 900
     assert request["AlgorithmSpecification"]["ContainerEntrypoint"] == ENTRYPOINT
     arguments = request["AlgorithmSpecification"]["ContainerArguments"]
-    assert arguments[:2] == ["--manifest", CONTAINER_MANIFEST_PATH]
+    assert arguments[:4] == [
+        "--execution-mode",
+        "emergency-smoke",
+        "--manifest",
+        CONTAINER_MANIFEST_PATH,
+    ]
+    assert CONTAINER_RESPONSES_PATH in arguments
+    assert "--execute" in arguments
     assert request["RoleArn"] == valid_evidence.iam_role_arn
     assert (
         request["AlgorithmSpecification"]["TrainingImage"]
         == valid_evidence.ecr_image_uri
     )
     channels = {item["ChannelName"] for item in request["InputDataConfig"]}
-    assert channels == {"manifest", "dataset", "models"}
+    assert channels == {"manifest", "dataset", "responses", "models"}
+    channel_map = {
+        item["ChannelName"]: item["DataSource"]["S3DataSource"]["S3Uri"]
+        for item in request["InputDataConfig"]
+    }
+    assert channel_map["models"] == valid_evidence.models_s3_uri.rstrip("/") + "/"
+    assert channel_map["responses"].endswith("/responses/")
+    assert request["HyperParameters"]["max_runtime_seconds"] == "900"
+    tags = {item["Key"]: item["Value"] for item in request["Tags"]}
+    assert tags["MaxRuntimeInSeconds"] == "900"
     s3 = FakeS3()
     target = stage_manifest_for_job(
         s3,
@@ -83,6 +101,25 @@ def test_request_is_network_isolated_and_uses_canonical_manifest(
             {"ContentType": "application/json"},
         )
     ]
+
+
+def test_request_rejects_runtime_profile_mismatch(
+    valid_evidence: EmergencyEvidence,
+    tmp_path: Path,
+) -> None:
+    paths, _, _ = build_campaign(tmp_path, valid_evidence)
+    manifest = discover_and_load_manifest(paths["logit_kd"].parent)
+    shorter = EmergencyTrainingProfile(
+        max_runtime_seconds=600,
+        memory_probe_evidence=valid_evidence.memory_probe_evidence,
+    )
+    with pytest.raises(ValueError, match="exactly equal"):
+        build_create_training_job_request(
+            manifest=manifest,
+            evidence=valid_evidence,
+            arm="logit_kd",
+            profile=shorter,
+        )
 
 
 def test_default_plan_fails_without_third_distinct_signal(

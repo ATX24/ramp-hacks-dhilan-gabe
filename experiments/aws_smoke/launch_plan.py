@@ -11,6 +11,7 @@ from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from distillery.contracts.manifest import SealedRunManifest
+from distillery.training.entrypoint import EXECUTE_ACKNOWLEDGEMENT
 from experiments.aws_smoke.channels import (
     CANONICAL_MANIFEST_FILENAME,
     load_manifest,
@@ -18,6 +19,7 @@ from experiments.aws_smoke.channels import (
 from experiments.aws_smoke.manifests import (
     job_name_for_arm,
     manifest_arm,
+    manifest_emergency_config,
     manifest_objective,
 )
 from experiments.aws_smoke.pins import EmergencyEvidence, parse_digest_pinned_ecr_image
@@ -29,10 +31,13 @@ from experiments.aws_smoke.profile import (
 )
 from experiments.aws_smoke.safety import CallerIdentity, enforce_safety_gates
 
-ENTRYPOINT = ["python", "-m", "experiments.aws_smoke.train"]
+ENTRYPOINT = ["python", "/opt/distillery/container_entrypoint.py"]
 CONTAINER_MANIFEST_PATH = (
     f"/opt/ml/input/data/manifest/{CANONICAL_MANIFEST_FILENAME}"
 )
+CONTAINER_RESPONSES_PATH = "/opt/ml/input/data/responses/responses.jsonl"
+CONTAINER_OUTPUT_DIR = "/opt/ml/output/data"
+CONTAINER_MODEL_OUTPUT_DIR = "/opt/ml/model"
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +168,20 @@ def build_create_training_job_request(
         raise ValueError("MaxRuntime must be <= 15 minutes for emergency path")
     if manifest.tags.get("EnableNetworkIsolation") != "true":
         raise ValueError("manifest must seal EnableNetworkIsolation=true")
+    try:
+        tagged_runtime_seconds = int(manifest.tags["MaxRuntimeInSeconds"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("manifest must seal an integer MaxRuntimeInSeconds tag") from exc
+    emergency_config = manifest_emergency_config(manifest)
+    configured_runtime_seconds = emergency_config.get("max_runtime_seconds")
+    if (
+        tagged_runtime_seconds != p.max_runtime_seconds
+        or configured_runtime_seconds != p.max_runtime_seconds
+    ):
+        raise ValueError(
+            "SageMaker runtime, sealed MaxRuntimeInSeconds tag, and "
+            "EmergencyConfig max_runtime_seconds must be exactly equal"
+        )
     identity = parse_digest_pinned_ecr_image(evidence.ecr_image_uri)
     if identity.digest != manifest.runtime.image_digest:
         raise ValueError("manifest image_digest does not match evidence ECR image")
@@ -180,6 +199,7 @@ def build_create_training_job_request(
         "arm": arm,
         "max_run_usd": str(manifest.cost.max_run_usd),
         "hourly_usd": str(p.hourly_usd),
+        "max_runtime_seconds": str(tagged_runtime_seconds),
         "emergency_profile": p.name,
         "initialization_fingerprint": str(
             manifest.tags["InitializationFingerprint"]
@@ -192,10 +212,21 @@ def build_create_training_job_request(
             "TrainingInputMode": "File",
             "ContainerEntrypoint": list(ENTRYPOINT),
             "ContainerArguments": [
+                "--execution-mode",
+                "emergency-smoke",
                 "--manifest",
                 CONTAINER_MANIFEST_PATH,
+                "--responses",
+                CONTAINER_RESPONSES_PATH,
+                "--output-dir",
+                CONTAINER_OUTPUT_DIR,
+                "--model-output-dir",
+                CONTAINER_MODEL_OUTPUT_DIR,
                 "--arm",
                 arm,
+                "--execute",
+                "--execute-acknowledgement",
+                EXECUTE_ACKNOWLEDGEMENT,
             ],
         },
         "RoleArn": evidence.iam_role_arn,
@@ -224,11 +255,23 @@ def build_create_training_job_request(
                 "InputMode": "File",
             },
             {
+                "ChannelName": "responses",
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": manifest.dataset.uri.rstrip("/") + "/responses/",
+                        "S3DataDistributionType": "FullyReplicated",
+                    }
+                },
+                "ContentType": "application/jsonlines",
+                "InputMode": "File",
+            },
+            {
                 "ChannelName": "models",
                 "DataSource": {
                     "S3DataSource": {
                         "S3DataType": "S3Prefix",
-                        "S3Uri": evidence.artifact_s3_prefix.rstrip("/") + "/models/",
+                        "S3Uri": evidence.models_s3_uri.rstrip("/") + "/",
                         "S3DataDistributionType": "FullyReplicated",
                     }
                 },
@@ -244,7 +287,7 @@ def build_create_training_job_request(
             "VolumeSizeInGB": 30,
         },
         "StoppingCondition": {
-            "MaxRuntimeInSeconds": p.max_runtime_seconds,
+            "MaxRuntimeInSeconds": tagged_runtime_seconds,
         },
         "HyperParameters": hyperparams,
         "EnableNetworkIsolation": True,
@@ -259,6 +302,7 @@ def build_create_training_job_request(
             {"Key": "ManifestSha256", "Value": manifest.seal_sha256()},
             {"Key": "Backend", "Value": "sagemaker"},
             {"Key": "EmergencyProfile", "Value": p.name},
+            {"Key": "MaxRuntimeInSeconds", "Value": str(tagged_runtime_seconds)},
             {"Key": "ScientificRole", "Value": str(objective["scientific_role"])},
             {
                 "Key": "DistinctTrainingSignal",

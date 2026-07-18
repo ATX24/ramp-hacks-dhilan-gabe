@@ -12,6 +12,7 @@ from experiments.aws_smoke.campaign_index import (
     verify_campaign_bundle,
 )
 from experiments.aws_smoke.campaign_wave import verify_wave_bundle
+from experiments.aws_smoke.manifests import manifest_emergency_config
 from experiments.aws_smoke.pins import EmergencyEvidence, parse_digest_pinned_ecr_image
 
 CAMPAIGN_CHANNEL_NAME = "campaign"
@@ -79,6 +80,22 @@ def _validate_launch_evidence(
         for manifest in bundle.manifests
     ):
         raise ValueError("campaign dataset channel does not match AWS evidence")
+    for manifest in bundle.manifests:
+        try:
+            tagged_runtime = int(manifest.tags["MaxRuntimeInSeconds"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("campaign manifest has invalid MaxRuntimeInSeconds tag") from exc
+        configured_runtime = manifest_emergency_config(manifest).get(
+            "max_runtime_seconds"
+        )
+        if (
+            tagged_runtime != index.max_runtime_seconds
+            or configured_runtime != index.max_runtime_seconds
+        ):
+            raise ValueError(
+                "campaign stopping condition, manifest runtime tag, and "
+                "EmergencyConfig runtime must be exactly equal"
+            )
 
 
 def build_campaign_launch_plan(
@@ -103,7 +120,7 @@ def build_campaign_launch_plan(
         max_runtime_seconds=index.max_runtime_seconds,
     )
     dataset_uri = bundle.manifests[0].dataset.uri.rstrip("/") + "/"
-    model_uri = evidence.artifact_s3_prefix.rstrip("/") + "/models/"
+    model_uri = evidence.models_s3_uri.rstrip("/") + "/"
     job_name = f"distillery-{index.hardware.gpu_count}gpu-{index_sha256[:16]}"
     request = {
         "TrainingJobName": job_name,
@@ -187,6 +204,7 @@ def build_campaign_launch_plan(
             "pricing_evidence_sha256": index.pricing.evidence_sha256,
             "hourly_price_microusd": str(index.pricing.hourly_price_microusd),
             "max_parent_cost_microusd": str(max_parent_cost),
+            "max_runtime_seconds": str(index.max_runtime_seconds),
             "execution_mode": index.hardware.execution_mode,
         },
         "EnableNetworkIsolation": True,
@@ -200,6 +218,7 @@ def build_campaign_launch_plan(
             {"Key": "InstanceTopology", "Value": index.hardware.profile_id},
             {"Key": "ArmCount", "Value": str(len(index.arms))},
             {"Key": "ExecutionMode", "Value": index.hardware.execution_mode},
+            {"Key": "MaxRuntimeInSeconds", "Value": str(index.max_runtime_seconds)},
         ],
     }
     if max_parent_cost <= 0 or max_parent_cost > 10_000 * MICRO_USD_PER_USD:

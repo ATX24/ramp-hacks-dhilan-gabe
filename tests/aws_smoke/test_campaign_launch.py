@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ import pytest
 from experiments.aws_smoke.campaign_launch import (
     CAMPAIGN_ENTRYPOINT,
     CONTAINER_PYTHON,
+    _validate_launch_evidence,
     build_campaign_launch_plan,
     build_wave_launch_plan,
 )
@@ -101,3 +103,20 @@ def test_single_campaign_plans_fallback_and_stretch_profiles(
     }
     expected_max = (price_microusd * TEST_RUNTIME_SECONDS + 3600 - 1) // 3600
     assert plan.max_parent_cost_microusd == expected_max
+
+
+def test_campaign_rejects_manifest_runtime_mismatch(
+    valid_evidence: EmergencyEvidence,
+    tmp_path: Path,
+) -> None:
+    bundle = stage_test_campaign(tmp_path, valid_evidence)
+    first = bundle.manifests[0]
+    tampered = first.model_copy(
+        update={"tags": {**first.tags, "MaxRuntimeInSeconds": "19"}}
+    )
+    mismatched = replace(
+        bundle,
+        manifests=(tampered, *bundle.manifests[1:]),
+    )
+    with pytest.raises(ValueError, match="exactly equal"):
+        _validate_launch_evidence(mismatched, valid_evidence)

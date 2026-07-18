@@ -37,6 +37,11 @@ def valid_evidence() -> EmergencyEvidence:
         iam_role_arn=f"arn:aws:iam::{ACCOUNT}:role/DistillerySageMakerTrainingRole",
         artifact_s3_prefix=f"s3://distillery-artifacts-{ACCOUNT}/artifacts",
         dataset_s3_uri=f"s3://distillery-artifacts-{ACCOUNT}/datasets/ds_awssmoke01/",
+        models_s3_uri=f"s3://distillery-artifacts-{ACCOUNT}/models/",
+        model_materialization_uri=(
+            f"s3://distillery-artifacts-{ACCOUNT}/models/materialization.json"
+        ),
+        model_materialization_sha256="4" * 64,
         ecr_image_uri=(
             f"{ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/distillery@{image_digest}"
         ),
