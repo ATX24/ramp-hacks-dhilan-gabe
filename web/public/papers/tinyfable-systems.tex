@@ -1,0 +1,89 @@
+\documentclass{article}
+\usepackage[preprint,nonatbib]{neurips_2025}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\title{TinyFable: Distilling a Finance Generalist}
+\author{
+Gabriel Keller \\
+Anthropic 2 \\
+\texttt{gabrielkeller@utexas.edu}
+\And
+Dhilan Shah \\
+Anthropic 2 \\
+\texttt{dhilan.shah@utexas.edu}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+TinyFable is a portable, 0.5B-class finance-generalist model trained to perform transaction review and variance analysis with the same weights. We use a deterministic synthetic finance world with latent accounting facts, group-isolated IID and OOD splits, and machine-checkable invariants. A Qwen2.5 1.5B Instruct teacher transfers behavior to a Qwen2.5 0.5B Instruct student through sequence-level and same-tokenizer logit distillation. The released candidate was compared with rules, the frozen student base, the teacher, a cheap off-the-shelf model, oracle supervised fine-tuning, and a matched cross-entropy ablation. TinyFable passed the joint quality, uncertainty, systems, and economic release gates. This conclusion is bounded to the frozen synthetic evaluation and does not establish production finance performance.
+\end{abstract}
+
+\section{Research question}
+Organizations accumulate model traces and reviewed finance decisions, but a smaller model is not automatically useful because it can be trained. The relevant question is whether one portable student can retain enough behavior to justify its training and operational cost against practical substitutes. We therefore evaluate a distill-or-don't decision rather than a training demonstration.
+
+TinyFable is intentionally a generalist within a narrow domain. The same artifact must execute both primary task schemas. No hidden task router or specialist checkpoint is allowed. Cash reconciliation is supported as a backup task but cannot substitute for a failed primary task in the release claim.
+
+\section{Tasks}
+\paragraph{Transaction review.} Given a transaction, evidence, and policy context, the model returns GL coding, a balanced journal entry, a policy action, cited evidence, and confidence. Hard gates include debit-credit balance, policy precedence, and schema validity.
+
+\paragraph{Variance analysis.} Given actuals, plan values, and supporting drivers, the model returns profit impact, direction, ranked drivers, arithmetic closure, evidence, and confidence. Hard gates include sign correctness, total closure, and stable handling of tied drivers.
+
+\paragraph{Cash reconciliation.} The backup task reconciles statement and ledger balances, identifies reconciling items, and reports adjusted balances and exceptions.
+
+\section{Synthetic finance world}
+The generator samples latent companies, periods, policies, accounts, transactions, plans, actuals, and cash movements before rendering prompts or answers. This order matters: the target is computed from the latent world rather than inferred from the same prose shown to the model.
+
+The smoke corpus contains 320 training, 80 validation, and 160 test examples. The full protocol contains 3,200 training, 400 validation, 800 IID test, and 800 OOD test examples. The task mixture is fixed at 45 percent transaction review, 45 percent variance analysis, and 10 percent cash reconciliation. Difficulty is fixed at 30 percent easy, 40 percent medium, and 30 percent hard.
+
+Splits isolate world identifiers, entity groups, periods, source identifiers, latent cases, and template families. Duplicate and near-duplicate detectors are tested with injected leaks. Integer minor units are used where rounding could otherwise obscure accounting invariants.
+
+\section{Models and transfer methods}
+The first model pair is Qwen/Qwen2.5-1.5B-Instruct as teacher and Qwen/Qwen2.5-0.5B-Instruct as student. Revisions, tokenizer files, special-token maps, and chat templates are pinned in the release manifest. QLoRA is the adaptation mechanism. It is not the compression mechanism; the size reduction comes from moving behavior from a 1.5B model into a 0.5B model.
+
+\texttt{sequence.v1} materializes valid imported, oracle, or teacher responses and performs completion-only training. \texttt{logit.v1} minimizes forward KL at teacher-forced output positions,
+\[
+\mathcal{L}_{KD}=T^2\,\mathrm{KL}(p_{teacher}^{T}\,\Vert\,p_{student}^{T}),
+\]
+with a hard-target cross-entropy mixture. Logit distillation proceeds only when tokenizer fingerprints, token identifiers, special tokens, and chat-template semantics match. Its chunked full-vocabulary implementation is checked against a direct PyTorch reference.
+
+\section{Evaluation design}
+The required arms are rules, teacher, frozen student, cheap off-the-shelf API, oracle SFT, sequence KD, logit KD, and a matched CE-only ablation. Trainable student arms share initialization, tokenizer, QLoRA configuration, sample order, token and step budget, hardware, precision, decoding, and seeds. The sole treatment difference is recorded in each manifest.
+
+Primary metrics combine schema validity and task invariants into a joint exact score. The report also includes component metrics, OOD slices, paired clustered 95 percent confidence intervals, seed variability, p50 and p95 latency, throughput, peak VRAM, GPU hours, gross experiment cost, and utilization-sensitive break-even.
+
+\section{Release result}
+The selected TinyFable artifact passed both primary task gates, the required OOD and uncertainty checks, the systems profile, and the economic gate. Distillery therefore approved the artifact for release. Exact numeric values are rendered from the immutable \texttt{ProofReport}; the paper does not maintain a second hand-copied score table.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Gate & Evidence & Release status \\
+\midrule
+Joint primary-task quality & Frozen IID predictions & Passed \\
+OOD and uncertainty & Grouped slices and paired CIs & Passed \\
+Systems behavior & Latency, throughput, VRAM & Measured \\
+Economics & Gross cost and break-even sensitivity & Passed \\
+Reproducibility & Two seeds and immutable manifests & Passed \\
+\bottomrule
+\end{tabular}
+\caption{Qualitative release summary. Numeric values remain sourced from the evaluation artifact.}
+\end{table}
+
+\section{Limitations}
+The benchmark is synthetic. It validates the pipeline, numerical methods, accounting invariants, leakage controls, and a bounded model comparison. It does not establish customer ROI, production privacy, robustness to real company distributions, or human-accountant acceptance. Serving cost is projected from measured systems behavior and explicit utilization assumptions until a later deployment study measures production TCO.
+
+\section{Artifact record}
+The release includes the sealed manifest, model and tokenizer revisions, dataset and split hashes, label provenance, training logs, prediction files, systems profiles, gross cost records, checksums, adapter and optional merged weights, load instructions, and the immutable evaluation report.
+
+\begin{thebibliography}{9}
+\bibitem{hinton} G. Hinton, O. Vinyals, and J. Dean. Distilling the Knowledge in a Neural Network. 2015.
+\bibitem{kimrush} Y. Kim and A. Rush. Sequence-Level Knowledge Distillation. EMNLP, 2016.
+\bibitem{qwen} Qwen Team. Qwen2.5 1.5B Instruct and Qwen2.5 0.5B Instruct model cards.
+\end{thebibliography}
+
+\end{document}

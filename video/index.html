@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Distillery Launch</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=block" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; width: 1920px; height: 1080px; background: #f1eee6; overflow: hidden; }
+      #master-root { width: 1920px; height: 1080px; position: relative; }
+      [data-composition-id="main"] > div[data-composition-id] { position: absolute; inset: 0; }
+      .cap {
+        position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+        text-align: center; font-family: "Instrument Sans", Arial, sans-serif; font-weight: 500;
+        font-size: 26px; color: #171714; letter-spacing: -0.005em;
+        background: rgba(250, 250, 249, 0.88); border: 1px solid #d9d5ca;
+        padding: 10px 22px; border-radius: 3px;
+        box-shadow: 0 8px 24px -10px rgba(20,20,20,0.18); z-index: 9999; pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="master-root" data-composition-id="main" data-width="1920" data-height="1080" data-start="0" data-duration="48.0">
+      <div class="clip" data-composition-id="cold-open" data-composition-src="compositions/cold-open.html" data-start="0" data-duration="5.5" data-width="1920" data-height="1080" data-track-index="1"></div>
+      <div class="clip" data-composition-id="hook-logo" data-composition-src="compositions/hook-logo.html" data-start="5.5" data-duration="6.0" data-width="1920" data-height="1080" data-track-index="1"></div>
+      <div class="clip" data-composition-id="code-reveal" data-composition-src="compositions/code-reveal.html" data-start="11.5" data-duration="9.0" data-width="1920" data-height="1080" data-track-index="1"></div>
+      <div class="clip" data-composition-id="before-after" data-composition-src="compositions/before-after.html" data-start="20.5" data-duration="8.5" data-width="1920" data-height="1080" data-track-index="1"></div>
+      <div class="clip" data-composition-id="vs-fable" data-composition-src="compositions/vs-fable.html" data-start="29.0" data-duration="7.5" data-width="1920" data-height="1080" data-track-index="1"></div>
+      <div class="clip" data-composition-id="proof-report" data-composition-src="compositions/proof-report.html" data-start="36.5" data-duration="6.5" data-width="1920" data-height="1080" data-track-index="1"></div>
+      <div class="clip" data-composition-id="outro" data-composition-src="compositions/outro.html" data-start="43.0" data-duration="5.0" data-width="1920" data-height="1080" data-track-index="1"></div>
+
+      <script>
+        window.__timelines = window.__timelines || {};
+        const masterTL = gsap.timeline({ paused: true });
+        window.__timelines["main"] = masterTL;
+      </script>
+    </div>
+
+    <div class="cap clip" data-start="0.8" data-duration="2.2" data-track-index="30">Every repetitive workflow call goes to a frontier model.</div>
+    <div class="cap clip" data-start="3.2" data-duration="2.0" data-track-index="31">Same task. Same prompt. Full price, every time.</div>
+    <div class="cap clip" data-start="5.9" data-duration="2.3" data-track-index="32">What if the small model could prove itself?</div>
+    <div class="cap clip" data-start="8.7" data-duration="2.4" data-track-index="33">This is Distillery.</div>
+    <div class="cap clip" data-start="11.9" data-duration="3.0" data-track-index="34">Describe your distillation in Python.</div>
+    <div class="cap clip" data-start="15.1" data-duration="2.6" data-track-index="35">Bring your own recipe. Even an experimental one.</div>
+    <div class="cap clip" data-start="17.9" data-duration="2.3" data-track-index="36">Every run is sealed and gated.</div>
+    <div class="cap clip" data-start="20.9" data-duration="2.6" data-track-index="37">The same 0.5B weights, before and after.</div>
+    <div class="cap clip" data-start="24.0" data-duration="2.2" data-track-index="38">Before: invalid output on a held-out case.</div>
+    <div class="cap clip" data-start="26.5" data-duration="2.2" data-track-index="39">After: valid, correct, and checked by an oracle.</div>
+    <div class="cap clip" data-start="29.4" data-duration="2.4" data-track-index="40">Claude Fable labels the dataset once.</div>
+    <div class="cap clip" data-start="32.1" data-duration="3.2" data-track-index="41">The student serves every request on your hardware.</div>
+    <div class="cap clip" data-start="36.9" data-duration="2.6" data-track-index="42">Every number comes from a frozen held-out set.</div>
+    <div class="cap clip" data-start="39.8" data-duration="2.6" data-track-index="43">The student matches its teacher at a thousandth the size.</div>
+    <div class="cap clip" data-start="43.4" data-duration="2.6" data-track-index="44">Distillery. Prove the smaller model.</div>
+  </body>
+</html>

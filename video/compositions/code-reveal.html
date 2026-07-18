@@ -1,0 +1,99 @@
+<template id="code-reveal-template">
+  <div data-composition-id="code-reveal" data-width="1920" data-height="1080" data-start="0" data-duration="9.0">
+    <div class="cr-rule cr-rule-t"></div>
+    <div class="cr-rule cr-rule-b"></div>
+    <div class="cr-meta cr-meta-tl">&dagger; EXHIBIT C &middot; THE API</div>
+    <div class="cr-meta cr-meta-tr">03 / 07</div>
+
+    <div class="cr-card">
+      <div class="cr-chrome">
+        <span class="cr-dot"></span><span class="cr-dot"></span><span class="cr-dot"></span>
+        <span class="cr-file">distill_finance.py</span>
+        <span class="cr-chrome-right">DISTILLERY &middot; SDK</span>
+      </div>
+      <div class="cr-code">
+        <div class="cr-line"><span class="cr-ln">1</span><span class="cr-content"><span class="cr-kw">from</span> distillery_sdk <span class="cr-kw">import</span> <span class="cr-type">Distillery</span></span></div>
+        <div class="cr-line"><span class="cr-ln">2</span><span class="cr-content"> </span></div>
+        <div class="cr-line"><span class="cr-ln">3</span><span class="cr-content">distillery <span class="cr-op">=</span> <span class="cr-type">Distillery</span><span class="cr-brace">(</span>base_url<span class="cr-op">=</span><span class="cr-str">"https://distillery.fly.dev"</span><span class="cr-brace">)</span></span></div>
+        <div class="cr-line"><span class="cr-ln">4</span><span class="cr-content">dataset <span class="cr-op">=</span> distillery.datasets.<span class="cr-fn">generate</span><span class="cr-brace">(</span>corpus<span class="cr-op">=</span><span class="cr-str">"smoke"</span><span class="cr-brace">)</span></span></div>
+        <div class="cr-line"><span class="cr-ln">5</span><span class="cr-content">curated <span class="cr-op">=</span> distillery.datasets.<span class="cr-fn">run_recipe</span><span class="cr-brace">(</span>dataset<span class="cr-brace">[</span><span class="cr-str">"dataset_id"</span><span class="cr-brace">]</span>, <span class="cr-str">"rejection_sampling.v1"</span><span class="cr-brace">)</span></span></div>
+        <div class="cr-line"><span class="cr-ln">6</span><span class="cr-content">run <span class="cr-op">=</span> distillery.<span class="cr-fn">distill</span><span class="cr-brace">(</span>curated<span class="cr-brace">[</span><span class="cr-str">"new_dataset_id"</span><span class="cr-brace">]</span>, recipe<span class="cr-op">=</span><span class="cr-str">"sequence.v1"</span><span class="cr-brace">)</span>.<span class="cr-fn">wait</span><span class="cr-brace">()</span></span></div>
+        <div class="cr-line"><span class="cr-ln">7</span><span class="cr-content"><span class="cr-kw">print</span><span class="cr-brace">(</span>run.proof_report<span class="cr-brace">)</span></span></div>
+      </div>
+    </div>
+
+    <div class="cr-annot cr-annot-1">
+      <span class="cr-annot-idx">A &middot; 01</span>
+      <span class="cr-annot-kicker">USER-DEFINED RECIPE</span>
+      <span class="cr-annot-sub">rejection_sampling.v1 keeps only oracle-verified teacher labels. Write your own in 20 lines.</span>
+    </div>
+    <div class="cr-annot cr-annot-2">
+      <span class="cr-annot-idx">A &middot; 02</span>
+      <span class="cr-annot-kicker">SEALED RUN</span>
+      <span class="cr-annot-sub">Immutable dataset, hashed manifest, one finite training job.</span>
+    </div>
+    <div class="cr-annot cr-annot-3">
+      <span class="cr-annot-idx">A &middot; 03</span>
+      <span class="cr-annot-kicker">THE PROOF GATE</span>
+      <span class="cr-annot-sub">Frozen held-out set the student never saw. Pass, or BLOCKED.</span>
+    </div>
+
+    <div class="cr-footer">&sect; THREE LINES TO A SEALED DISTILLATION</div>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap");
+      [data-composition-id="code-reveal"] { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #f1eee6; color: #171714; }
+      [data-composition-id="code-reveal"] .cr-rule { position: absolute; left: 80px; right: 80px; height: 1px; background: #d9d5ca; }
+      [data-composition-id="code-reveal"] .cr-rule-t { top: 80px; }
+      [data-composition-id="code-reveal"] .cr-rule-b { bottom: 80px; }
+      [data-composition-id="code-reveal"] .cr-meta { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="code-reveal"] .cr-meta-tl { top: 48px; left: 80px; }
+      [data-composition-id="code-reveal"] .cr-meta-tr { top: 48px; right: 80px; }
+      [data-composition-id="code-reveal"] .cr-card { position: absolute; top: 220px; left: 130px; width: 1180px; background: #fbfaf6; border: 1px solid #171714; overflow: hidden; opacity: 0; }
+      [data-composition-id="code-reveal"] .cr-chrome { height: 44px; border-bottom: 1px solid #171714; display: flex; align-items: center; gap: 8px; padding: 0 20px; }
+      [data-composition-id="code-reveal"] .cr-dot { width: 8px; height: 8px; border: 1px solid #171714; border-radius: 50%; background: transparent; }
+      [data-composition-id="code-reveal"] .cr-file { margin-left: 16px; font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: 0.04em; }
+      [data-composition-id="code-reveal"] .cr-chrome-right { margin-left: auto; font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 11px; letter-spacing: 0.32em; color: #d75a3d; text-transform: uppercase; }
+      [data-composition-id="code-reveal"] .cr-code { padding: 34px 36px 38px; font-family: "JetBrains Mono", monospace; font-size: 21px; line-height: 1.75; }
+      [data-composition-id="code-reveal"] .cr-line { display: flex; gap: 26px; white-space: pre; }
+      [data-composition-id="code-reveal"] .cr-ln { width: 24px; color: #a5a196; text-align: right; white-space: pre; }
+      [data-composition-id="code-reveal"] .cr-content { flex: 1; white-space: pre; }
+      [data-composition-id="code-reveal"] .cr-kw { color: #b3542f; font-weight: 500; }
+      [data-composition-id="code-reveal"] .cr-type { color: #3d6b5e; font-weight: 500; }
+      [data-composition-id="code-reveal"] .cr-fn { color: #d75a3d; font-weight: 500; }
+      [data-composition-id="code-reveal"] .cr-str { color: #9c5a12; }
+      [data-composition-id="code-reveal"] .cr-brace { color: #6d6a63; }
+      [data-composition-id="code-reveal"] .cr-op { color: #6d6a63; }
+      [data-composition-id="code-reveal"] .cr-annot { position: absolute; left: 1400px; width: 380px; padding-top: 14px; border-top: 2px solid #171714; opacity: 0; }
+      [data-composition-id="code-reveal"] .cr-annot-idx { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 12px; letter-spacing: 0.28em; color: #d75a3d; display: block; margin-bottom: 6px; }
+      [data-composition-id="code-reveal"] .cr-annot-kicker { font-family: "Instrument Sans", Arial, sans-serif; font-weight: 800; font-size: 21px; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.05; display: block; margin-bottom: 6px; }
+      [data-composition-id="code-reveal"] .cr-annot-sub { font-family: "JetBrains Mono", monospace; font-size: 14px; color: #6d6a63; line-height: 1.4; display: block; }
+      [data-composition-id="code-reveal"] .cr-annot-1 { top: 240px; }
+      [data-composition-id="code-reveal"] .cr-annot-2 { top: 460px; }
+      [data-composition-id="code-reveal"] .cr-annot-3 { top: 680px; }
+      [data-composition-id="code-reveal"] .cr-footer { position: absolute; bottom: 48px; left: 80px; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        const root = document.querySelector('[data-composition-id="code-reveal"]');
+        const card = root.querySelector(".cr-card");
+        const lines = root.querySelectorAll(".cr-line");
+        const annots = root.querySelectorAll(".cr-annot");
+        gsap.set(card, { y: 24, opacity: 0 });
+        gsap.set(lines, { x: -10, opacity: 0 });
+        gsap.set(annots, { x: -12, opacity: 0 });
+        tl.to(card, { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" }, 0.25);
+        lines.forEach((l, i) => tl.to(l, { x: 0, opacity: 1, duration: 0.25, ease: "power2.out" }, 0.85 + i * 0.28));
+        annots.forEach((a, i) => tl.to(a, { x: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, 3.4 + i * 0.9));
+        tl.to([card, ...annots], { opacity: 0, duration: 0.45, ease: "power2.in" }, 8.3);
+        tl.set([card, ...annots], { opacity: 0, visibility: "hidden" }, 8.8);
+        tl.to({}, { duration: 9.0 }, 0);
+        window.__timelines["code-reveal"] = tl;
+      })();
+    </script>
+  </div>
+</template>

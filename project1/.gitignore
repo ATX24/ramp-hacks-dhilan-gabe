@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+runs_local/corpus*/
+runs_local/*/training/
+runs_local/labeled.jsonl
+runs_local/*.jsonl
+!runs_local/demo_data.json

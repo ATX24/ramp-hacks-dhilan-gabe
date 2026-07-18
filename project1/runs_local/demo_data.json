@@ -1,0 +1,181 @@
+[
+ {
+  "task": "transaction_review",
+  "difficulty": "easy",
+  "input_preview": "{\"chart_of_accounts\":[{\"account\":\"6205\",\"name\":\"Travel - Airfare\",\"type\":\"expense\"},{\"account\":\"6210\",\"name\":\"Travel - Lodging\",\"type\":\"expense\"},{\"account\":\"6215\",\"name\":\"Meals & Entertainment\",\"type\":\"expense\"},{\"account\":\"6300\",\"name\":\"Software Subscriptions\",\"type\":\"expense\"},{\"account\":\"6310\",\"name\":\"Cloud Infrastructure\",\"type\":\"expense\"},{\"account\":\"6400\",\"name\":\"Office Supplies\",\"type\":\"ex",
+  "expected": {
+   "confidence": 0.95,
+   "evidence": [
+    {
+     "field": "amount_minor",
+     "source_id": "txn",
+     "value": "206940"
+    }
+   ],
+   "gl_account": "6400",
+   "journal_entry": [
+    {
+     "account": "6400",
+     "amount_minor": 206940,
+     "side": "debit"
+    },
+    {
+     "account": "2110",
+     "amount_minor": 206940,
+     "side": "credit"
+    }
+   ],
+   "policy_action": "approve",
+   "rule_ids": [
+    "POL-DEFAULT-000"
+   ],
+   "schema_version": "transaction_review.v1",
+   "task": "transaction_review"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"transaction_review.v1\",\n  \"task\": \"transaction_review\",\n  \"gl_account\": {\n    \"travel_airfare\": 1500,\n    \"travel_lodging\": 8000,\n    \"travel_meals_entertainment\": 1500,\n    \"software_subscriptions\": 10000,\n    \"cloud_infrastructure\": 8000,\n    \"office_supplies\": 1500,\n    \"professional_services\": 1500,\n    \"marketing_advertising\": 10000,\n    \"computer_equipment_capex\": 25000,\n    \"accounts_payable\": 2110,\n    \"corporate_card_payable\": 2100\n  },\n  \"journal_entry\": [\n    {\n      \"account\": \"travel_airfare\",\n      \"side\": \"debit\",\n      \"amount_minor\": 206940\n    },\n    {\n      \"account\": \"travel_lodging\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"travel_meals_entertainment\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"software_subscriptions\",\n      \"side\": \"credit\",\n      \"amount_minor\": 10000\n    },\n    {\n      \"account\": \"cloud_infrastructure\",\n      \"side\": \"credit\",\n      \"amount_minor\": 8000\n    },\n    {\n      \"account\": \"office_supplies\",\n      \"side\": \"credit\",\n      \"amount_minor\": 1500\n    },\n    {\n      \"account\": \"professional_services\",\n      \"side\": \"credit\",\n      \"amou",
+   "schema_valid": false,
+   "errors": [
+    "invalid JSON"
+   ],
+   "key_fields_correct": false,
+   "latency_s": 37.8
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"evidence\":[{\"field\":\"amount_minor\",\"source_id\":\"transaction\",\"value\":206940},{\"field\":\"vendor_hint\",\"source_id\":\"transaction\",\"value\":\"Staples\"}],\"gl_account\":\"6400\",\"journal_entry\":[{\"account\":\"6400\",\"amount_minor\":206940,\"side\":\"debit\"},{\"account\":\"2110\",\"amount_minor\":206940,\"side\":\"credit\"}],\"policy_action\":\"approve\",\"rule_ids\":[\"POL-CAPEX-001\"],\"schema_version\":\"transaction_review.v1\",\"task\":\"transaction_review\"}",
+   "schema_valid": true,
+   "errors": [],
+   "key_fields_correct": true,
+   "latency_s": 15.3
+  }
+ },
+ {
+  "task": "variance_analysis",
+  "difficulty": "easy",
+  "input_preview": "{\"driver_lines\":[{\"actual_minor\":1254344,\"budget_minor\":1000000,\"driver_id\":\"headcount\"},{\"actual_minor\":1413096,\"budget_minor\":1000000,\"driver_id\":\"cloud_usage\"},{\"actual_minor\":703095,\"budget_minor\":1000000,\"driver_id\":\"fx_effect\"},{\"actual_minor\":1229318,\"budget_minor\":1000000,\"driver_id\":\"license_sales\"}],\"evidence_index\":[\"actual_headcount\",\"actual_cloud_usage\",\"actual_fx_effect\",\"actual_lice",
+  "expected": {
+   "confidence": 0.92,
+   "direction": "unfavorable",
+   "evidence_ids": [
+    "actual_cloud_usage",
+    "actual_fx_effect",
+    "actual_headcount",
+    "actual_license_sales"
+   ],
+   "other_impact_minor": 7039,
+   "profit_impact_minor": -592814,
+   "rule_ids": [
+    "VAR-MATERIAL-005"
+   ],
+   "schema_version": "variance_analysis.v1",
+   "task": "variance_analysis",
+   "top_drivers": [
+    {
+     "driver_id": "cloud_usage",
+     "impact_minor": -413096,
+     "rank": 1
+    },
+    {
+     "driver_id": "fx_effect",
+     "impact_minor": 296905,
+     "rank": 2
+    },
+    {
+     "driver_id": "headcount",
+     "impact_minor": -254344,
+     "rank": 3
+    },
+    {
+     "driver_id": "license_sales",
+     "impact_minor": -229318,
+     "rank": 4
+    }
+   ]
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"variance_analysis.v1\",\n  \"task\": \"variance_analysis\",\n  \"profit_impact_minor\": -7039,\n  \"direction\": \"favorable\",\n  \"top_drivers\": [\n    {\n      \"driver_id\": \"license_sales\",\n      \"impact_minor\": 1229318,\n      \"rank\": 1\n    },\n    {\n      \"driver_id\": \"cloud_usage\",\n      \"impact_minor\": 1413096,\n      \"rank\": 2\n    },\n    {\n      \"driver_id\": \"fx_effect\",\n      \"impact_minor\": 703095,\n      \"rank\": 3\n    }\n  ],\n  \"other_impact_minor\": 7039,\n  \"rule_ids\": [\"VAR-MATERIAL-005\"],\n  \"evidence_ids\": [],\n  \"confidence\": 1.0\n}",
+   "schema_valid": false,
+   "errors": [
+    "arithmetic closure violated",
+    "direction/sign mismatch"
+   ],
+   "key_fields_correct": false,
+   "latency_s": 17.3
+  },
+  "distilled": {
+   "raw": "{\"confidence\":0.95,\"rule_ids\":[\"VAR-MATERIAL-005\"],\"other_impact_minor\":7039,\"top_drivers\":[{\"driver_id\":\"headcount\",\"impact_minor\":1254344,\"rank\":0},{\"driver_id\":\"cloud_usage\",\"impact_minor\":1413096,\"rank\":1},{\"driver_id\":\"fx_effect\",\"impact_minor\":703095,\"rank\":2},{\"driver_id\":\"license_sales\",\"impact_minor\":1229318,\"rank\":3}],\"scheme\":\"major\",\"schema_version\":\"variance_analysis.v1\",\"score\":0.85,\"confidence\":0.95,\"profit_impact_minor\":7039,\"direction\":\"favorable\",\"other_impact_minor\":10000,\"schema_object\":\"profit_impact_minor\"}",
+   "schema_valid": false,
+   "errors": [
+    "wrong task field"
+   ],
+   "key_fields_correct": false,
+   "latency_s": 18.7
+  }
+ },
+ {
+  "task": "cash_reconciliation",
+  "difficulty": "easy",
+  "input_preview": "{\"bank_events\":[{\"amount_minor\":10000,\"id\":\"k0\"},{\"amount_minor\":20000,\"id\":\"k1\"},{\"amount_minor\":-2081,\"id\":\"k2\",\"memo\":\"SERVICE FEE\"}],\"book_balance_minor\":6389269,\"book_entries\":[{\"amount_minor\":10000,\"id\":\"b0\"},{\"amount_minor\":20000,\"id\":\"b1\"},{\"amount_minor\":82369,\"id\":\"b_dit\",\"memo\":\"deposit in transit\"}]}",
+  "expected": {
+   "adjusted_bank_balance_minor": 6387188,
+   "adjusted_book_balance_minor": 6387188,
+   "confidence": 0.9,
+   "difference_minor": 0,
+   "exceptions": [
+    {
+     "amount_minor": 2081,
+     "event_ids": [
+      "k2"
+     ],
+     "type": "bank_fee"
+    },
+    {
+     "amount_minor": 82369,
+     "event_ids": [
+      "b_dit"
+     ],
+     "type": "deposit_in_transit"
+    }
+   ],
+   "matched_groups": [
+    {
+     "bank_ids": [
+      "k0"
+     ],
+     "book_ids": [
+      "b0"
+     ]
+    },
+    {
+     "bank_ids": [
+      "k1"
+     ],
+     "book_ids": [
+      "b1"
+     ]
+    }
+   ],
+   "schema_version": "cash_reconciliation.v1",
+   "status": "exceptions",
+   "task": "cash_reconciliation"
+  },
+  "base": {
+   "raw": "{\n  \"schema_version\": \"cash_reconciliation.v1\",\n  \"task\": \"cash_reconciliation\",\n  \"status\": \"clean\",\n  \"matched_groups\": [\n    {\n      \"book_ids\": [\"b0\", \"b1\"],\n      \"bank_ids\": [\"k0\", \"k1\"]\n    }\n  ],\n  \"exceptions\": [\n    {\n      \"type\": \"SERVICE FEE\",\n      \"event_ids\": [\"k2\", \"b_dit\"],\n      \"amount_minor\": -2081,\n      \"confidence\": 0.95\n    }\n  ],\n  \"adjusted_book_balance_minor\": 6389247,\n  \"adjusted_bank_balance_minor\": 6389269,\n  \"difference_minor\": 100,\n  \"confidence\": 0.95\n}",
+   "schema_valid": false,
+   "errors": [
+    "balance difference mismatch"
+   ],
+   "key_fields_correct": false,
+   "latency_s": 16.0
+  },
+  "distilled": {
+   "raw": "{\"adjusted_bank_balance_minor\":27989,\"adjusted_book_balance_minor\":6389269,\"confidence\":0.857,\"difference_minor\":6361270,\"exceptions\":[{\"amount_minor\":2081,\"event_ids\":[\"k2\"],\"type\":\"fee\"},{\"amount_minor\":82369,\"event_ids\":[\"b_dit\"],\"type\":\"deposit_in_transit\"}],\"matched_groups\":[{\"bank_ids\":[\"k0\",\"k1\"],\"book_ids\":[\"b0\",\"b1\"]}],\"schema_version\":\"cash_reconciliation.v1\",\"status\":\"exceptions\",\"task\":\"cash_reconciliation\"}",
+   "schema_valid": false,
+   "errors": [
+    "balance difference mismatch"
+   ],
+   "key_fields_correct": false,
+   "latency_s": 12.9
+  }
+ }
+]

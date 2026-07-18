@@ -1,0 +1,90 @@
+<template id="vs-fable-template">
+  <div data-composition-id="vs-fable" data-width="1920" data-height="1080" data-start="0" data-duration="7.5">
+    <div class="vf-rule vf-rule-t"></div>
+    <div class="vf-rule vf-rule-b"></div>
+    <div class="vf-meta vf-meta-tl">&dagger; EXHIBIT E &middot; MEASURED, NOT ASSERTED</div>
+    <div class="vf-meta vf-meta-tr">05 / 07</div>
+
+    <div class="vf-kicker">Fable teaches. <em>The student serves.</em></div>
+
+    <div class="vf-cols">
+      <div class="vf-col">
+        <div class="vf-col-rule"></div>
+        <span class="vf-idx">A</span>
+        <span class="vf-tag">CLAUDE FABLE &middot; FRONTIER TEACHER</span>
+        <div class="vf-rows">
+          <div class="vf-row"><span>role</span><i></i><span>labels the dataset once</span></div>
+          <div class="vf-row"><span>trace validity</span><i></i><span class="vf-num">149 / 150</span></div>
+          <div class="vf-row"><span>where it runs</span><i></i><span>frontier API</span></div>
+          <div class="vf-row"><span>cost model</span><i></i><span>full price, every call</span></div>
+        </div>
+      </div>
+
+      <div class="vf-spine">&rarr;</div>
+
+      <div class="vf-col">
+        <div class="vf-col-rule vf-col-rule-accent"></div>
+        <span class="vf-idx vf-idx-accent">B</span>
+        <span class="vf-tag">TINYFABLE &middot; 0.5B DISTILLED STUDENT</span>
+        <div class="vf-rows">
+          <div class="vf-row"><span>role</span><i></i><span>serves every request</span></div>
+          <div class="vf-row"><span>decision accuracy</span><i></i><span class="vf-num">25% &middot; equals its teacher</span></div>
+          <div class="vf-row"><span>where it runs</span><i></i><span>your own hardware</span></div>
+          <div class="vf-row"><span>size</span><i></i><span class="vf-num">roughly 1/1000th</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vf-footer">&sect; 40 FROZEN HELD-OUT CASES &middot; SAME HARNESS FOR BOTH MODELS</div>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap");
+      [data-composition-id="vs-fable"] { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #f1eee6; color: #171714; }
+      [data-composition-id="vs-fable"] .vf-rule { position: absolute; left: 80px; right: 80px; height: 1px; background: #d9d5ca; }
+      [data-composition-id="vs-fable"] .vf-rule-t { top: 80px; }
+      [data-composition-id="vs-fable"] .vf-rule-b { bottom: 80px; }
+      [data-composition-id="vs-fable"] .vf-meta { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="vs-fable"] .vf-meta-tl { top: 48px; left: 80px; }
+      [data-composition-id="vs-fable"] .vf-meta-tr { top: 48px; right: 80px; }
+      [data-composition-id="vs-fable"] .vf-kicker { position: absolute; top: 140px; left: 130px; font-family: "Newsreader", Georgia, serif; font-size: 60px; letter-spacing: -0.01em; opacity: 0; }
+      [data-composition-id="vs-fable"] .vf-kicker em { font-style: italic; color: #d75a3d; }
+      [data-composition-id="vs-fable"] .vf-cols { position: absolute; top: 300px; left: 130px; right: 130px; display: flex; gap: 48px; }
+      [data-composition-id="vs-fable"] .vf-col { flex: 1; opacity: 0; }
+      [data-composition-id="vs-fable"] .vf-col-rule { width: 64px; height: 2px; background: #6d6a63; margin-bottom: 20px; }
+      [data-composition-id="vs-fable"] .vf-col-rule-accent { background: #d75a3d; }
+      [data-composition-id="vs-fable"] .vf-idx { font-family: "Newsreader", Georgia, serif; font-size: 64px; line-height: 1; display: block; margin-bottom: 8px; }
+      [data-composition-id="vs-fable"] .vf-idx-accent { color: #d75a3d; font-style: italic; }
+      [data-composition-id="vs-fable"] .vf-tag { font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase; color: #6d6a63; display: block; margin-bottom: 26px; }
+      [data-composition-id="vs-fable"] .vf-rows { font-family: "JetBrains Mono", monospace; font-size: 20px; }
+      [data-composition-id="vs-fable"] .vf-row { display: flex; align-items: baseline; gap: 14px; padding: 15px 0; border-bottom: 1px solid #d9d5ca; opacity: 0; }
+      [data-composition-id="vs-fable"] .vf-row i { flex: 1; border-bottom: 1px dotted #d9d5ca; }
+      [data-composition-id="vs-fable"] .vf-num { color: #d75a3d; font-weight: 600; }
+      [data-composition-id="vs-fable"] .vf-spine { align-self: center; font-family: "Newsreader", Georgia, serif; font-size: 72px; color: #d75a3d; opacity: 0; }
+      [data-composition-id="vs-fable"] .vf-footer { position: absolute; bottom: 48px; left: 80px; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        const root = document.querySelector('[data-composition-id="vs-fable"]');
+        const kicker = root.querySelector(".vf-kicker");
+        const cols = root.querySelectorAll(".vf-col");
+        const spine = root.querySelector(".vf-spine");
+        const rows = root.querySelectorAll(".vf-row");
+        gsap.set(kicker, { y: 14, opacity: 0 });
+        gsap.set(cols, { y: 18, opacity: 0 });
+        tl.to(kicker, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.2);
+        tl.to(cols[0], { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.8);
+        tl.to(spine, { opacity: 1, duration: 0.4 }, 1.6);
+        tl.to(cols[1], { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 1.8);
+        rows.forEach((r, i) => tl.to(r, { opacity: 1, duration: 0.3, ease: "power2.out" }, 1.2 + i * 0.35));
+        tl.to([kicker, ...cols, spine], { opacity: 0, duration: 0.45, ease: "power2.in" }, 6.8);
+        tl.set([kicker, ...cols, spine], { opacity: 0, visibility: "hidden" }, 7.3);
+        tl.to({}, { duration: 7.5 }, 0);
+        window.__timelines["vs-fable"] = tl;
+      })();
+    </script>
+  </div>
+</template>
