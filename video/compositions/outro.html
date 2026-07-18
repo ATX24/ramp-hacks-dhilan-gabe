@@ -1,0 +1,60 @@
+<template id="outro-template">
+  <div data-composition-id="outro" data-width="1920" data-height="1080" data-start="0" data-duration="5.0">
+    <div class="ou-rule ou-rule-t"></div>
+    <div class="ou-rule ou-rule-b"></div>
+    <div class="ou-meta ou-meta-tl">&dagger; EXHIBIT F &middot; SHIP IT</div>
+    <div class="ou-meta ou-meta-tr">07 / 07</div>
+
+    <div class="ou-center">
+      <div class="ou-wordmark">Distillery</div>
+      <div class="ou-underline"></div>
+      <div class="ou-cmd">
+        <span class="ou-prompt">$</span> pip install distillery-sdk<span class="ou-caret">&#9615;</span>
+      </div>
+      <div class="ou-tag">PROVE THE SMALLER MODEL.</div>
+    </div>
+
+    <div class="ou-footer">&sect; BUILT AT RAMP HACKATHON &middot; 2026</div>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap");
+      [data-composition-id="outro"] { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #f1eee6; color: #171714; }
+      [data-composition-id="outro"] .ou-rule { position: absolute; left: 80px; right: 80px; height: 1px; background: #d9d5ca; }
+      [data-composition-id="outro"] .ou-rule-t { top: 80px; }
+      [data-composition-id="outro"] .ou-rule-b { bottom: 80px; }
+      [data-composition-id="outro"] .ou-meta { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="outro"] .ou-meta-tl { top: 48px; left: 80px; }
+      [data-composition-id="outro"] .ou-meta-tr { top: 48px; right: 80px; }
+      [data-composition-id="outro"] .ou-center { position: absolute; top: 320px; left: 0; right: 0; text-align: center; }
+      [data-composition-id="outro"] .ou-wordmark { font-family: "Newsreader", Georgia, serif; font-size: 148px; letter-spacing: -0.03em; line-height: 1; opacity: 0; }
+      [data-composition-id="outro"] .ou-underline { width: 0; height: 3px; background: #d75a3d; margin: 24px auto 0; }
+      [data-composition-id="outro"] .ou-cmd { margin-top: 44px; font-family: "JetBrains Mono", monospace; font-size: 30px; color: #171714; opacity: 0; }
+      [data-composition-id="outro"] .ou-prompt { color: #d75a3d; margin-right: 14px; }
+      [data-composition-id="outro"] .ou-caret { color: #171714; }
+      [data-composition-id="outro"] .ou-tag { margin-top: 30px; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: 0.34em; color: #6d6a63; opacity: 0; }
+      [data-composition-id="outro"] .ou-footer { position: absolute; bottom: 48px; left: 80px; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        const root = document.querySelector('[data-composition-id="outro"]');
+        const mark = root.querySelector(".ou-wordmark");
+        const under = root.querySelector(".ou-underline");
+        const cmd = root.querySelector(".ou-cmd");
+        const caret = root.querySelector(".ou-caret");
+        const tag = root.querySelector(".ou-tag");
+        gsap.set(mark, { y: 16, opacity: 0 });
+        tl.to(mark, { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, 0.3);
+        tl.to(under, { width: 560, duration: 0.55, ease: "power3.inOut" }, 0.8);
+        tl.to(cmd, { opacity: 1, duration: 0.45, ease: "power2.out" }, 1.5);
+        tl.to(caret, { opacity: 0, duration: 0.15, repeat: 5, yoyo: true, ease: "steps(1)" }, 2.0);
+        tl.to(tag, { opacity: 1, duration: 0.45, ease: "power2.out" }, 2.3);
+        tl.to({}, { duration: 5.0 }, 0);
+        window.__timelines["outro"] = tl;
+      })();
+    </script>
+  </div>
+</template>

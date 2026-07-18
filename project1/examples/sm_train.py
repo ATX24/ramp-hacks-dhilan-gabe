@@ -31,6 +31,8 @@ def main():
 
     tok = AutoTokenizer.from_pretrained(STUDENT)
     model = AutoModelForCausalLM.from_pretrained(STUDENT, torch_dtype=torch.bfloat16)
+    model.gradient_checkpointing_enable()
+    model.enable_input_require_grads()
     model = get_peft_model(model, LoraConfig(
         r=16, lora_alpha=32, lora_dropout=0.05, task_type="CAUSAL_LM",
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
@@ -67,7 +69,7 @@ def main():
 
     args = TrainingArguments(
         output_dir="/tmp/train", max_steps=MAX_STEPS,
-        per_device_train_batch_size=8, gradient_accumulation_steps=1,
+        per_device_train_batch_size=2, gradient_accumulation_steps=4,
         learning_rate=2e-4, warmup_ratio=0.05, lr_scheduler_type="cosine",
         bf16=True, logging_steps=10, save_strategy="no", report_to=[], seed=17)
     result = Trainer(model=model, args=args, train_dataset=DS(),

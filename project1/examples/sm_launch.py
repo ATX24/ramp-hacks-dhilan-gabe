@@ -40,7 +40,8 @@ sm.create_training_job(
         "sagemaker_program": "sm_train.py",
         "sagemaker_submit_directory": f"s3://{BUCKET}/sagemaker/src/sourcedir.tar.gz",
     },
-    Environment={"SM_HP_MAX_STEPS": "200"},
+    Environment={"SM_HP_MAX_STEPS": "200",
+                 "CUDA_VISIBLE_DEVICES": "0"},  # single GPU: avoids DP batch scattering on 12xlarge
     InputDataConfig=[{
         "ChannelName": "train",
         "DataSource": {"S3DataSource": {

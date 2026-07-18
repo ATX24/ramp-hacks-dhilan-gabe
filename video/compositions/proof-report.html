@@ -1,0 +1,63 @@
+<template id="proof-report-template">
+  <div data-composition-id="proof-report" data-width="1920" data-height="1080" data-start="0" data-duration="6.5">
+    <div class="pr-rule pr-rule-t"></div>
+    <div class="pr-rule pr-rule-b"></div>
+    <div class="pr-meta pr-meta-tl">&dagger; EXHIBIT F &middot; THE SEALED REPORT</div>
+    <div class="pr-meta pr-meta-tr">06 / 07</div>
+
+    <div class="pr-kicker">The gate decides. <em>Not the demo.</em></div>
+
+    <div class="pr-card">
+      <div class="pr-card-head"><span>SEALED EVALUATION REPORT</span><span class="pr-stamp">MEASURED</span></div>
+      <div class="pr-row"><span>Nova Pro teacher, schema validity</span><i></i><span class="pr-num">57.5%</span></div>
+      <div class="pr-row"><span>Nova Pro teacher, decision fields</span><i></i><span class="pr-num">25%</span></div>
+      <div class="pr-row"><span>base 0.5B student, before distillation</span><i></i><span class="pr-num">0%</span></div>
+      <div class="pr-row"><span>distilled student, schema validity</span><i></i><span class="pr-num pr-num-accent">55%</span></div>
+      <div class="pr-row"><span>distilled student, decision fields</span><i></i><span class="pr-num pr-num-accent">25% &middot; equals teacher</span></div>
+    </div>
+
+    <div class="pr-footer">&sect; SAME FROZEN 40-CASE HELD-OUT SET FOR EVERY MODEL</div>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap");
+      [data-composition-id="proof-report"] { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #f1eee6; color: #171714; }
+      [data-composition-id="proof-report"] .pr-rule { position: absolute; left: 80px; right: 80px; height: 1px; background: #d9d5ca; }
+      [data-composition-id="proof-report"] .pr-rule-t { top: 80px; }
+      [data-composition-id="proof-report"] .pr-rule-b { bottom: 80px; }
+      [data-composition-id="proof-report"] .pr-meta { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="proof-report"] .pr-meta-tl { top: 48px; left: 80px; }
+      [data-composition-id="proof-report"] .pr-meta-tr { top: 48px; right: 80px; }
+      [data-composition-id="proof-report"] .pr-kicker { position: absolute; top: 150px; left: 130px; font-family: "Newsreader", Georgia, serif; font-size: 60px; letter-spacing: -0.01em; opacity: 0; }
+      [data-composition-id="proof-report"] .pr-kicker em { font-style: italic; color: #d75a3d; }
+      [data-composition-id="proof-report"] .pr-card { position: absolute; top: 300px; left: 330px; right: 330px; background: #fbfaf6; border: 1px solid #171714; padding: 30px 40px; opacity: 0; }
+      [data-composition-id="proof-report"] .pr-card-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #171714; padding-bottom: 16px; margin-bottom: 10px; font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="proof-report"] .pr-stamp { color: #d75a3d; font-weight: 600; }
+      [data-composition-id="proof-report"] .pr-row { display: flex; align-items: baseline; gap: 16px; padding: 16px 0; border-bottom: 1px solid #d9d5ca; font-family: "JetBrains Mono", monospace; font-size: 22px; opacity: 0; }
+      [data-composition-id="proof-report"] .pr-row i { flex: 1; border-bottom: 1px dotted #d9d5ca; }
+      [data-composition-id="proof-report"] .pr-num { font-weight: 600; }
+      [data-composition-id="proof-report"] .pr-num-accent { color: #d75a3d; }
+      [data-composition-id="proof-report"] .pr-footer { position: absolute; bottom: 48px; left: 80px; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        const root = document.querySelector('[data-composition-id="proof-report"]');
+        const kicker = root.querySelector(".pr-kicker");
+        const card = root.querySelector(".pr-card");
+        const rows = root.querySelectorAll(".pr-row");
+        gsap.set(kicker, { y: 14, opacity: 0 });
+        gsap.set(card, { y: 20, opacity: 0 });
+        tl.to(kicker, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.2);
+        tl.to(card, { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" }, 0.7);
+        rows.forEach((r, i) => tl.to(r, { opacity: 1, duration: 0.3, ease: "power2.out" }, 1.2 + i * 0.5));
+        tl.to([kicker, card], { opacity: 0, duration: 0.45, ease: "power2.in" }, 5.8);
+        tl.set([kicker, card], { opacity: 0, visibility: "hidden" }, 6.3);
+        tl.to({}, { duration: 6.5 }, 0);
+        window.__timelines["proof-report"] = tl;
+      })();
+    </script>
+  </div>
+</template>

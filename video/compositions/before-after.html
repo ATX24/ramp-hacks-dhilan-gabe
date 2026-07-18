@@ -1,0 +1,98 @@
+<template id="before-after-template">
+  <div data-composition-id="before-after" data-width="1920" data-height="1080" data-start="0" data-duration="8.5">
+    <div class="ba-rule ba-rule-t"></div>
+    <div class="ba-rule ba-rule-b"></div>
+    <div class="ba-meta ba-meta-tl">&dagger; EXHIBIT D &middot; REAL OUTPUTS, HELD-OUT TASK</div>
+    <div class="ba-meta ba-meta-tr">04 / 07</div>
+
+    <div class="ba-kicker">Same 0.5B weights. <em>Before and after distillation.</em></div>
+
+    <div class="ba-cols">
+      <div class="ba-card ba-card-bad">
+        <div class="ba-card-head"><span class="ba-idx">E &middot; 01</span><span class="ba-tag">BASE MODEL &middot; transaction_review</span></div>
+        <div class="ba-snip">
+          <div class="ba-l">{</div>
+          <div class="ba-l">  "gl_account": {</div>
+          <div class="ba-l">    "travel_airfare": 1500,</div>
+          <div class="ba-l">    "travel_lodging": 8000,</div>
+          <div class="ba-l">    "travel_meals": 1500,</div>
+          <div class="ba-l ba-l-dim">    ...</div>
+        </div>
+        <div class="ba-verdict ba-verdict-bad">SCHEMA INVALID &middot; gl_account must be one code</div>
+      </div>
+
+      <div class="ba-spine">&rarr;</div>
+
+      <div class="ba-card ba-card-good">
+        <div class="ba-card-head"><span class="ba-idx">E &middot; 02</span><span class="ba-tag">DISTILLED &middot; transaction_review</span></div>
+        <div class="ba-snip">
+          <div class="ba-l">{"gl_account": "6400",</div>
+          <div class="ba-l"> "journal_entry": [</div>
+          <div class="ba-l">  {"account": "6400", "side": "debit",</div>
+          <div class="ba-l">   "amount_minor": 206940},</div>
+          <div class="ba-l">  {"account": "2110", "side": "credit",</div>
+          <div class="ba-l">   "amount_minor": 206940}],</div>
+          <div class="ba-l"> "policy_action": "approve", ...}</div>
+        </div>
+        <div class="ba-verdict ba-verdict-good">SCHEMA VALID &middot; DECISION FIELDS CORRECT</div>
+      </div>
+    </div>
+
+    <div class="ba-footer">&sect; ORACLE-CHECKED &middot; NEITHER MODEL EVER TRAINED ON THIS CASE</div>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap");
+      [data-composition-id="before-after"] { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #f1eee6; color: #171714; }
+      [data-composition-id="before-after"] .ba-rule { position: absolute; left: 80px; right: 80px; height: 1px; background: #d9d5ca; }
+      [data-composition-id="before-after"] .ba-rule-t { top: 80px; }
+      [data-composition-id="before-after"] .ba-rule-b { bottom: 80px; }
+      [data-composition-id="before-after"] .ba-meta { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="before-after"] .ba-meta-tl { top: 48px; left: 80px; }
+      [data-composition-id="before-after"] .ba-meta-tr { top: 48px; right: 80px; }
+      [data-composition-id="before-after"] .ba-kicker { position: absolute; top: 130px; left: 130px; font-family: "Newsreader", Georgia, serif; font-size: 54px; letter-spacing: -0.01em; opacity: 0; }
+      [data-composition-id="before-after"] .ba-kicker em { font-style: italic; color: #d75a3d; }
+      [data-composition-id="before-after"] .ba-cols { position: absolute; top: 260px; left: 130px; right: 130px; display: flex; gap: 40px; align-items: stretch; }
+      [data-composition-id="before-after"] .ba-card { flex: 1; background: #fbfaf6; border: 1px solid #171714; padding: 26px 30px; opacity: 0; }
+      [data-composition-id="before-after"] .ba-card-head { display: flex; justify-content: space-between; border-bottom: 1px solid #d9d5ca; padding-bottom: 12px; margin-bottom: 18px; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="before-after"] .ba-idx { color: #d75a3d; font-weight: 500; }
+      [data-composition-id="before-after"] .ba-snip { font-family: "JetBrains Mono", monospace; font-size: 20px; line-height: 1.65; min-height: 320px; }
+      [data-composition-id="before-after"] .ba-l { white-space: pre; opacity: 0; }
+      [data-composition-id="before-after"] .ba-l-dim { color: #a5a196; }
+      [data-composition-id="before-after"] .ba-verdict { margin-top: 18px; padding-top: 14px; border-top: 1px solid #d9d5ca; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0; }
+      [data-composition-id="before-after"] .ba-verdict-bad { color: #9c5a12; }
+      [data-composition-id="before-after"] .ba-verdict-good { color: #2f7a3a; }
+      [data-composition-id="before-after"] .ba-spine { align-self: center; font-family: "Newsreader", Georgia, serif; font-size: 72px; color: #d75a3d; opacity: 0; }
+      [data-composition-id="before-after"] .ba-footer { position: absolute; bottom: 48px; left: 80px; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        const root = document.querySelector('[data-composition-id="before-after"]');
+        const kicker = root.querySelector(".ba-kicker");
+        const cards = root.querySelectorAll(".ba-card");
+        const spine = root.querySelector(".ba-spine");
+        const badLines = root.querySelectorAll(".ba-card-bad .ba-l");
+        const goodLines = root.querySelectorAll(".ba-card-good .ba-l");
+        const verdicts = root.querySelectorAll(".ba-verdict");
+        gsap.set(kicker, { y: 14, opacity: 0 });
+        gsap.set(cards, { y: 20, opacity: 0 });
+        tl.to(kicker, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.2);
+        tl.to(cards[0], { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.7);
+        badLines.forEach((l, i) => tl.to(l, { opacity: 1, duration: 0.2, ease: "power2.out" }, 1.1 + i * 0.14));
+        tl.to(verdicts[0], { opacity: 1, duration: 0.35, ease: "power4.out" }, 2.4);
+        tl.fromTo(cards[0], { x: 0 }, { x: -6, duration: 0.05, ease: "power2.inOut", yoyo: true, repeat: 3 }, 2.45);
+        tl.to(spine, { opacity: 1, duration: 0.4, ease: "power2.out" }, 3.0);
+        tl.to(cards[1], { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 3.3);
+        goodLines.forEach((l, i) => tl.to(l, { opacity: 1, duration: 0.2, ease: "power2.out" }, 3.7 + i * 0.14));
+        tl.to(verdicts[1], { opacity: 1, duration: 0.35, ease: "power4.out" }, 5.4);
+        tl.to([kicker, ...cards, spine], { opacity: 0, duration: 0.45, ease: "power2.in" }, 7.8);
+        tl.set([kicker, ...cards, spine], { opacity: 0, visibility: "hidden" }, 8.3);
+        tl.to({}, { duration: 8.5 }, 0);
+        window.__timelines["before-after"] = tl;
+      })();
+    </script>
+  </div>
+</template>

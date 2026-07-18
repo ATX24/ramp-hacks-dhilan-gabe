@@ -1,0 +1,68 @@
+<template id="hook-logo-template">
+  <div data-composition-id="hook-logo" data-width="1920" data-height="1080" data-start="0" data-duration="6.0">
+    <div class="hl-rule hl-rule-t"></div>
+    <div class="hl-rule hl-rule-b"></div>
+    <div class="hl-meta hl-meta-tl">&dagger; EXHIBIT B &middot; THE QUESTION</div>
+    <div class="hl-meta hl-meta-tr">02 / 07</div>
+
+    <div class="hl-hook">
+      <span class="hl-w">What</span>
+      <span class="hl-w">if</span>
+      <span class="hl-w">the</span>
+      <span class="hl-w">small</span>
+      <span class="hl-w">model</span>
+      <span class="hl-w">could</span>
+      <span class="hl-w hl-w-accent">prove</span>
+      <span class="hl-w hl-w-accent">itself?</span>
+    </div>
+
+    <div class="hl-logo">
+      <div class="hl-wordmark">Distillery</div>
+      <div class="hl-underline"></div>
+      <div class="hl-tag">SMALLER MODELS &middot; PROVEN ECONOMICS</div>
+    </div>
+
+    <div class="hl-footer">&sect; CURATE &middot; SYNTHESIZE &middot; TRAIN &middot; PROVE</div>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap");
+      [data-composition-id="hook-logo"] { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #f1eee6; color: #171714; }
+      [data-composition-id="hook-logo"] .hl-rule { position: absolute; left: 80px; right: 80px; height: 1px; background: #d9d5ca; }
+      [data-composition-id="hook-logo"] .hl-rule-t { top: 80px; }
+      [data-composition-id="hook-logo"] .hl-rule-b { bottom: 80px; }
+      [data-composition-id="hook-logo"] .hl-meta { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+      [data-composition-id="hook-logo"] .hl-meta-tl { top: 48px; left: 80px; }
+      [data-composition-id="hook-logo"] .hl-meta-tr { top: 48px; right: 80px; }
+      [data-composition-id="hook-logo"] .hl-hook { position: absolute; top: 300px; left: 130px; right: 130px; text-align: center; font-family: "Newsreader", Georgia, serif; font-size: 88px; line-height: 1.1; letter-spacing: -0.02em; }
+      [data-composition-id="hook-logo"] .hl-w { display: inline-block; margin-right: 20px; }
+      [data-composition-id="hook-logo"] .hl-w-accent { font-style: italic; color: #d75a3d; }
+      [data-composition-id="hook-logo"] .hl-logo { position: absolute; top: 380px; left: 0; right: 0; text-align: center; opacity: 0; }
+      [data-composition-id="hook-logo"] .hl-wordmark { font-family: "Newsreader", Georgia, serif; font-size: 168px; letter-spacing: -0.03em; line-height: 1; }
+      [data-composition-id="hook-logo"] .hl-underline { width: 0; height: 3px; background: #d75a3d; margin: 26px auto 0; }
+      [data-composition-id="hook-logo"] .hl-tag { margin-top: 30px; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: 0.34em; color: #6d6a63; }
+      [data-composition-id="hook-logo"] .hl-footer { position: absolute; bottom: 48px; left: 80px; font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #6d6a63; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        const root = document.querySelector('[data-composition-id="hook-logo"]');
+        const words = root.querySelectorAll(".hl-w");
+        const logo = root.querySelector(".hl-logo");
+        const underline = root.querySelector(".hl-underline");
+        gsap.set(words, { y: 16, opacity: 0 });
+        words.forEach((w, i) => tl.to(w, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.2 + i * 0.1));
+        tl.to(words, { y: -14, opacity: 0, duration: 0.35, ease: "power2.in" }, 2.5);
+        tl.set(words, { opacity: 0, visibility: "hidden" }, 2.9);
+        tl.to(logo, { opacity: 1, duration: 0.5, ease: "power3.out" }, 3.0);
+        tl.to(underline, { width: 620, duration: 0.55, ease: "power3.inOut" }, 3.4);
+        tl.to(logo, { opacity: 0, duration: 0.4, ease: "power2.in" }, 5.4);
+        tl.set(logo, { opacity: 0, visibility: "hidden" }, 5.85);
+        tl.to({}, { duration: 6.0 }, 0);
+        window.__timelines["hook-logo"] = tl;
+      })();
+    </script>
+  </div>
+</template>
