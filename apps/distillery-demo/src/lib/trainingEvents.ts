@@ -67,7 +67,7 @@ function originLabel(origin: TrainingDataOrigin): string {
     case "precomputed_prior_run":
       return "Prior-run record · not live";
     case "fixture":
-      return "Fixture rehearsal · not live";
+      return "Saved preview · not live";
     default: {
       const _exhaustive: never = origin;
       return _exhaustive;
@@ -186,7 +186,7 @@ function etaFor(
   }
   if (status === "failed" || status === "cancelled") return "No ETA · job stopped";
   if (origin === "fixture") {
-    return `Fixture estimate ${plan.wall_time_minutes_estimate.low}–${plan.wall_time_minutes_estimate.high} min · not a live clock`;
+    return `Saved estimate ${plan.wall_time_minutes_estimate.low}–${plan.wall_time_minutes_estimate.high} min · not a live clock`;
   }
   return `About ${plan.wall_time_minutes_estimate.low}–${plan.wall_time_minutes_estimate.high} min remaining (estimate)`;
 }
@@ -196,7 +196,7 @@ function spendFor(plan: DistillationPlan, origin: TrainingDataOrigin): string {
   const low = plan.cost.estimate_low_usd;
   const high = plan.cost.estimate_high_usd;
   const base = `Spend ceiling $${ceiling} · estimate $${low}–$${high}`;
-  if (origin === "fixture") return `${base} · fixture planning only`;
+  if (origin === "fixture") return `${base} · saved preview only`;
   if (origin === "precomputed_prior_run") return `${base} · prior-run record`;
   return base;
 }

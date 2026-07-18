@@ -131,7 +131,17 @@ describe("demo playground interactions", () => {
       "article",
     )) {
       expect(card).toHaveAttribute("data-provenance", "fixture_preview");
+      expect(within(card).getByText("Decision")).toBeInTheDocument();
+      expect(within(card).getByText("Why")).toBeInTheDocument();
+      expect(within(card).getByText("Confidence")).toBeInTheDocument();
+      expect(
+        within(card).getByText("Advanced output details").closest("details"),
+      ).not.toHaveAttribute("open");
     }
+    expect(screen.getByTestId("demo-decision")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Review the saved proof" }),
+    ).toBeInTheDocument();
   });
 
   it("does not expose or imply live inference controls", async () => {

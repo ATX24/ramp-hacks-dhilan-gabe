@@ -71,8 +71,8 @@ export function LiveTrainingCard({
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          At-a-glance progress for the sealed teaching job. Fixture and prior-run
-          views are labeled so they are never mistaken for a live cloud job.
+          At-a-glance progress for the sealed teaching job. Saved previews and earlier
+          runs are labeled so they are never mistaken for a live cloud job.
         </p>
       </CardHeader>
       <CardContent className="grid gap-4 pt-4">
@@ -99,8 +99,10 @@ export function LiveTrainingCard({
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {formatTimestamp(glance.recentEvent.timestamp)}
-            {glance.recentEvent.state ? ` · ${glance.recentEvent.state}` : ""}
-            {` · ${glance.recentEvent.origin === "live" ? "live" : glance.recentEvent.origin === "precomputed_prior_run" ? "prior-run" : "fixture"}`}
+            {glance.recentEvent.state && glance.isLive
+              ? ` · ${glance.recentEvent.state}`
+              : ""}
+            {` · ${glance.recentEvent.origin === "live" ? "live" : glance.recentEvent.origin === "precomputed_prior_run" ? "saved earlier run" : "saved preview"}`}
           </p>
         </div>
 

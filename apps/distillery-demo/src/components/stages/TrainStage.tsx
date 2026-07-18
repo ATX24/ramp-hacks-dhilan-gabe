@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { DemoExamplePicker } from "@/components/DemoExamplePicker";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -17,6 +18,7 @@ import {
   getDemoExamplePreset,
   type DemoExamplePresetId,
 } from "@/lib/demo/exampleCatalog";
+import { buildStageHref } from "@/lib/navigation";
 import { STAGE_PLAIN } from "@/lib/plainLanguage";
 import {
   deriveTrainPresentation,
@@ -91,21 +93,16 @@ export function TrainStage({
               className="font-serif text-3xl tracking-tight sm:text-4xl"
             >
               {previewedInput
-                ? "Teaching preview is ready"
-                : "Choose an example to teach"}
+                ? "Your teaching plan is ready"
+                : "What do you want your smaller model to do?"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-              Pick a finance example, review the request, then preview the plan.
+              Describe one useful finance job. The saved example is ready to use.
             </p>
           </div>
 
-          <DemoExamplePicker
-            selectedId={selectedPresetId}
-            onSelect={selectExample}
-          />
-
           <div className="grid gap-2">
-            <Label htmlFor="train-plain-input">Review or edit the input</Label>
+            <Label htmlFor="train-plain-input">Goal</Label>
             <Textarea
               id="train-plain-input"
               data-testid="train-plain-input"
@@ -114,7 +111,7 @@ export function TrainStage({
               onChange={(event) => setTrainingInput(event.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Your edits stay here until you choose another example.
+              Use a job description, not private data. Nothing is sent from this preview.
             </p>
           </div>
 
@@ -126,8 +123,38 @@ export function TrainStage({
             disabled={trainingInput.trim().length === 0}
             onClick={() => setPreviewedInput(trainingInput.trim())}
           >
-            Preview teaching plan
+            Preview my model plan
           </Button>
+
+          <div
+            className="grid gap-2 sm:grid-cols-2"
+            data-testid="train-model-candidates"
+          >
+            <div className="rounded-xl border border-border bg-background/60 p-3">
+              <p className="font-serif text-base">Current base model</p>
+              <p className="text-xs text-muted-foreground">
+                The smaller model before it learns this finance job.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-background/60 p-3">
+              <p className="font-serif text-base">Taught smaller model</p>
+              <p className="text-xs text-muted-foreground">
+                The same model after the saved teaching plan.
+              </p>
+            </div>
+          </div>
+
+          <details className="rounded-xl border border-black/15 px-3">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
+              Try another finance example
+            </summary>
+            <div className="pb-3">
+              <DemoExamplePicker
+                selectedId={selectedPresetId}
+                onSelect={selectExample}
+              />
+            </div>
+          </details>
 
           {previewedInput ? (
             <div
@@ -140,13 +167,19 @@ export function TrainStage({
               <p className="mt-2 text-xs text-muted-foreground">
                 Saved demo data only. No training job was launched.
               </p>
+              <Link
+                href={buildStageHref("/demo", mode, run.run_id)}
+                className="btn btn-primary mt-3 w-fit"
+              >
+                Compare both models
+              </Link>
             </div>
           ) : null}
         </CardContent>
       </Card>
 
       <details className="panel">
-        <summary className="cursor-pointer font-serif text-lg">
+        <summary className="min-h-11 cursor-pointer py-3 font-serif text-lg">
           Saved run status
         </summary>
         <div className="mt-4 grid gap-4">
@@ -176,8 +209,12 @@ export function TrainStage({
             Run <code>{run.run_id}</code>
           </span>
           <span>
-            {presentation.kind === "prior_completion" ? "Recorded state" : "Run state"}{" "}
-            <code>{run.state}</code>
+            {presentation.kind === "prior_completion" ? "Saved state" : "Current state"}{" "}
+            <code>
+              {presentation.kind === "preparation" && run.state === "QUEUED"
+                ? "Planned"
+                : run.state}
+            </code>
           </span>
           <StatusBadge
             tone={
@@ -207,7 +244,7 @@ export function TrainStage({
       </details>
 
       <details className="panel">
-        <summary className="cursor-pointer font-serif text-lg">
+        <summary className="min-h-11 cursor-pointer py-3 font-serif text-lg">
           Advanced · recipe, gates, and job plan
         </summary>
       <div className="panel" style={{ marginTop: "1rem", boxShadow: "none" }}>
@@ -289,8 +326,8 @@ export function TrainStage({
             <li>
               Record source:{" "}
               {presentation.kind === "prior_completion"
-                ? "precomputed prior run"
-                : "fixture preparation"}
+                ? "saved earlier run"
+                : "saved sample plan"}
             </li>
             <li>
               Peak memory estimate: {plan.memory_peak_gib_estimate} GiB
@@ -330,7 +367,7 @@ export function TrainStage({
                   const updated = await client.cancelRun(run.run_id);
                   setCancelRequested(updated.cancel_requested);
                   setCancelNote(
-                    "Cancellation was recorded by the fixture client. No live service call was made.",
+                    "The saved preview now shows a stop request. No live service was called.",
                   );
                 }}
               >
@@ -339,8 +376,7 @@ export function TrainStage({
             </div>
           ) : (
             <p data-testid="cancellation-unavailable">
-              Cancellation unavailable: this view does not represent an active, started
-              run.
+              There is no running job to stop. Leaving this alone changes nothing.
             </p>
           )}
           {cancelNote ? (
@@ -380,7 +416,8 @@ export function TrainStage({
           </>
         ) : (
           <p data-testid="no-artifacts-yet">
-            No artifacts yet. This fixture contains preflight data only.
+            No model files exist yet. This saved preview only contains the checks that
+            happen before a run.
           </p>
         )}
       </div>

@@ -3,19 +3,37 @@ import { test, expect } from "@playwright/test";
 const RESTORED_RUN_ID = "run_fixture_tinyfable_restored_002";
 
 test.describe("five-stage Distillery UI", () => {
-  test("root redirects to Curate", async ({ page }) => {
-    await page.goto("/?mode=failed_quality");
-    await expect(page).toHaveURL(/\/curate\?mode=failed_quality/);
-    await expect(page.getByRole("heading", { name: "Curate" })).toBeVisible();
+  test("root starts with the judge-facing setup", async ({ page }) => {
+    await page.goto("/?mode=proved");
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "What do you want your smaller model to do?",
+      }),
+    ).toBeVisible();
+    await expect(page.getByTestId("train-demo-run")).toBeVisible();
+    await expect(page.getByText("Current base model")).toBeVisible();
+    await expect(page.getByText("Taught smaller model")).toBeVisible();
+  });
+
+  test("default path reaches comparison and saved proof", async ({ page }) => {
+    await page.goto("/?mode=proved");
+    await page.getByTestId("train-demo-run").click();
+    await page.getByRole("link", { name: "Compare both models" }).click();
+    await page.getByTestId("demo-run").click();
+    await expect(page.getByTestId("demo-decision")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Review the saved proof" }),
+    ).toBeVisible();
   });
 
   test("renders exactly five routes", async ({ page }) => {
     for (const [route, heading] of [
-      ["/curate", "Curate"],
-      ["/synthesize", "Synthesize"],
-      ["/train", "Train"],
-      ["/prove", "Prove"],
-      ["/demo", "Demo"],
+      ["/curate", "Check the data"],
+      ["/synthesize", "Fill the missing answers"],
+      ["/train", "What do you want your smaller model to do?"],
+      ["/prove", "Check the result"],
+      ["/demo", "Compare models on saved demo data"],
     ] as const) {
       await page.goto(`${route}?mode=default`);
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
@@ -33,6 +51,7 @@ test.describe("five-stage Distillery UI", () => {
       "href",
       /\/synthesize\?mode=failed_quality&run=run_fixture_failed_quality_001/,
     );
+    await page.getByText("More stages and session details").click();
     await synthesize.click();
     await expect(page).toHaveURL(
       /\/synthesize\?mode=failed_quality&run=run_fixture_failed_quality_001/,
@@ -50,10 +69,16 @@ test.describe("five-stage Distillery UI", () => {
   });
 
   test("remains usable at a narrow viewport", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/prove?mode=proved");
-    await expect(page.getByRole("heading", { name: "Prove" })).toBeVisible();
-    await expect(page.getByTestId("stage-link-curate")).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/?mode=proved");
+    await expect(
+      page.getByRole("heading", {
+        name: "What do you want your smaller model to do?",
+      }),
+    ).toBeVisible();
+    const action = await page.getByTestId("train-demo-run").boundingBox();
+    expect(action).not.toBeNull();
+    expect(action!.y + action!.height).toBeLessThanOrEqual(844);
     const overflow = await page.evaluate(() =>
       Array.from(document.querySelectorAll<HTMLElement>("body *"))
         .filter((element) => {

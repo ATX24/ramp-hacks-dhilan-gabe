@@ -37,7 +37,7 @@ const BASE_DATASET: Dataset = {
   },
   uri: "fixture://datasets/ds_finance_world_v1_smoke",
   provenance_summary:
-    "Synthetic finance_world.v1 smoke corpus: sealed splits, oracle-backed labels, no customer data.",
+    "This made-up finance sample keeps teaching and test records separate. It contains no customer data.",
   task_mixture: {
     transaction_review: 0.45,
     variance_analysis: 0.45,
@@ -308,7 +308,7 @@ function baseProof(
     arms: [
       {
         arm_id: "rules",
-        purpose: "Deterministic accounting/policy baseline",
+        purpose: "Simple accounting and policy rules",
         primary_index: 0.71,
         ci_low: 0.68,
         ci_high: 0.74,
@@ -318,7 +318,7 @@ function baseProof(
       },
       {
         arm_id: "teacher",
-        purpose: "Upper reference / teacher-gap validation",
+        purpose: "Source model used as the upper reference",
         primary_index: 0.88,
         ci_low: 0.85,
         ci_high: 0.91,
@@ -328,7 +328,7 @@ function baseProof(
       },
       {
         arm_id: "student_base",
-        purpose: "Frozen student starting point",
+        purpose: "Smaller model before it learns the new job",
         primary_index: 0.62,
         ci_low: 0.58,
         ci_high: 0.66,
@@ -338,7 +338,7 @@ function baseProof(
       },
       {
         arm_id: "cheap_off_the_shelf",
-        purpose: "Cheap API substitute check",
+        purpose: "Low-cost hosted model used for comparison",
         primary_index: 0.69,
         ci_low: 0.65,
         ci_high: 0.73,
@@ -348,7 +348,7 @@ function baseProof(
       },
       {
         arm_id: "oracle_sft",
-        purpose: "Oracle-gold sequence upper bound",
+        purpose: "Known-correct answers used as an upper comparison",
         primary_index: 0.86,
         ci_low: 0.83,
         ci_high: 0.89,
@@ -358,7 +358,7 @@ function baseProof(
       },
       {
         arm_id: "sequence_kd",
-        purpose: "Implemented sequence.v1 treatment",
+        purpose: "Smaller model trained from complete source answers",
         primary_index: sequencePrimaryIndex,
         ci_low: failedQuality ? 0.66 : insufficient ? 0.78 : 0.82,
         ci_high: failedQuality ? 0.78 : insufficient ? 0.9 : 0.88,
@@ -368,7 +368,7 @@ function baseProof(
       },
       {
         arm_id: "logit_kd",
-        purpose: "Implemented logit.v1 treatment",
+        purpose: "Smaller model trained from source model scores",
         primary_index: includeLogitPair ? (failedQuality ? 0.7 : 0.84) : null,
         ci_low: includeLogitPair ? (failedQuality ? 0.64 : 0.81) : null,
         ci_high: includeLogitPair ? (failedQuality ? 0.76 : 0.87) : null,
@@ -380,7 +380,7 @@ function baseProof(
       },
       {
         arm_id: "ce_ablation",
-        purpose: "Matched CE-only control",
+        purpose: "Matched training run without the extra distillation loss",
         primary_index: includeLogitPair ? (failedQuality ? 0.68 : 0.8) : null,
         ci_low: includeLogitPair ? (failedQuality ? 0.62 : 0.77) : null,
         ci_high: includeLogitPair ? (failedQuality ? 0.74 : 0.83) : null,
@@ -413,20 +413,20 @@ function baseProof(
         { utilization: 0.5, cost_per_request_usd: 0.0011 },
         { utilization: 0.8, cost_per_request_usd: 0.0009 },
       ],
-      note: "Serving costs are projected from benchmark throughput, not measured production savings.",
+      note: "Running costs are projected from the saved speed test, not measured production savings.",
     },
     limitations: [
-      "Synthetic finance_world.v1 only; no customer-data generalization claim.",
-      "Serving economics are projected at disclosed utilization points.",
+      "The test only uses made-up finance data. It does not show how customer data would perform.",
+      "Running costs are projected at the listed machine use levels.",
       ...(insufficient
-        ? ["Seed-23 replication missing; proof_status cannot be proved."]
+        ? ["A second saved check is missing, so this result needs more evidence."]
         : failedQuality
-          ? ["Quality retention and OOD gates failed on the prior run."]
+          ? ["The saved run missed its accuracy checks on unfamiliar examples."]
           : failedEconomics
-            ? ["Per-request savings were nonpositive in the prior-run economics record."]
+            ? ["The saved run did not lower the estimated cost per request."]
             : doNotDistill
-              ? ["Baseline gate stopped the full treatment sweep."]
-              : ["Synthetic benchmark evidence does not establish production generalization."]),
+              ? ["The simpler comparison won, so the full model sweep stopped."]
+              : ["A made-up benchmark cannot show how the model will behave in production."]),
     ],
     artifact_downloads: [
       {
@@ -450,7 +450,7 @@ function notStartedTelemetry(): TrainingTelemetry {
     provenance: "not_started",
     events: [],
     metrics: [],
-    message: "Not started. No events or training metrics exist for this planned fixture.",
+    message: "Not started. This saved plan has no job events or measurements.",
   };
 }
 

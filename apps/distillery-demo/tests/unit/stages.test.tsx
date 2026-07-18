@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe("stage components", () => {
-  it("Curate shows mixture, hashes, and leakage", () => {
+  it("Curate shows the data checks in plain language", () => {
     const bundle = buildStageBundle("default");
     render(
       <CurateStage
@@ -49,9 +49,9 @@ describe("stage components", () => {
         runId={bundle.run.run_id}
       />,
     );
-    expect(screen.getByRole("heading", { name: "Curate" })).toBeInTheDocument();
-    expect(screen.getByText("Task mixture")).toBeInTheDocument();
-    expect(screen.getByText("Leakage checks")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Check the data" })).toBeInTheDocument();
+    expect(screen.getByText("What is in the sample")).toBeInTheDocument();
+    expect(screen.getByText("Checks for copied test examples")).toBeInTheDocument();
     expect(screen.getByText(/content:/i)).toBeInTheDocument();
   });
 
@@ -59,7 +59,7 @@ describe("stage components", () => {
     const bundle = buildStageBundle("skipped_synthesis");
     render(<SynthesizeStage synthesis={bundle.synthesis} error={null} />);
     expect(screen.getByTestId("synthesis-skipped")).toHaveTextContent(
-      "responses_already_present",
+      "The provided answers already passed the saved checks.",
     );
   });
 
@@ -131,9 +131,9 @@ describe("stage components", () => {
   it("Prove shows projected economics and insufficient evidence", () => {
     const bundle = buildStageBundle("insufficient_evidence");
     render(<ProveStage proof={bundle.proof} error={null} />);
-    expect(screen.getByText("insufficient_evidence")).toBeInTheDocument();
-    expect(screen.getAllByText(/Projected/).length).toBeGreaterThan(0);
-    expect(screen.getByText("Arm comparison")).toBeInTheDocument();
+    expect(screen.getByText("More proof needed")).toBeInTheDocument();
+    expect(screen.getAllByText(/Estimated/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Compare the candidates")).toBeInTheDocument();
   });
 
   it("Train labels prior-run events and metrics as immutable", () => {
@@ -186,13 +186,16 @@ describe("stage components", () => {
       ),
     );
     render(<ProveStage proof={proof} error={null} />);
-    expect(screen.getByText("Measured serving economics")).toBeInTheDocument();
-    expect(screen.getByText("Measured $/request")).toBeInTheDocument();
+    expect(screen.getByText("Measured running cost")).toBeInTheDocument();
+    expect(screen.getByText("Measured cost per request")).toBeInTheDocument();
   });
 
   it("Prove empty state when no report", () => {
     render(<ProveStage proof={null} error={null} />);
     expect(screen.getByTestId("prove-empty")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Set up a comparison" }),
+    ).toBeInTheDocument();
   });
 });
 

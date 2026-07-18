@@ -67,7 +67,7 @@ export function AppShell({
       </main>
       <aside className="mt-8 border-t border-black/15 pt-4">
         <details className="rounded-[20px] border border-black/15 bg-card px-4 py-3">
-          <summary className="cursor-pointer text-sm font-medium">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
             More stages and session details
           </summary>
           <div className="mt-4 grid gap-3">

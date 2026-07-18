@@ -93,10 +93,9 @@ describe("mode × stage rendered matrix", () => {
       STAGES.map((stage) => ({
         mode,
         stage: stage.id,
-        name: stage.name,
       })),
     ),
-  )("renders $mode on $stage without a blank screen", ({ mode, stage, name }) => {
+  )("renders $mode on $stage without a blank screen", ({ mode, stage }) => {
     const bundle = buildStageBundle(mode);
     render(<StageRouteContent stage={stage} bundle={bundle} />);
 
@@ -104,10 +103,8 @@ describe("mode × stage rendered matrix", () => {
       expect(screen.getByTestId("stage-loading")).toBeInTheDocument();
     } else if (mode === "fetch_failure") {
       expect(screen.getByTestId("stage-fetch-failure")).toHaveAttribute("role", "alert");
-    } else if (stage === "train" || stage === "demo") {
-      expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     } else {
-      expect(screen.getByRole("heading", { name })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     }
   });
 });
@@ -139,9 +136,7 @@ describe("cross-stage state honesty", () => {
   it("labels every precomputed system row as prior-run measurement", () => {
     const bundle = buildStageBundle("precomputed");
     render(<StageRouteContent stage="prove" bundle={bundle} />);
-    expect(
-      screen.getAllByText("Prior-run precomputed measurement"),
-    ).toHaveLength(7);
+    expect(screen.getAllByText("Saved earlier run")).toHaveLength(7);
   });
 
   it.each([
@@ -151,11 +146,18 @@ describe("cross-stage state honesty", () => {
     ["failed_economics", "failed_economics"],
     ["insufficient_evidence", "insufficient_evidence"],
   ] as const)("renders %s proof status from prior-run provenance", (mode, status) => {
+    const labels = {
+      proved: "Passed",
+      do_not_distill: "Keep the current model",
+      failed_quality: "Accuracy missed",
+      failed_economics: "Cost target missed",
+      insufficient_evidence: "More proof needed",
+    } as const;
     const bundle = buildStageBundle(mode);
     expect(bundle.proof?.proof_status).toBe(status);
     expect(bundle.proof?.precomputed).toBe(true);
     expect(bundle.artifact?.precomputed).toBe(true);
     render(<StageRouteContent stage="prove" bundle={bundle} />);
-    expect(screen.getByText(status)).toBeInTheDocument();
+    expect(screen.getByText(labels[status])).toBeInTheDocument();
   });
 });
