@@ -50,6 +50,24 @@ def test_downstream_argv_matches_actual_trainer_parser() -> None:
     assert evidence["json_path"] == "training.qlora.capability_evidence"
 
 
+def test_emergency_mode_dispatches_real_optimizer_trainer(entrypoint_module) -> None:
+    contract = json.loads(DOWNSTREAM_CONTRACT.read_text(encoding="utf-8"))
+    emergency = contract["sagemaker_backend"]["emergency_smoke_invocation"]
+    args = entrypoint_module.validate_trainer_arguments(emergency["ContainerArguments"])
+    command = entrypoint_module.build_trainer_command(
+        args,
+        model_channel=Path("/opt/ml/input/data/models"),
+        dataset_channel=Path("/opt/ml/input/data/dataset"),
+    )
+    assert args.execution_mode == "emergency-smoke"
+    assert command[1:3] == ["-m", "experiments.aws_smoke.train"]
+    assert "--dataset-dir" in command
+    assert "--models-dir" in command
+    assert "--model-output-dir" in command
+    assert "--validate-only" not in command
+    assert emergency["optimizer_path"] == "torch.optim.AdamW"
+
+
 def test_wrapper_rejects_missing_or_ambiguous_mode(entrypoint_module) -> None:
     common = [
         "--manifest",
@@ -167,7 +185,10 @@ def test_healthcheck_validates_version_metadata(
         lambda name: imported.append(name),
     )
     assert entrypoint_module.healthcheck(version) == 0
-    assert imported == ["distillery.training.entrypoint"]
+    assert imported == [
+        "distillery.training.entrypoint",
+        "experiments.aws_smoke.train",
+    ]
 
     version.write_text('{"runtime_uid":0}\n', encoding="utf-8")
     with pytest.raises(ValueError):
@@ -263,6 +284,8 @@ def test_pid1_forwards_sigterm_and_writes_failure(tmp_path: Path) -> None:
             "--responses",
             str(responses),
             "--output-dir",
+            str(output),
+            "--model-output-dir",
             str(output),
             "--validate-only",
         ],

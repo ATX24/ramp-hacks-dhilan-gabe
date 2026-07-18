@@ -70,10 +70,14 @@ def test_package_metadata_and_runtime_files_are_copied() -> None:
     copy_text = "\n".join(copies)
     assert "pyproject.toml uv.lock README.md LICENSE" in copy_text
     assert "src/distillery ./src/distillery" in copy_text
+    assert "experiments ./experiments" in copy_text
     assert "container_entrypoint.py" in copy_text
     assert "ml-compatibility.json" in copy_text
     assert "verify_ml_compatibility.py" in copy_text
     assert all("--chown=root:root" in copy for copy in copies)
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert 'PYTHONPATH="/opt/distillery/src:/opt/distillery"' in text
+    assert "python -m experiments.aws_smoke.train --help" in text
 
 
 def test_lock_and_runtime_checks_surround_uv_sync() -> None:
@@ -156,6 +160,20 @@ def test_no_credentials_or_weights_can_enter_context() -> None:
         "README.md",
         "LICENSE",
         "src/distillery/**",
+        "experiments/__init__.py",
+        "experiments/aws_smoke/__init__.py",
+        "experiments/aws_smoke/artifacts.py",
+        "experiments/aws_smoke/channels.py",
+        "experiments/aws_smoke/deadline.py",
+        "experiments/aws_smoke/device_mapping.py",
+        "experiments/aws_smoke/loss_wiring.py",
+        "experiments/aws_smoke/manifests.py",
+        "experiments/aws_smoke/memory.py",
+        "experiments/aws_smoke/model_evidence.py",
+        "experiments/aws_smoke/pins.py",
+        "experiments/aws_smoke/profile.py",
+        "experiments/aws_smoke/tokenization.py",
+        "experiments/aws_smoke/train.py",
         "containers/training/Dockerfile",
         "containers/training/container_entrypoint.py",
         "containers/training/ml-compatibility.json",

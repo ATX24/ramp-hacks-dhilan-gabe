@@ -38,6 +38,27 @@
         "I_ACKNOWLEDGE_TRAINING_EXECUTION"
       ]
     },
+    "emergency_smoke_invocation": {
+      "ContainerArguments": [
+        "--execution-mode",
+        "emergency-smoke",
+        "--manifest",
+        "/opt/ml/input/data/manifest/manifest.json",
+        "--responses",
+        "/opt/ml/input/data/responses/responses.jsonl",
+        "--output-dir",
+        "/opt/ml/output/data",
+        "--model-output-dir",
+        "/opt/ml/model",
+        "--arm",
+        "oracle_sft",
+        "--execute",
+        "--execute-acknowledgement",
+        "I_ACKNOWLEDGE_TRAINING_EXECUTION"
+      ],
+      "trainer_module": "experiments.aws_smoke.train",
+      "optimizer_path": "torch.optim.AdamW"
+    },
     "required_channels": {
       "manifest": {
         "path": "/opt/ml/input/data/manifest/manifest.json",

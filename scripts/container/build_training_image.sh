@@ -99,7 +99,8 @@ require_clean_reviewed_source() {
   [[ -z "$(git -C "${ROOT_DIR}" status --porcelain --untracked-files=all)" ]] \
     || die "real builds require a completely clean committed source tree"
   git -C "${ROOT_DIR}" diff --quiet "${REVIEWED_SOURCE_SHA}" -- \
-    README.md LICENSE pyproject.toml uv.lock src/distillery containers/training \
+    README.md LICENSE pyproject.toml uv.lock src/distillery experiments \
+    containers/training \
     || die "staged image content differs from reviewed commit"
 }
 
@@ -138,6 +139,8 @@ snapshot_reviewed_source() {
     pyproject.toml \
     uv.lock \
     src/distillery \
+    experiments/__init__.py \
+    experiments/aws_smoke \
     containers/training \
     | tar -xf - -C "${destination}"
 }
@@ -280,6 +283,7 @@ main() {
   assert_tag "${tag}"
   local build_command=(
     docker build
+    --platform linux/amd64
     --file "${STAGE_DIR}/containers/training/Dockerfile"
     --build-arg "BASE_IMAGE=pytorch/pytorch@${BASE_DIGEST}"
     --build-arg "DISTILLERY_SOURCE_SHA=${head}"
@@ -298,11 +302,16 @@ main() {
   local config_id
   config_id="$(docker image inspect --format '{{.Id}}' "${local_ref}")"
   assert_digest "${config_id}" "local image config ID"
+  local image_platform
+  image_platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "${local_ref}")"
+  [[ "${image_platform}" == "linux/amd64" ]] \
+    || die "built image platform must be linux/amd64, got ${image_platform}"
   "${PYTHON}" "${MANIFEST_TOOL}" set-local \
     --schema "${SCHEMA}" \
     --manifest "${MANIFEST_OUT}" \
     --config-id "${config_id}"
   log "local_config_id=${config_id}"
+  log "local_platform=${image_platform}"
   log "build complete; no registry digest exists until verified post-push"
 }
 

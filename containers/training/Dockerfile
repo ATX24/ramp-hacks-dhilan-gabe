@@ -36,7 +36,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/distillery/.venv \
     PATH="/opt/distillery/.venv/bin:/opt/conda/bin:/usr/local/bin:${PATH}" \
-    PYTHONPATH="/opt/distillery/src" \
+    PYTHONPATH="/opt/distillery/src:/opt/distillery" \
     HF_HOME=/opt/distillery/hf-cache \
     HUGGINGFACE_HUB_CACHE=/opt/distillery/hf-cache/hub \
     TRANSFORMERS_CACHE=/opt/distillery/hf-cache/transformers \
@@ -118,6 +118,7 @@ WORKDIR /opt/distillery
 # the repository .dockerignore at context root.
 COPY --chown=root:root pyproject.toml uv.lock README.md LICENSE ./
 COPY --chown=root:root src/distillery ./src/distillery
+COPY --chown=root:root experiments ./experiments
 COPY --chown=root:root containers/training/container_entrypoint.py ./
 COPY --chown=root:root containers/training/ml-compatibility.json ./
 COPY --chown=root:root containers/training/verify_ml_compatibility.py ./
@@ -152,7 +153,8 @@ RUN set -eux; \
     python verify_ml_compatibility.py runtime \
       --compatibility ml-compatibility.json \
       --require-bitsandbytes; \
-    python -m distillery.training.entrypoint --help >/dev/null
+    python -m distillery.training.entrypoint --help >/dev/null; \
+    python -m experiments.aws_smoke.train --help >/dev/null
 
 RUN python - <<'PY'
 import json
@@ -168,6 +170,7 @@ payload = {
     "package_lock_sha256": os.environ["DISTILLERY_LOCK_SHA256"],
     "entrypoint": "/opt/distillery/container_entrypoint.py",
     "trainer_module": "distillery.training.entrypoint",
+    "emergency_trainer_module": "experiments.aws_smoke.train",
     "runtime_uid": 1000,
     "torch_version": "2.4.1",
     "torch_cuda_version": "12.4",

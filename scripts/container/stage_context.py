@@ -19,6 +19,22 @@ CONTAINER_FILES = (
     "ml-compatibility.json",
     "verify_ml_compatibility.py",
 )
+EMERGENCY_TRAINER_FILES = (
+    "__init__.py",
+    "aws_smoke/__init__.py",
+    "aws_smoke/artifacts.py",
+    "aws_smoke/channels.py",
+    "aws_smoke/deadline.py",
+    "aws_smoke/device_mapping.py",
+    "aws_smoke/loss_wiring.py",
+    "aws_smoke/manifests.py",
+    "aws_smoke/memory.py",
+    "aws_smoke/model_evidence.py",
+    "aws_smoke/pins.py",
+    "aws_smoke/profile.py",
+    "aws_smoke/tokenization.py",
+    "aws_smoke/train.py",
+)
 EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
 SENSITIVE_PARTS = {".aws", "secrets"}
 SENSITIVE_NAMES = {".env", "credentials", "id_rsa", "id_ed25519"}
@@ -66,23 +82,35 @@ def copy_file(source: Path, destination: Path) -> None:
     os.utime(destination, (0, 0))
 
 
-def source_files(repo: Path) -> list[Path]:
-    source_root = repo / "src" / "distillery"
-    if not source_root.is_dir():
-        raise ValueError(f"package source directory missing: {source_root}")
-    symlinks = sorted(path for path in source_root.rglob("*") if path.is_symlink())
+def _collect_package_files(repo: Path, package_root: Path) -> list[Path]:
+    if not package_root.is_dir():
+        raise ValueError(f"package source directory missing: {package_root}")
+    symlinks = sorted(path for path in package_root.rglob("*") if path.is_symlink())
     if symlinks:
         raise ValueError(f"staging refuses package symlink: {symlinks[0]}")
     files = [
         path
-        for path in source_root.rglob("*")
+        for path in package_root.rglob("*")
         if path.is_file()
         and not any(part in EXCLUDED_PARTS for part in path.parts)
         and path.name != ".DS_Store"
     ]
     if not files:
-        raise ValueError("src/distillery contains no package files")
+        raise ValueError(f"{package_root.relative_to(repo)} contains no package files")
     return sorted(files, key=lambda path: path.relative_to(repo).as_posix())
+
+
+def source_files(repo: Path) -> list[Path]:
+    return _collect_package_files(repo, repo / "src" / "distillery")
+
+
+def emergency_trainer_files(repo: Path) -> list[Path]:
+    """Return only reviewed modules in the emergency trainer dependency closure."""
+    experiment_root = repo / "experiments"
+    files = [experiment_root / relative for relative in EMERGENCY_TRAINER_FILES]
+    for path in files:
+        ensure_safe_source(path)
+    return files
 
 
 def build_inventory(destination: Path) -> tuple[list[dict[str, Any]], str]:
@@ -145,6 +173,9 @@ def stage_context(repo: Path, destination: Path) -> str:
         copy_file(repo / relative, destination / relative)
 
     for source in source_files(repo):
+        copy_file(source, destination / source.relative_to(repo))
+
+    for source in emergency_trainer_files(repo):
         copy_file(source, destination / source.relative_to(repo))
 
     container_root = repo / "containers" / "training"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import shutil
@@ -71,6 +72,9 @@ def test_packaging_scripts_are_executable() -> None:
         VERIFY_ML,
     ):
         assert path.stat().st_mode & stat.S_IXUSR
+    build_text = BUILD_SCRIPT.read_text(encoding="utf-8")
+    assert "--platform linux/amd64" in build_text
+    assert "built image platform must be linux/amd64" in build_text
 
 
 def test_staging_rejects_credentials_weights_and_symlinks(tmp_path: Path) -> None:
@@ -107,18 +111,41 @@ def test_stage_context_is_reproducible_and_complete(tmp_path: Path) -> None:
         "pyproject.toml",
         "uv.lock",
         ".dockerignore",
+        "experiments/__init__.py",
+        "experiments/aws_smoke/train.py",
         "containers/training/Dockerfile",
         "containers/training/container_entrypoint.py",
         "containers/training/ml-compatibility.json",
         "containers/training/verify_ml_compatibility.py",
     }.issubset(staged_paths)
     assert any(path.startswith("src/distillery/") for path in staged_paths)
+    stage_module = load_module(STAGE_TOOL, "distillery_stage_context_allowlist")
+    expected_emergency = {
+        f"experiments/{relative}"
+        for relative in stage_module.EMERGENCY_TRAINER_FILES
+    }
+    assert {path for path in staged_paths if path.startswith("experiments/")} == (
+        expected_emergency
+    )
+    assert "experiments/aws_smoke/campaign_launch.py" not in staged_paths
     assert not any("__pycache__" in path for path in staged_paths)
     assert not any(path.startswith(("apps/", "tests/", "docs/", ".git/")) for path in staged_paths)
     for path in first.rglob("*"):
         assert path.stat().st_mtime == 0
         expected_mode = 0o755 if path.is_dir() else 0o644
         assert stat.S_IMODE(path.stat().st_mode) == expected_mode
+
+    train_source = (first / "experiments" / "aws_smoke" / "train.py").read_text(
+        encoding="utf-8"
+    )
+    tree = ast.parse(train_source, filename="train.py")
+    defined = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert "run_training" in defined
+    assert "main" in defined
 
 
 def test_staged_uv_sync_smoke_validates_package_metadata(tmp_path: Path) -> None:
@@ -301,6 +328,7 @@ def test_real_build_stages_reviewed_commit_not_ignored_worktree_content(
         repo / "containers" / "training",
         repo / "scripts" / "container",
         repo / "src" / "distillery",
+        repo / "experiments" / "aws_smoke",
     ):
         directory.mkdir(parents=True)
     for name in ("README.md", "LICENSE", "pyproject.toml", "uv.lock"):
@@ -309,6 +337,12 @@ def test_real_build_stages_reviewed_commit_not_ignored_worktree_content(
         REPO / "src" / "distillery" / "__init__.py",
         repo / "src" / "distillery" / "__init__.py",
     )
+    stage_module = load_module(STAGE_TOOL, "distillery_stage_context_for_build_test")
+    for relative in stage_module.EMERGENCY_TRAINER_FILES:
+        source = REPO / "experiments" / relative
+        destination = repo / "experiments" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
     for source in (REPO / "containers" / "training").iterdir():
         if source.is_file():
             shutil.copy2(source, repo / "containers" / "training" / source.name)
@@ -367,10 +401,18 @@ from pathlib import Path
 args = sys.argv[1:]
 if args[0] == "build":
     context = Path(args[-1])
-    result = "present" if (context / "src/distillery/ignored.py").exists() else "absent"
+    ignored = (context / "src/distillery/ignored.py").exists()
+    emergency = (context / "experiments/aws_smoke/train.py").is_file()
+    result = "present" if ignored else ("absent" if emergency else "missing-emergency")
     Path(os.environ["FAKE_CONTEXT_RESULT"]).write_text(result + "\\n", encoding="utf-8")
 elif args[:2] == ["image", "inspect"]:
-    print("sha256:" + ("1" * 64))
+    fmt = ""
+    if "--format" in args:
+        fmt = args[args.index("--format") + 1]
+    if fmt == "{{.Os}}/{{.Architecture}}":
+        print("linux/amd64")
+    else:
+        print("sha256:" + ("1" * 64))
 else:
     raise SystemExit(91)
 """,
