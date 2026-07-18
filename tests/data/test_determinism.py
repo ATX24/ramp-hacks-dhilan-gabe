@@ -15,7 +15,9 @@ from distillery.data.generate import CORPUS_SMOKE, generate_corpus
 from distillery.data.mixture import mixture_plan
 from distillery.data.world import build_world
 
-_OPAQUE_ID_RE = re.compile(r"^(?:ex|world|grp|ent|txn|vnd|src|bok|bnk)_[0-9a-f]{18}$")
+_OPAQUE_ID_RE = re.compile(
+    r"^(?:ex|world|grp|ent|txn|vnd|src|bok|bnk|mrc|mem)_[0-9a-f]{18}$"
+)
 _VISIBLE_SPLIT_RE = re.compile(
     r"(?i)(?:\b(?:train|training|validation|ood|iid_test)\b|"
     r"(?:smk|full)_(?:tr|va|te|iid|ood)\b)"

@@ -24,13 +24,55 @@ from distillery.contracts.hashing import (
 from distillery.contracts.ids import ExampleId, GroupId, WorldId
 
 SCHEMA_VERSION_FINANCE_WORLD = "finance_world.v1"
+SCHEMA_VERSION_FINANCE_WORLD_V2 = "finance_world.v2"
 FiniteFloat = Annotated[float, Field(strict=True, allow_inf_nan=False)]
+
+# Canonical spend categories for merchant_tagging (bounded closed set).
+MERCHANT_SPEND_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "meals",
+        "airfare",
+        "lodging",
+        "saas",
+        "cloud",
+        "capex",
+        "services",
+        "fees",
+        "facilities",
+        "personal",
+        "rideshare",
+        "ground_transport",
+        "office_supplies",
+        "advertising",
+    }
+)
+
+# Bounded finance tags for merchant_tagging outputs.
+MERCHANT_FINANCE_TAGS: frozenset[str] = frozenset(
+    {
+        "recurring",
+        "travel",
+        "entertainment",
+        "infrastructure",
+        "software",
+        "hardware",
+        "professional",
+        "processor",
+        "employee_spend",
+        "vendor_bill",
+        "card_present",
+        "card_not_present",
+        "international",
+        "refundable",
+    }
+)
 
 
 class TaskId(StrEnum):
     TRANSACTION_REVIEW = "transaction_review"
     VARIANCE_ANALYSIS = "variance_analysis"
     CASH_RECONCILIATION = "cash_reconciliation"
+    MERCHANT_TAGGING = "merchant_tagging"
 
 
 class Difficulty(StrEnum):
@@ -206,8 +248,38 @@ class CashReconciliationOutput(FrozenModel):
         return self
 
 
+class MerchantTaggingOutput(FrozenModel):
+    """Compact merchant identity + category/tag contract (Primary C)."""
+
+    schema_version: Literal["merchant_tagging.v1"] = "merchant_tagging.v1"
+    task: Literal[TaskId.MERCHANT_TAGGING] = TaskId.MERCHANT_TAGGING
+    merchant_id: StrictStr = Field(min_length=1)
+    merchant_name: StrictStr = Field(min_length=1)
+    spend_category: StrictStr = Field(min_length=1)
+    tags: tuple[StrictStr, ...] = Field(min_length=1, max_length=6)
+    confidence: FiniteFloat = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _bounded_category_and_tags(self) -> MerchantTaggingOutput:
+        if self.spend_category not in MERCHANT_SPEND_CATEGORIES:
+            raise ValueError(
+                f"spend_category {self.spend_category!r} not in closed category set"
+            )
+        unknown = sorted(set(self.tags) - MERCHANT_FINANCE_TAGS)
+        if unknown:
+            raise ValueError(f"unknown finance tags: {unknown}")
+        if len(self.tags) != len(set(self.tags)):
+            raise ValueError("merchant tags must be unique")
+        if list(self.tags) != sorted(self.tags):
+            raise ValueError("merchant tags must be sorted ascending")
+        return self
+
+
 TaskOutput = Annotated[
-    TransactionReviewOutput | VarianceAnalysisOutput | CashReconciliationOutput,
+    TransactionReviewOutput
+    | VarianceAnalysisOutput
+    | CashReconciliationOutput
+    | MerchantTaggingOutput,
     Field(discriminator="task"),
 ]
 _TASK_OUTPUT_ADAPTER = TypeAdapter(TaskOutput)
@@ -230,9 +302,11 @@ class Provenance(FrozenModel):
 
 
 class FinanceTaskEnvelope(FrozenModel):
-    """Canonical task envelope for finance_world.v1 examples."""
+    """Canonical task envelope for finance_world.v1 / finance_world.v2 examples."""
 
-    schema_version: Literal["finance_world.v1"] = SCHEMA_VERSION_FINANCE_WORLD
+    schema_version: Literal["finance_world.v1", "finance_world.v2"] = (
+        SCHEMA_VERSION_FINANCE_WORLD
+    )
     example_id: ExampleId
     world_id: WorldId
     group_id: GroupId

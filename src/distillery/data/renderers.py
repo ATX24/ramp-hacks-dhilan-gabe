@@ -8,8 +8,10 @@ from typing import Any
 from distillery.contracts.tasks import Difficulty, TaskId
 from distillery.data.world import (
     IID_TEMPLATE_FAMILIES,
+    MCC_CATEGORY_MAP,
     OOD_TEMPLATE_FAMILIES,
     LatentWorld,
+    MerchantHardNegative,
     VarianceObservation,
 )
 
@@ -43,6 +45,8 @@ def render_input(
         return render_variance_analysis(world, template_family=template_family)
     if task == TaskId.CASH_RECONCILIATION:
         return render_cash_reconciliation(world, template_family=template_family)
+    if task == TaskId.MERCHANT_TAGGING:
+        return render_merchant_tagging(world, template_family=template_family)
     raise ValueError(f"no renderer for task {task}")
 
 
@@ -185,6 +189,60 @@ def render_cash_reconciliation(
             for event in cash.bank_events
         ],
     }
+
+
+def render_merchant_tagging(
+    world: LatentWorld,
+    *,
+    template_family: str,
+) -> dict[str, Any]:
+    merchant = world.merchant
+    if merchant is None:
+        raise ValueError("missing merchant")
+    prompt = {
+        "merch_card_slip": "Identify the canonical merchant and spend tags.",
+        "merch_descriptor_packet": "Normalize the noisy card descriptor.",
+        "merch_receipt_note": "Resolve merchant identity from slip and receipt.",
+        "merch_mcc_table": "Map MCC and descriptor to merchant tags.",
+        "merch_corruption_sheet": "Recover the merchant despite corruption.",
+        "merch_holdout_packet": "Tag an unfamiliar merchant family.",
+        "merch_lookalike_memo": "Disambiguate lookalike merchant descriptors.",
+    }.get(_template_base(template_family), "Tag the merchant.")
+    displayed_mcc = merchant.mcc
+    if merchant.corruption_template == MerchantHardNegative.MCC_NEAR_MISS:
+        near = sorted(code for code in MCC_CATEGORY_MAP if code != merchant.mcc)
+        displayed_mcc = near[hash(merchant.merchant_id) % len(near)]
+    result: dict[str, Any] = {
+        "prompt": prompt,
+        "descriptor": merchant.noisy_descriptor,
+        "mcc": displayed_mcc,
+        "amount_minor": merchant.amount_minor,
+        "currency": merchant.currency,
+        "memo": merchant.memo,
+        "entity_id": merchant.entity_id,
+        "allowed_categories": sorted(set(MCC_CATEGORY_MAP.values())),
+        "allowed_tags": sorted(
+            {
+                "recurring",
+                "travel",
+                "entertainment",
+                "infrastructure",
+                "software",
+                "hardware",
+                "professional",
+                "processor",
+                "employee_spend",
+                "vendor_bill",
+                "card_present",
+                "card_not_present",
+                "international",
+                "refundable",
+            }
+        ),
+    }
+    if merchant.receipt_text is not None:
+        result["receipt_text"] = merchant.receipt_text
+    return result
 
 
 def _render_variance_observation(

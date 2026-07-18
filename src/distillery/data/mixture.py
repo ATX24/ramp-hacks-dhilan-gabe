@@ -6,10 +6,21 @@ from collections.abc import Mapping, Sequence
 
 from distillery.contracts.tasks import Difficulty, TaskId
 
-# Locked experiment mixture (finance_world.v2).
+# Locked finance_world.v1 experiment mixture (Primary A/B + cash backup).
 TASK_MIXTURE: dict[TaskId, float] = {
     TaskId.TRANSACTION_REVIEW: 0.45,
     TaskId.VARIANCE_ANALYSIS: 0.45,
+    TaskId.CASH_RECONCILIATION: 0.10,
+}
+
+# Locked finance_world.v2 mixture (Primary A/B/C + cash diagnostic backup).
+# Justification: 35/35/20/10 on a 6,240-example full corpus yields 1,248
+# merchant_tagging examples (>=1,000) while keeping A/B each at 2,184
+# (only ~6.7% below v1's 2,340) and cash diagnostic weight unchanged at 10%.
+TASK_MIXTURE_V2: dict[TaskId, float] = {
+    TaskId.TRANSACTION_REVIEW: 0.35,
+    TaskId.VARIANCE_ANALYSIS: 0.35,
+    TaskId.MERCHANT_TAGGING: 0.20,
     TaskId.CASH_RECONCILIATION: 0.10,
 }
 
@@ -22,6 +33,13 @@ DIFFICULTY_MIXTURE: dict[Difficulty, float] = {
 TASK_ORDER: tuple[TaskId, ...] = (
     TaskId.TRANSACTION_REVIEW,
     TaskId.VARIANCE_ANALYSIS,
+    TaskId.CASH_RECONCILIATION,
+)
+
+TASK_ORDER_V2: tuple[TaskId, ...] = (
+    TaskId.TRANSACTION_REVIEW,
+    TaskId.VARIANCE_ANALYSIS,
+    TaskId.MERCHANT_TAGGING,
     TaskId.CASH_RECONCILIATION,
 )
 
@@ -61,11 +79,18 @@ def hamilton_apportion(
     return result
 
 
-def task_counts(total: int) -> dict[TaskId, int]:
+def task_counts(
+    total: int,
+    *,
+    mixture: Mapping[TaskId, float] | None = None,
+    order: Sequence[TaskId] | None = None,
+) -> dict[TaskId, int]:
+    weights = dict(mixture or TASK_MIXTURE)
+    task_order = tuple(order or TASK_ORDER)
     raw = hamilton_apportion(
         total,
-        {t.value: TASK_MIXTURE[t] for t in TASK_ORDER},
-        [t.value for t in TASK_ORDER],
+        {t.value: weights[t] for t in task_order},
+        [t.value for t in task_order],
     )
     return {TaskId(k): v for k, v in raw.items()}
 
@@ -81,39 +106,40 @@ def difficulty_counts(task_total: int) -> dict[Difficulty, int]:
 
 def joint_cell_counts(
     total: int,
+    *,
+    mixture: Mapping[TaskId, float] | None = None,
+    order: Sequence[TaskId] | None = None,
 ) -> dict[tuple[TaskId, Difficulty], int]:
     """Allocate cells while satisfying exact task and difficulty margins."""
-    rows = task_counts(total)
+    task_order = tuple(order or TASK_ORDER)
+    rows = task_counts(total, mixture=mixture, order=task_order)
     columns = difficulty_counts(total)
     exact = {
         (task, difficulty): rows[task] * DIFFICULTY_MIXTURE[difficulty]
-        for task in TASK_ORDER
+        for task in task_order
         for difficulty in DIFFICULTY_ORDER
     }
     cells = {cell: int(value) for cell, value in exact.items()}
     row_remaining = {
         task: rows[task] - sum(cells[(task, difficulty)] for difficulty in DIFFICULTY_ORDER)
-        for task in TASK_ORDER
+        for task in task_order
     }
     column_remaining = {
-        difficulty: columns[difficulty] - sum(cells[(task, difficulty)] for task in TASK_ORDER)
+        difficulty: columns[difficulty] - sum(cells[(task, difficulty)] for task in task_order)
         for difficulty in DIFFICULTY_ORDER
     }
-    awarded: set[tuple[TaskId, Difficulty]] = set()
     while sum(row_remaining.values()):
         candidates = [
             (
                 exact[(task, difficulty)] - cells[(task, difficulty)],
-                -TASK_ORDER.index(task),
+                -task_order.index(task),
                 -DIFFICULTY_ORDER.index(difficulty),
                 task,
                 difficulty,
             )
-            for task in TASK_ORDER
+            for task in task_order
             for difficulty in DIFFICULTY_ORDER
-            if row_remaining[task] > 0
-            and column_remaining[difficulty] > 0
-            and (task, difficulty) not in awarded
+            if row_remaining[task] > 0 and column_remaining[difficulty] > 0
         ]
         if not candidates:
             raise RuntimeError("could not satisfy joint mixture margins")
@@ -121,18 +147,23 @@ def joint_cell_counts(
         cells[(task, difficulty)] += 1
         row_remaining[task] -= 1
         column_remaining[difficulty] -= 1
-        awarded.add((task, difficulty))
 
     if any(column_remaining.values()):
         raise RuntimeError("joint mixture left unmatched difficulty counts")
     return cells
 
 
-def mixture_plan(total: int) -> list[tuple[TaskId, Difficulty]]:
+def mixture_plan(
+    total: int,
+    *,
+    mixture: Mapping[TaskId, float] | None = None,
+    order: Sequence[TaskId] | None = None,
+) -> list[tuple[TaskId, Difficulty]]:
     """Expand a split size into an ordered list of (task, difficulty) slots."""
+    task_order = tuple(order or TASK_ORDER)
     slots: list[tuple[TaskId, Difficulty]] = []
-    cells = joint_cell_counts(total)
-    for task in TASK_ORDER:
+    cells = joint_cell_counts(total, mixture=mixture, order=task_order)
+    for task in task_order:
         for difficulty in DIFFICULTY_ORDER:
             slots.extend([(task, difficulty)] * cells[(task, difficulty)])
     if len(slots) != total:
@@ -142,12 +173,15 @@ def mixture_plan(total: int) -> list[tuple[TaskId, Difficulty]]:
 
 def summarize_mixture(
     examples: Sequence[tuple[TaskId, Difficulty]],
+    *,
+    order: Sequence[TaskId] | None = None,
 ) -> dict[str, dict[str, int]]:
-    by_task: dict[str, int] = {t.value: 0 for t in TASK_ORDER}
+    task_order = tuple(order or TASK_ORDER)
+    by_task: dict[str, int] = {t.value: 0 for t in task_order}
     by_difficulty: dict[str, int] = {d.value: 0 for d in DIFFICULTY_ORDER}
     by_cell: dict[str, int] = {}
     for task, difficulty in examples:
-        by_task[task.value] += 1
+        by_task[task.value] = by_task.get(task.value, 0) + 1
         by_difficulty[difficulty.value] += 1
         key = f"{task.value}:{difficulty.value}"
         by_cell[key] = by_cell.get(key, 0) + 1

@@ -10,9 +10,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from distillery.contracts.budgets import PRIMARY_INDEX_WEIGHTS, PrimaryIndexWeights
+from distillery.contracts.budgets import (
+    PRIMARY_INDEX_WEIGHTS,
+    PRIMARY_INDEX_WEIGHTS_V2,
+    PrimaryIndexWeights,
+    PrimaryIndexWeightsV2,
+)
 from distillery.contracts.tasks import (
     CashReconciliationOutput,
+    MerchantTaggingOutput,
     TaskId,
     TransactionReviewOutput,
     VarianceAnalysisOutput,
@@ -111,6 +117,8 @@ class ArmMetrics:
     task_metrics: dict[str, dict[str, float | None]]
     calibration: CalibrationMetrics
     slices: list[SliceReport]
+    merchant_joint_exact: float | None = None
+    primary_index_v2: float | None = None
     seeds: tuple[int, ...] = ()
     seed_metrics: dict[int, dict[str, float | None]] = field(default_factory=dict)
     example_scores: list[ExampleScore] = field(default_factory=list)
@@ -251,6 +259,9 @@ def _schema_valid(task: str, parsed: dict[str, Any]) -> bool:
             return True
         if task == TaskId.CASH_RECONCILIATION.value:
             CashReconciliationOutput.model_validate(parsed)
+            return True
+        if task == TaskId.MERCHANT_TAGGING.value:
+            MerchantTaggingOutput.model_validate(parsed)
             return True
     except ValidationError:
         return False
@@ -545,6 +556,10 @@ def score_prediction(record: PredictionRecord) -> ExampleScore:
             )
         elif record.task == TaskId.CASH_RECONCILIATION.value:
             components, joint, invariant_violation = _score_cash(record.expected_output, parsed)
+        elif record.task == TaskId.MERCHANT_TAGGING.value:
+            components, joint, invariant_violation = _score_merchant(
+                record.expected_output, parsed
+            )
         else:
             joint = parsed == record.expected_output
             components["joint_exact"] = float(joint)
@@ -579,7 +594,7 @@ def compute_primary_index(
     json_schema_validity: float,
     weights: PrimaryIndexWeights = PRIMARY_INDEX_WEIGHTS,
 ) -> float:
-    """Prespecified primary index. Missing task rates contribute 0 (not hidden)."""
+    """Prespecified finance-proof.v1 primary index. Missing tasks contribute 0."""
     txn = 0.0 if transaction_joint_exact is None else transaction_joint_exact
     var = 0.0 if variance_joint_exact is None else variance_joint_exact
     return (
@@ -587,6 +602,65 @@ def compute_primary_index(
         + weights.variance_joint_exact * var
         + weights.json_schema_validity * json_schema_validity
     )
+
+
+def compute_primary_index_v2(
+    transaction_joint_exact: float | None,
+    variance_joint_exact: float | None,
+    merchant_joint_exact: float | None,
+    json_schema_validity: float,
+    weights: PrimaryIndexWeightsV2 = PRIMARY_INDEX_WEIGHTS_V2,
+) -> float:
+    """Prespecified finance-proof.v2 primary index (A/B/C + schema)."""
+    txn = 0.0 if transaction_joint_exact is None else transaction_joint_exact
+    var = 0.0 if variance_joint_exact is None else variance_joint_exact
+    merch = 0.0 if merchant_joint_exact is None else merchant_joint_exact
+    return (
+        weights.transaction_joint_exact * txn
+        + weights.variance_joint_exact * var
+        + weights.merchant_joint_exact * merch
+        + weights.json_schema_validity * json_schema_validity
+    )
+
+
+def _score_merchant(
+    gold: dict[str, Any], pred: dict[str, Any]
+) -> tuple[dict[str, float], bool, bool]:
+    components: dict[str, float] = {}
+    merchant_exact = float(
+        gold.get("merchant_id") == pred.get("merchant_id")
+        and gold.get("merchant_name") == pred.get("merchant_name")
+    )
+    components["merchant_exact"] = merchant_exact
+    components["merchant_id_exact"] = float(gold.get("merchant_id") == pred.get("merchant_id"))
+    components["merchant_name_exact"] = float(
+        gold.get("merchant_name") == pred.get("merchant_name")
+    )
+    components["category_exact"] = float(
+        gold.get("spend_category") == pred.get("spend_category")
+    )
+    gold_tags = set(gold.get("tags") or [])
+    pred_tags = (
+        set(pred.get("tags") or [])
+        if isinstance(pred.get("tags"), (list, tuple))
+        else set()
+    )
+    _, _, tag_f1 = _set_prf(pred_tags, gold_tags)
+    components["tag_set_f1"] = tag_f1
+    components["tag_set_exact"] = float(gold_tags == pred_tags)
+    joint = (
+        merchant_exact == 1.0
+        and components["category_exact"] == 1.0
+        and components["tag_set_exact"] == 1.0
+    )
+    components["joint_exact"] = float(joint)
+    # Invariant: predicted tags must be sorted unique when present.
+    pred_tag_list = pred.get("tags")
+    invariant_violation = False
+    if isinstance(pred_tag_list, list):
+        if pred_tag_list != sorted(pred_tag_list) or len(pred_tag_list) != len(set(pred_tag_list)):
+            invariant_violation = True
+    return components, joint, invariant_violation
 
 
 def _adaptive_ece(confidences: list[float], correct: list[float], n_bins: int = 10) -> float | None:
@@ -715,7 +789,9 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
             transaction_joint_exact=None,
             variance_joint_exact=None,
             cash_joint_exact=None,
+            merchant_joint_exact=None,
             primary_index=0.0,
+            primary_index_v2=None,
             components={},
             task_metrics={},
             calibration=CalibrationMetrics(None, None, [], 0),
@@ -733,10 +809,12 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
     txn = [s for s in scores if s.task == TaskId.TRANSACTION_REVIEW.value]
     var = [s for s in scores if s.task == TaskId.VARIANCE_ANALYSIS.value]
     cash = [s for s in scores if s.task == TaskId.CASH_RECONCILIATION.value]
+    merchant = [s for s in scores if s.task == TaskId.MERCHANT_TAGGING.value]
 
     txn_joint = _mean([float(s.joint_exact) for s in txn])
     var_joint = _mean([float(s.joint_exact) for s in var])
     cash_joint = _mean([float(s.joint_exact) for s in cash])
+    merchant_joint = _mean([float(s.joint_exact) for s in merchant])
 
     # Macro-F1 for policy actions across transaction examples with schema-valid preds.
     policy_true: list[str] = []
@@ -770,6 +848,28 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
         cash_exc_pred.append(ptypes)
     exception_macro = _multilabel_macro_f1(cash_exc_true, cash_exc_pred)
 
+    category_true: list[str] = []
+    category_pred: list[str] = []
+    tag_true: list[set[str]] = []
+    tag_pred: list[set[str]] = []
+    for rec, score in zip(records, scores, strict=True):
+        if rec.task != TaskId.MERCHANT_TAGGING.value or not score.json_schema_valid:
+            continue
+        parsed, _, _ = parse_prediction(rec)
+        if parsed is None:
+            continue
+        category_true.append(str(rec.expected_output.get("spend_category")))
+        category_pred.append(str(parsed.get("spend_category")))
+        tag_true.append({str(tag) for tag in (rec.expected_output.get("tags") or [])})
+        raw_tags = parsed.get("tags") or []
+        tag_pred.append(
+            {str(tag) for tag in raw_tags}
+            if isinstance(raw_tags, (list, tuple))
+            else set()
+        )
+    category_macro = _macro_f1(category_true, category_pred)
+    tag_macro = _multilabel_macro_f1(tag_true, tag_pred)
+
     task_metrics: dict[str, dict[str, float | None]] = {
         TaskId.TRANSACTION_REVIEW.value: {
             **_aggregate_components(txn),
@@ -785,17 +885,30 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
             "exception_type_macro_f1": exception_macro,
             "n": float(len(cash)),
         },
+        TaskId.MERCHANT_TAGGING.value: {
+            **_aggregate_components(merchant),
+            "category_macro_f1": category_macro,
+            "tag_macro_f1": tag_macro,
+            "n": float(len(merchant)),
+        },
     }
 
     primary = compute_primary_index(txn_joint, var_joint, json_schema_validity)
+    primary_v2 = compute_primary_index_v2(
+        txn_joint, var_joint, merchant_joint, json_schema_validity
+    )
     components = {
         "transaction_joint_exact": txn_joint if txn_joint is not None else float("nan"),
         "variance_joint_exact": var_joint if var_joint is not None else float("nan"),
         "cash_joint_exact": cash_joint if cash_joint is not None else float("nan"),
+        "merchant_joint_exact": (
+            merchant_joint if merchant_joint is not None else float("nan")
+        ),
         "json_schema_validity": json_schema_validity,
         "json_parse_rate": json_parse_rate,
         "refusal_empty_rate": refusal_empty_rate,
         "primary_index": primary,
+        "primary_index_v2": primary_v2,
     }
     seed_metrics: dict[int, dict[str, float | None]] = {}
     for seed in sorted({score.seed for score in scores}):
@@ -842,7 +955,9 @@ def compute_arm_metrics(arm_id: str, records: list[PredictionRecord]) -> ArmMetr
         transaction_joint_exact=txn_joint,
         variance_joint_exact=var_joint,
         cash_joint_exact=cash_joint,
+        merchant_joint_exact=merchant_joint,
         primary_index=primary,
+        primary_index_v2=primary_v2,
         components=components,
         task_metrics=task_metrics,
         calibration=compute_calibration(scores),

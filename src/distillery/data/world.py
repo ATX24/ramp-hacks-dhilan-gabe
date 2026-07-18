@@ -117,6 +117,18 @@ class TxnHardNegative(StrEnum):
     MISLEADING_DESCRIPTOR = "misleading_descriptor"
 
 
+class MerchantHardNegative(StrEnum):
+    NONE = "none"
+    PROCESSOR_PREFIX = "processor_prefix"
+    TRUNCATED_DESCRIPTOR = "truncated_descriptor"
+    TRANSPOSED_TOKENS = "transposed_tokens"
+    NUMERIC_NOISE = "numeric_noise"
+    LOOKALIKE_FAMILY = "lookalike_family"
+    MCC_NEAR_MISS = "mcc_near_miss"
+    CATEGORY_COLLISION = "category_collision"
+    RECEIPT_CONTRADICTION = "receipt_contradiction"
+
+
 @dataclass(frozen=True)
 class GLAccount:
     code: str
@@ -242,6 +254,33 @@ class CashLatent:
 
 
 @dataclass(frozen=True)
+class MerchantFamily:
+    family_id: str
+    canonical_name: str
+    mcc: str
+    spend_category: str
+    default_tags: tuple[str, ...]
+    held_out: bool = False
+
+
+@dataclass(frozen=True)
+class MerchantLatent:
+    merchant_id: str
+    merchant_name: str
+    family_id: str
+    mcc: str
+    spend_category: str
+    tags: tuple[str, ...]
+    noisy_descriptor: str
+    amount_minor: int
+    currency: str
+    memo: str
+    receipt_text: str | None
+    corruption_template: MerchantHardNegative
+    entity_id: str
+
+
+@dataclass(frozen=True)
 class LatentWorld:
     """Internally consistent company snapshot for one synthetic world."""
 
@@ -256,6 +295,7 @@ class LatentWorld:
     transaction: TransactionLatent | None = None
     variance: VarianceLatent | None = None
     cash: CashLatent | None = None
+    merchant: MerchantLatent | None = None
     latent_regime: str = "baseline"
     ood_held_out: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -310,6 +350,51 @@ OOD_VENDOR_ARCHETYPES: tuple[VendorArchetype, ...] = (
 IID_VENDORS = IID_VENDOR_ARCHETYPES
 OOD_VENDORS = OOD_VENDOR_ARCHETYPES
 
+# MCC → spend_category locked mapping used by merchant oracle/validators.
+MCC_CATEGORY_MAP: dict[str, str] = {
+    "5812": "meals",
+    "5814": "meals",
+    "3000": "airfare",
+    "4511": "airfare",
+    "7011": "lodging",
+    "5734": "saas",
+    "4816": "cloud",
+    "5045": "capex",
+    "7392": "services",
+    "6011": "fees",
+    "6513": "facilities",
+    "5999": "personal",
+    "4121": "rideshare",
+    "4111": "ground_transport",
+    "5943": "office_supplies",
+    "7311": "advertising",
+}
+
+IID_MERCHANT_FAMILY_SPECS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("cafe_chain", "Harbor Cafe Collective", "5812", ("employee_spend", "entertainment")),
+    ("airline_major", "Cobalt Air Exchange", "3000", ("travel", "refundable")),
+    ("hotel_group", "Linden Lodging Group", "7011", ("travel", "employee_spend")),
+    ("saas_suite", "Indigo Software Works", "5734", ("software", "recurring")),
+    ("cloud_provider", "Quartz Compute Labs", "4816", ("infrastructure", "recurring")),
+    ("hardware_oem", "Flint Equipment Systems", "5045", ("hardware", "vendor_bill")),
+    ("consultancy", "Spruce Advisory Partners", "7392", ("professional", "vendor_bill")),
+    ("rideshare", "River Mobility Network", "4121", ("travel", "employee_spend")),
+    ("office_retail", "Maple Supply Market", "5943", ("employee_spend", "card_present")),
+    ("ad_platform", "Amber Media Platform", "7311", ("card_not_present", "vendor_bill")),
+)
+
+# Held-out OOD merchant families (never appear in IID splits).
+OOD_MERCHANT_FAMILY_SPECS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("cafe_alt", "Pearl Catering Collective", "5814", ("employee_spend", "entertainment")),
+    ("airline_alt", "Onyx Charter Airways", "4511", ("travel", "international")),
+    ("hotel_alt", "Willow Inn Holdings", "7011", ("travel", "employee_spend")),
+    ("saas_alt", "Cedar Automation Labs", "5734", ("software", "recurring")),
+    ("cloud_alt", "Stone Capacity Systems", "4816", ("infrastructure", "recurring")),
+    ("processor_alt", "Navy Processor Exchange", "6011", ("processor", "vendor_bill")),
+    ("facilities_alt", "Reed Workspace Works", "6513", ("recurring", "vendor_bill")),
+    ("personal_alt", "Ember Consumer Market", "5999", ("employee_spend", "card_present")),
+)
+
 IID_TEMPLATE_FAMILIES: dict[TaskId, tuple[str, ...]] = {
     TaskId.TRANSACTION_REVIEW: (
         "txn_card_packet",
@@ -328,6 +413,12 @@ IID_TEMPLATE_FAMILIES: dict[TaskId, tuple[str, ...]] = {
         "cash_close_table",
         "cash_ledger_extract",
     ),
+    TaskId.MERCHANT_TAGGING: (
+        "merch_card_slip",
+        "merch_descriptor_packet",
+        "merch_receipt_note",
+        "merch_mcc_table",
+    ),
 }
 
 OOD_TEMPLATE_FAMILIES: dict[TaskId, tuple[str, ...]] = {
@@ -345,6 +436,11 @@ OOD_TEMPLATE_FAMILIES: dict[TaskId, tuple[str, ...]] = {
         "cash_aggregation_sheet",
         "cash_collision_worksheet",
         "cash_settlement_packet",
+    ),
+    TaskId.MERCHANT_TAGGING: (
+        "merch_corruption_sheet",
+        "merch_holdout_packet",
+        "merch_lookalike_memo",
     ),
 }
 
@@ -456,6 +552,7 @@ def build_world(
     transaction: TransactionLatent | None = None
     variance: VarianceLatent | None = None
     cash: CashLatent | None = None
+    merchant: MerchantLatent | None = None
     latent_regime = "baseline"
 
     if task == TaskId.TRANSACTION_REVIEW:
@@ -488,6 +585,15 @@ def build_world(
             ood,
         )
         latent_regime = cash.regime.value
+    elif task == TaskId.MERCHANT_TAGGING:
+        merchant = _build_merchant(
+            h,
+            identity,
+            entity_id,
+            difficulty,
+            ood,
+        )
+        latent_regime = merchant.corruption_template.value
     else:
         raise ValueError(f"unsupported finance task {task}")
 
@@ -503,6 +609,7 @@ def build_world(
         transaction=transaction,
         variance=variance,
         cash=cash,
+        merchant=merchant,
         latent_regime=latent_regime,
         ood_held_out=ood,
         metadata={
@@ -1266,6 +1373,132 @@ def _build_cash(
         entity_id=entity_id,
         close_period=close_period,
     )
+
+
+def _build_merchant(
+    h: int,
+    identity: str,
+    entity_id: str,
+    difficulty: Difficulty,
+    ood: bool,
+) -> MerchantLatent:
+    family = _select_merchant_family(h, ood=ood)
+    if MCC_CATEGORY_MAP[family.mcc] != family.spend_category:
+        raise ValueError(
+            f"merchant family {family.family_id} MCC/category inconsistency: "
+            f"{family.mcc}->{family.spend_category}"
+        )
+    corruption = _merchant_corruption(h, difficulty)
+    amount = 1_500 + (h % 250_000)
+    currency = "USD" if (h >> 3) % 7 else "EUR"
+    # Group-unique canonical name (family brand stem + opaque coining) so
+    # merchant names cannot cross groups under leakage detectors.
+    brand_stem = family.canonical_name.split()[0]
+    base_name = f"{brand_stem} {_natural_name(f'{identity}|merchant|{family.family_id}')}"
+    merchant_id = _opaque_id("mrc_", f"{identity}|merchant|{family.family_id}")
+    noisy = _corrupt_descriptor(base_name, family.family_id, h, corruption)
+    memo = f"{family.spend_category} card auth {_opaque_id('mem_', identity)[-8:]}"
+    receipt: str | None = None
+    if difficulty != Difficulty.EASY or corruption == MerchantHardNegative.RECEIPT_CONTRADICTION:
+        receipt = (
+            f"Receipt for {base_name}"
+            if corruption != MerchantHardNegative.RECEIPT_CONTRADICTION
+            else f"Receipt mentions {_lookalike_name(base_name, h)} storefront"
+        )
+    tags = tuple(sorted(family.default_tags))
+    if currency != "USD" and "international" not in tags:
+        tags = tuple(sorted((*tags, "international")))
+    if corruption == MerchantHardNegative.PROCESSOR_PREFIX and "processor" not in tags:
+        tags = tuple(sorted((*tags, "processor")))
+    return MerchantLatent(
+        merchant_id=merchant_id,
+        merchant_name=base_name,
+        family_id=family.family_id,
+        mcc=family.mcc,
+        spend_category=family.spend_category,
+        tags=tags,
+        noisy_descriptor=noisy,
+        amount_minor=amount,
+        currency=currency,
+        memo=memo,
+        receipt_text=receipt,
+        corruption_template=corruption,
+        entity_id=entity_id,
+    )
+
+
+def _select_merchant_family(h: int, *, ood: bool) -> MerchantFamily:
+    specs = OOD_MERCHANT_FAMILY_SPECS if ood else IID_MERCHANT_FAMILY_SPECS
+    family_id, name, mcc, tags = specs[h % len(specs)]
+    return MerchantFamily(
+        family_id=family_id,
+        canonical_name=name,
+        mcc=mcc,
+        spend_category=MCC_CATEGORY_MAP[mcc],
+        default_tags=tags,
+        held_out=ood,
+    )
+
+
+def _merchant_corruption(h: int, difficulty: Difficulty) -> MerchantHardNegative:
+    if difficulty == Difficulty.EASY:
+        return MerchantHardNegative.NONE
+    hard = (
+        MerchantHardNegative.PROCESSOR_PREFIX,
+        MerchantHardNegative.TRUNCATED_DESCRIPTOR,
+        MerchantHardNegative.TRANSPOSED_TOKENS,
+        MerchantHardNegative.NUMERIC_NOISE,
+        MerchantHardNegative.LOOKALIKE_FAMILY,
+        MerchantHardNegative.MCC_NEAR_MISS,
+        MerchantHardNegative.CATEGORY_COLLISION,
+        MerchantHardNegative.RECEIPT_CONTRADICTION,
+    )
+    if difficulty == Difficulty.MEDIUM:
+        medium = hard[:4]
+        return medium[(h >> 5) % len(medium)]
+    return hard[(h >> 5) % len(hard)]
+
+
+def _corrupt_descriptor(
+    name: str,
+    family_id: str,
+    h: int,
+    corruption: MerchantHardNegative,
+) -> str:
+    tokens = name.upper().split()
+    compact = "".join(tokens)
+    store_num = 100 + (h % 900)
+    if corruption == MerchantHardNegative.NONE:
+        return f"{compact} STORE {store_num}"
+    if corruption == MerchantHardNegative.PROCESSOR_PREFIX:
+        prefix = ("SQ *", "TST*", "PAYPAL *", "SP *")[(h >> 8) % 4]
+        return f"{prefix}{compact[:18]} {store_num}"
+    if corruption == MerchantHardNegative.TRUNCATED_DESCRIPTOR:
+        return f"{compact[: max(6, len(compact) // 2)]}*{store_num}"
+    if corruption == MerchantHardNegative.TRANSPOSED_TOKENS:
+        if len(tokens) >= 2:
+            tokens = [tokens[1], tokens[0], *tokens[2:]]
+        return f"{' '.join(tokens)} #{store_num}"
+    if corruption == MerchantHardNegative.NUMERIC_NOISE:
+        return f"{compact} {store_num} REF{(h >> 11) % 10_000:04d} XX"
+    if corruption == MerchantHardNegative.LOOKALIKE_FAMILY:
+        return f"{_lookalike_name(name, h).upper()} STORE {store_num}"
+    if corruption == MerchantHardNegative.MCC_NEAR_MISS:
+        return f"{compact} AUTH {store_num} NEAR"
+    if corruption == MerchantHardNegative.CATEGORY_COLLISION:
+        return f"{compact} / {family_id.upper()} MIX {store_num}"
+    if corruption == MerchantHardNegative.RECEIPT_CONTRADICTION:
+        return f"{compact} POS {store_num}"
+    raise ValueError(f"unsupported merchant corruption {corruption}")
+
+
+def _lookalike_name(name: str, h: int) -> str:
+    parts = name.split()
+    if not parts:
+        return name
+    swap = _NAME_LEFT[(h >> 9) % len(_NAME_LEFT)]
+    parts = [swap if index == 0 else part for index, part in enumerate(parts)]
+    return " ".join(parts)
 
 
 def _vendor_for_category(vendors: Sequence[Vendor], category: str) -> Vendor:

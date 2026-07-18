@@ -1,0 +1,60 @@
+{
+  "coverage": {
+    "case_tags": [
+      "backup",
+      "corruption",
+      "holdout_family",
+      "negative_case",
+      "primary",
+      "synthetic",
+      "unsorted_tags",
+      "valid"
+    ],
+    "difficulties": [
+      "easy",
+      "hard",
+      "medium"
+    ],
+    "required_case_tags": [
+      "corruption",
+      "holdout_family",
+      "unsorted_tags"
+    ],
+    "tasks": [
+      "cash_reconciliation",
+      "merchant_tagging",
+      "transaction_review",
+      "variance_analysis"
+    ]
+  },
+  "files": {
+    "golden.jsonl": {
+      "line_count": 7,
+      "sha256": "1a9845f1842fa0bc68f2c2f767c9a98b6c2e7b86e7331fec8a3bd45b3eab1d23"
+    },
+    "oracle_expected.json": {
+      "sha256": "e14cc0913f7f49eba4621fc90e46a8bc70e086c1c0b28727e7fe057d9c55d480"
+    }
+  },
+  "fixture_set": "finance_world_v2",
+  "raw_line_sha256": {
+    "ex_v2_cash_medium_05": "6635bafa8771ec159d76da392fd86a5b82c9d68b1f827da51854978d5bc82faf",
+    "ex_v2_merc_easy_02": "d8f62100ecb73efef5c045360bdc662e77a8b3a889c9cb2b258edab1c9b725e1",
+    "ex_v2_merc_hard_03": "26992040fe809aee6e71eb77ab3649d22f16af96f9e0e9083a455ef98d0998b1",
+    "ex_v2_merc_hard_04": "fa8b960bb46be76e38ff1f5da777deedf842a0a97f50647c2d674af027c2f6b0",
+    "ex_v2_merch_unsorted_tags": "595f4c2a2c40d099aa3bf12a4340a1ab365ed9a2356b46559a782500249b8784",
+    "ex_v2_tran_easy_00": "6a181996b0c23e77480734e555f350bb66e23649041c3401a1979239ad516867",
+    "ex_v2_vari_medium_01": "4fb0f5cb4a4534ee5e1231fa209ef75928e335315f86895320e31dce3007c345"
+  },
+  "record_count": 7,
+  "schema_version": "finance_world.v2.fixture_manifest",
+  "semantic_example_sha256": {
+    "ex_v2_cash_medium_05": "8d1c217864f5de75cabfdef5679304d076e9cddbb6159cbd7334ea763e97156e",
+    "ex_v2_merc_easy_02": "f4e33bcec23c607e08be6c28acf1c5456d5f5f8cbf0003cca45b27b8870dcac6",
+    "ex_v2_merc_hard_03": "19f606d03b3e25492249993b56138c5d2c4b04365dc05898a0eb630be924e6ff",
+    "ex_v2_merc_hard_04": "29d13792743caed5f39f79b068f85dc40d76797aa54f5a0a4b51313721966e1e",
+    "ex_v2_merch_unsorted_tags": "6df977212241eb8039914bb5a894b804238153f9c42a74998faf2ed49e3c6d40",
+    "ex_v2_tran_easy_00": "895a6966ad99dd5634107f0adc7ee37339bd55f25f92bca5f386afa128f1913b",
+    "ex_v2_vari_medium_01": "6cc6850e25d1dc73eb784e3164a6443197251526bd32daf267cd49b6fcf42b8a"
+  }
+}

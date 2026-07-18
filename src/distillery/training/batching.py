@@ -101,6 +101,17 @@ DEFAULT_FINANCE_MIXTURE = MixtureSpec(
     difficulty_weights={"easy": 0.30, "medium": 0.40, "hard": 0.30},
 )
 
+# finance_world.v2 / finance-proof.v2 sampler mixture (does not replace DEFAULT).
+FINANCE_MIXTURE_V2 = MixtureSpec(
+    task_weights={
+        "transaction_review": 0.35,
+        "variance_analysis": 0.35,
+        "merchant_tagging": 0.20,
+        "cash_reconciliation": 0.10,
+    },
+    difficulty_weights={"easy": 0.30, "medium": 0.40, "hard": 0.30},
+)
+
 
 def sampler_order_hash(
     example_ids: Sequence[str],

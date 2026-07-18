@@ -196,13 +196,29 @@ def test_every_executable_task_has_output_contract() -> None:
         "transaction_review",
         "variance_analysis",
         "cash_reconciliation",
+        "merchant_tagging",
     }
-    with pytest.raises(ValueError):
-        TaskId("merchant_tagging")
+    merchant = validate_task_output(
+        {
+            "schema_version": "merchant_tagging.v1",
+            "task": "merchant_tagging",
+            "merchant_id": "mrc_abcdef0123456789ab",
+            "merchant_name": "Harbor Cafe Collective",
+            "spend_category": "meals",
+            "tags": ["employee_spend", "entertainment"],
+            "confidence": 0.91,
+        }
+    )
+    assert merchant.task.value == "merchant_tagging"
     with pytest.raises(ValidationError):
         validate_task_output(
             {
                 "schema_version": "merchant_tagging.v1",
                 "task": "merchant_tagging",
+                "merchant_id": "mrc_abcdef0123456789ab",
+                "merchant_name": "Harbor Cafe Collective",
+                "spend_category": "not_a_real_category",
+                "tags": ["employee_spend"],
+                "confidence": 0.91,
             }
         )

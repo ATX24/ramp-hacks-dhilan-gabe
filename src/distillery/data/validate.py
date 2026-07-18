@@ -10,14 +10,17 @@ from typing import Any
 from pydantic import ValidationError
 
 from distillery.contracts.tasks import (
+    MERCHANT_FINANCE_TAGS,
+    MERCHANT_SPEND_CATEGORIES,
     CashReconciliationOutput,
     FinanceTaskEnvelope,
+    MerchantTaggingOutput,
     TaskId,
     TransactionReviewOutput,
     VarianceAnalysisOutput,
 )
 from distillery.data.oracle import adjust_cash_from_output, rank_drivers
-from distillery.data.world import PolicyAction, PolicyRule, resolve_policy
+from distillery.data.world import MCC_CATEGORY_MAP, PolicyAction, PolicyRule, resolve_policy
 
 FORBIDDEN_INPUT_KEYS: frozenset[str] = frozenset(
     {
@@ -81,6 +84,10 @@ def validate_output(task: TaskId, output: dict[str, Any]) -> ValidationResult:
         typed_cash = _parse_cash(output, errors, checks)
         if typed_cash is not None:
             _validate_cash_shape(typed_cash, errors, checks)
+    elif task == TaskId.MERCHANT_TAGGING:
+        typed_merchant = _parse_merchant(output, errors, checks)
+        if typed_merchant is not None:
+            _validate_merchant_shape(typed_merchant, errors, checks)
     else:
         errors.append(f"unsupported_task:{task}")
     return ValidationResult(not errors, tuple(errors), tuple(checks))
@@ -119,6 +126,8 @@ def validate_example(
         _validate_variance_context(envelope, errors, checks)
     elif envelope.task == TaskId.CASH_RECONCILIATION:
         _validate_cash_context(envelope, errors, checks)
+    elif envelope.task == TaskId.MERCHANT_TAGGING:
+        _validate_merchant_context(envelope, errors, checks)
     return ValidationResult(not errors, tuple(errors), tuple(checks))
 
 
@@ -504,6 +513,86 @@ def _validate_cash_shape(
         checks.append("difference_identity")
 
 
+def _parse_merchant(
+    output: dict[str, Any],
+    errors: list[str],
+    checks: list[str],
+) -> MerchantTaggingOutput | None:
+    try:
+        typed = MerchantTaggingOutput.model_validate(output)
+    except ValidationError as exc:
+        errors.append(f"typed_output:{exc}")
+        return None
+    checks.append("typed_merchant_tagging")
+    return typed
+
+
+def _validate_merchant_shape(
+    typed: MerchantTaggingOutput,
+    errors: list[str],
+    checks: list[str],
+) -> None:
+    if typed.spend_category not in MERCHANT_SPEND_CATEGORIES:
+        errors.append(f"merchant_category_unbounded:{typed.spend_category}")
+    unknown = sorted(set(typed.tags) - MERCHANT_FINANCE_TAGS)
+    if unknown:
+        errors.append(f"merchant_tags_unknown:{','.join(unknown)}")
+    if list(typed.tags) != sorted(typed.tags):
+        errors.append("merchant_tags_unsorted")
+    if not errors:
+        checks.append("merchant_category_tag_bounds")
+
+
+def _validate_merchant_context(
+    envelope: FinanceTaskEnvelope,
+    errors: list[str],
+    checks: list[str],
+) -> None:
+    try:
+        output = MerchantTaggingOutput.model_validate(envelope.expected_output)
+    except ValidationError:
+        return
+    finance_input = envelope.input
+    for required in ("descriptor", "mcc", "amount_minor", "currency", "memo"):
+        if required not in finance_input:
+            errors.append(f"merchant_input_missing:{required}")
+    allowed_categories = finance_input.get("allowed_categories")
+    if isinstance(allowed_categories, Sequence):
+        allowed_cat_set = {str(value) for value in allowed_categories}
+        if output.spend_category not in allowed_cat_set:
+            errors.append(f"merchant_category_not_allowed:{output.spend_category}")
+        else:
+            checks.append("merchant_category_allowed")
+    allowed_tags = finance_input.get("allowed_tags")
+    if isinstance(allowed_tags, Sequence):
+        allowed_tag_set = {str(value) for value in allowed_tags}
+        unknown = sorted(set(output.tags) - allowed_tag_set)
+        if unknown:
+            errors.append(f"merchant_tag_not_allowed:{','.join(unknown)}")
+        else:
+            checks.append("merchant_tags_allowed")
+    mcc = finance_input.get("mcc")
+    if isinstance(mcc, str) and mcc in MCC_CATEGORY_MAP:
+        mapped = MCC_CATEGORY_MAP[mcc]
+        if mapped == output.spend_category:
+            checks.append("mcc_category_consistent")
+        else:
+            # Hard-negative near-miss MCC: gold category may disagree with displayed MCC.
+            checks.append("mcc_category_near_miss_tolerated")
+    if output.merchant_id.startswith("mrc_"):
+        checks.append("merchant_id_opaque")
+    # Gold labels must never leak into the model-facing input.
+    for leaked_key in ("merchant_id", "merchant_name", "spend_category", "tags"):
+        if leaked_key in finance_input:
+            errors.append(f"merchant_label_leak:{leaked_key}")
+    if output.merchant_name and str(finance_input.get("descriptor", "")).find(
+        output.merchant_name
+    ) != -1:
+        # Exact canonical name in descriptor is allowed only when uncorrupted;
+        # never treat as an error by itself.
+        checks.append("descriptor_may_contain_canonical_tokens")
+
+
 def _parse_policy_rules(
     finance_input: dict[str, Any],
     errors: list[str],
@@ -576,6 +665,9 @@ def _sensitive_target_values(output: dict[str, Any]) -> set[tuple[type, Any]]:
         "profit_impact_minor",
         "other_impact_minor",
         "difference_minor",
+        "merchant_id",
+        "merchant_name",
+        "spend_category",
     }
     values: set[tuple[type, Any]] = set()
     for path, value in _walk(output):

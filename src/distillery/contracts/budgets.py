@@ -35,6 +35,33 @@ class PrimaryIndexWeights(FrozenModel):
 PRIMARY_INDEX_WEIGHTS = PrimaryIndexWeights()
 
 
+class PrimaryIndexWeightsV2(FrozenModel):
+    """finance-proof.v2 primary index: three primaries + schema validity.
+
+    cash_reconciliation remains diagnostic and is intentionally excluded.
+    """
+
+    transaction_joint_exact: FiniteFloat = Field(default=0.35, ge=0.0, le=1.0)
+    variance_joint_exact: FiniteFloat = Field(default=0.35, ge=0.0, le=1.0)
+    merchant_joint_exact: FiniteFloat = Field(default=0.20, ge=0.0, le=1.0)
+    json_schema_validity: FiniteFloat = Field(default=0.10, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _weights_sum_to_one(self) -> PrimaryIndexWeightsV2:
+        total = (
+            self.transaction_joint_exact
+            + self.variance_joint_exact
+            + self.merchant_joint_exact
+            + self.json_schema_validity
+        )
+        if abs(total - 1.0) > WEIGHT_SUM_TOLERANCE:
+            raise ValueError(f"primary index v2 weights must sum to 1.0, got {total}")
+        return self
+
+
+PRIMARY_INDEX_WEIGHTS_V2 = PrimaryIndexWeightsV2()
+
+
 class ProofGates(FrozenModel):
     """Stop/go proof gates (locked constants for contracts-v1)."""
 
@@ -118,6 +145,8 @@ class TrainingBudget(FrozenModel):
 
 
 class EvaluationBudget(FrozenModel):
+    """finance_world.v1 evaluation mixture (Primary A/B + cash backup)."""
+
     warmup_requests: NonNegativeSafeInt = 20
     timed_examples_per_primary_task: PositiveSafeInt = 200
     batch_sizes: tuple[PositiveSafeInt, ...] = Field(default=(1, 8), min_length=1)
@@ -140,6 +169,40 @@ class EvaluationBudget(FrozenModel):
         )
         if abs(task_total - 1.0) > WEIGHT_SUM_TOLERANCE:
             raise ValueError(f"task mixture weights must sum to 1.0, got {task_total}")
+        if abs(difficulty_total - 1.0) > WEIGHT_SUM_TOLERANCE:
+            raise ValueError(
+                f"difficulty mixture weights must sum to 1.0, got {difficulty_total}"
+            )
+        return self
+
+
+class EvaluationBudgetV2(FrozenModel):
+    """finance_world.v2 evaluation mixture (A/B/C primaries + cash backup)."""
+
+    warmup_requests: NonNegativeSafeInt = 20
+    timed_examples_per_primary_task: PositiveSafeInt = 200
+    batch_sizes: tuple[PositiveSafeInt, ...] = Field(default=(1, 8), min_length=1)
+    mixture_transaction_review: FiniteFloat = Field(default=0.35, ge=0.0, le=1.0)
+    mixture_variance_analysis: FiniteFloat = Field(default=0.35, ge=0.0, le=1.0)
+    mixture_merchant_tagging: FiniteFloat = Field(default=0.20, ge=0.0, le=1.0)
+    mixture_cash_reconciliation: FiniteFloat = Field(default=0.10, ge=0.0, le=1.0)
+    difficulty_easy: FiniteFloat = Field(default=0.30, ge=0.0, le=1.0)
+    difficulty_medium: FiniteFloat = Field(default=0.40, ge=0.0, le=1.0)
+    difficulty_hard: FiniteFloat = Field(default=0.30, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _mixtures_sum_to_one(self) -> EvaluationBudgetV2:
+        task_total = (
+            self.mixture_transaction_review
+            + self.mixture_variance_analysis
+            + self.mixture_merchant_tagging
+            + self.mixture_cash_reconciliation
+        )
+        difficulty_total = (
+            self.difficulty_easy + self.difficulty_medium + self.difficulty_hard
+        )
+        if abs(task_total - 1.0) > WEIGHT_SUM_TOLERANCE:
+            raise ValueError(f"task mixture v2 weights must sum to 1.0, got {task_total}")
         if abs(difficulty_total - 1.0) > WEIGHT_SUM_TOLERANCE:
             raise ValueError(
                 f"difficulty mixture weights must sum to 1.0, got {difficulty_total}"

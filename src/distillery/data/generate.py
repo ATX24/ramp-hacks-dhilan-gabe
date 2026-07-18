@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
 from distillery.contracts.hashing import content_sha256, sha256_hex
 from distillery.contracts.tasks import (
+    SCHEMA_VERSION_FINANCE_WORLD,
+    SCHEMA_VERSION_FINANCE_WORLD_V2,
     Difficulty,
     FinanceTaskEnvelope,
     LabelSource,
@@ -18,14 +21,34 @@ from distillery.contracts.tasks import (
     TaskId,
 )
 from distillery.data.leakage import LeakageReport, check_leakage, normalized_content_hash
-from distillery.data.mixture import mixture_plan, summarize_mixture, task_counts
-from distillery.data.oracle import GENERATOR_REVISION, oracle_meta, solve_task
+from distillery.data.mixture import (
+    TASK_MIXTURE,
+    TASK_MIXTURE_V2,
+    TASK_ORDER,
+    TASK_ORDER_V2,
+    mixture_plan,
+    summarize_mixture,
+    task_counts,
+)
+from distillery.data.oracle import (
+    GENERATOR_REVISION,
+    GENERATOR_REVISION_V1,
+    GENERATOR_REVISION_V2,
+    oracle_meta,
+    solve_task,
+)
 from distillery.data.renderers import render_input, select_template_family
-from distillery.data.split import FULL_SPLITS, SMOKE_SPLITS, SplitSpec
+from distillery.data.split import (
+    FULL_SPLITS,
+    FULL_SPLITS_V2,
+    SMOKE_SPLITS,
+    SMOKE_SPLITS_V2,
+    SplitSpec,
+)
 from distillery.data.validate import validate_example
 from distillery.data.world import build_world
 
-CorpusName = Literal["smoke", "full"]
+CorpusName = Literal["smoke", "full", "smoke_v2", "full_v2"]
 
 
 @dataclass(frozen=True)
@@ -33,7 +56,11 @@ class CorpusSpec:
     name: CorpusName
     seed: int
     splits: tuple[SplitSpec, ...]
-    schema_version: str = "finance_world.v1"
+    schema_version: str = SCHEMA_VERSION_FINANCE_WORLD
+    generator_revision: str = GENERATOR_REVISION_V1
+    task_mixture: Mapping[TaskId, float] = field(default_factory=lambda: dict(TASK_MIXTURE))
+    task_order: tuple[TaskId, ...] = TASK_ORDER
+    corpus_manifest_schema: str = "finance_world.v1.corpus_manifest"
 
     @property
     def total_examples(self) -> int:
@@ -42,6 +69,33 @@ class CorpusSpec:
 
 CORPUS_SMOKE = CorpusSpec(name="smoke", seed=17, splits=SMOKE_SPLITS)
 CORPUS_FULL = CorpusSpec(name="full", seed=17, splits=FULL_SPLITS)
+CORPUS_SMOKE_V2 = CorpusSpec(
+    name="smoke_v2",
+    seed=17,
+    splits=SMOKE_SPLITS_V2,
+    schema_version=SCHEMA_VERSION_FINANCE_WORLD_V2,
+    generator_revision=GENERATOR_REVISION_V2,
+    task_mixture=dict(TASK_MIXTURE_V2),
+    task_order=TASK_ORDER_V2,
+    corpus_manifest_schema="finance_world.v2.corpus_manifest",
+)
+CORPUS_FULL_V2 = CorpusSpec(
+    name="full_v2",
+    seed=17,
+    splits=FULL_SPLITS_V2,
+    schema_version=SCHEMA_VERSION_FINANCE_WORLD_V2,
+    generator_revision=GENERATOR_REVISION_V2,
+    task_mixture=dict(TASK_MIXTURE_V2),
+    task_order=TASK_ORDER_V2,
+    corpus_manifest_schema="finance_world.v2.corpus_manifest",
+)
+
+_CORPUS_BY_NAME: dict[str, CorpusSpec] = {
+    "smoke": CORPUS_SMOKE,
+    "full": CORPUS_FULL,
+    "smoke_v2": CORPUS_SMOKE_V2,
+    "full_v2": CORPUS_FULL_V2,
+}
 
 
 @dataclass
@@ -100,11 +154,20 @@ def generate_corpus(
 ) -> GeneratedCorpus:
     """Generate, validate, shuffle, leak-check, and seal a corpus."""
     if isinstance(spec, str):
-        if spec not in {"smoke", "full"}:
+        if spec not in _CORPUS_BY_NAME:
             raise ValueError(f"unknown corpus {spec!r}")
-        spec = CORPUS_SMOKE if spec == "smoke" else CORPUS_FULL
+        spec = _CORPUS_BY_NAME[spec]
     if seed is not None:
-        spec = CorpusSpec(name=spec.name, seed=seed, splits=spec.splits)
+        spec = CorpusSpec(
+            name=spec.name,
+            seed=seed,
+            splits=spec.splits,
+            schema_version=spec.schema_version,
+            generator_revision=spec.generator_revision,
+            task_mixture=dict(spec.task_mixture),
+            task_order=spec.task_order,
+            corpus_manifest_schema=spec.corpus_manifest_schema,
+        )
 
     examples: list[FinanceTaskEnvelope] = []
     by_split: dict[SplitName, list[FinanceTaskEnvelope]] = {}
@@ -115,13 +178,20 @@ def generate_corpus(
 
     for split_spec in spec.splits:
         generated: list[FinanceTaskEnvelope] = []
-        for index, (task, difficulty) in enumerate(mixture_plan(split_spec.count)):
+        plan = mixture_plan(
+            split_spec.count,
+            mixture=spec.task_mixture,
+            order=spec.task_order,
+        )
+        for index, (task, difficulty) in enumerate(plan):
             example = _generate_unique(
                 seed=spec.seed,
                 index=index,
                 split_spec=split_spec,
                 task=task,
                 difficulty=difficulty,
+                schema_version=spec.schema_version,
+                generator_revision=spec.generator_revision,
                 seen_semantic_hashes=seen_semantic_hashes,
             )
             if validate:
@@ -144,10 +214,16 @@ def generate_corpus(
         mixture_records[split_spec.name.value] = {
             "count": len(split_examples),
             "mixture": summarize_mixture(
-                [(example.task, example.difficulty) for example in split_examples]
+                [(example.task, example.difficulty) for example in split_examples],
+                order=spec.task_order,
             ),
             "target_task": {
-                task.value: count for task, count in task_counts(split_spec.count).items()
+                task.value: count
+                for task, count in task_counts(
+                    split_spec.count,
+                    mixture=spec.task_mixture,
+                    order=spec.task_order,
+                ).items()
             },
             "ood": split_spec.ood,
         }
@@ -161,10 +237,10 @@ def generate_corpus(
         raise ValueError(f"DATA_LEAKAGE_DETECTED: {len(leakage.findings)} findings; first={first}")
 
     manifest: dict[str, Any] = {
-        "schema_version": "finance_world.v2.corpus_manifest",
+        "schema_version": spec.corpus_manifest_schema,
         "envelope_schema_version": spec.schema_version,
         "corpus": spec.name,
-        "generator_revision": GENERATOR_REVISION,
+        "generator_revision": spec.generator_revision,
         "seed": spec.seed,
         "renderer_seed": spec.seed,
         "total_examples": len(examples),
@@ -173,9 +249,7 @@ def generate_corpus(
         "content_sha256": content_sha256([example.model_dump(mode="json") for example in examples]),
         "mixtures": mixture_records,
         "task_mixture_target": {
-            "transaction_review": 0.45,
-            "variance_analysis": 0.45,
-            "cash_reconciliation": 0.10,
+            task.value: weight for task, weight in spec.task_mixture.items()
         },
         "difficulty_mixture_target": {
             "easy": 0.30,
@@ -184,7 +258,7 @@ def generate_corpus(
         },
         "provenance": {
             "label_source": LabelSource.ORACLE.value,
-            "generator_revision": GENERATOR_REVISION,
+            "generator_revision": spec.generator_revision,
         },
         "leakage_summary": {
             "ok": leakage.ok,
@@ -195,6 +269,12 @@ def generate_corpus(
             "cross_split_template_leaks": (leakage.cross_split_template_leaks),
         },
     }
+    if spec.schema_version == SCHEMA_VERSION_FINANCE_WORLD_V2:
+        merchant_total = sum(
+            1 for example in examples if example.task == TaskId.MERCHANT_TAGGING
+        )
+        manifest["merchant_tagging_examples"] = merchant_total
+        manifest["min_full_merchant_examples"] = 1000 if spec.name == "full_v2" else 0
     manifest["manifest_sha256"] = content_sha256(
         {key: value for key, value in manifest.items() if key != "manifest_sha256"}
     )
@@ -214,6 +294,8 @@ def _generate_unique(
     split_spec: SplitSpec,
     task: TaskId,
     difficulty: Difficulty,
+    schema_version: str,
+    generator_revision: str,
     seen_semantic_hashes: set[str],
 ) -> FinanceTaskEnvelope:
     for salt in range(64):
@@ -223,6 +305,8 @@ def _generate_unique(
             split_spec=split_spec,
             task=task,
             difficulty=difficulty,
+            schema_version=schema_version,
+            generator_revision=generator_revision,
             salt=salt,
         )
         semantic_hash = normalized_content_hash(example)
@@ -241,6 +325,8 @@ def _generate_one(
     split_spec: SplitSpec,
     task: TaskId,
     difficulty: Difficulty,
+    schema_version: str,
+    generator_revision: str,
     salt: int = 0,
 ) -> FinanceTaskEnvelope:
     world = build_world(
@@ -268,6 +354,7 @@ def _generate_one(
     example_key = f"{seed}|{split_spec.token}|{index}|{salt}|{task.value}|{difficulty.value}"
     example_id = f"ex_{hashlib.sha256(example_key.encode()).hexdigest()[:18]}"
     return FinanceTaskEnvelope(
+        schema_version=schema_version,  # type: ignore[arg-type]
         example_id=example_id,
         world_id=world.world_id,
         group_id=world.group_id,
@@ -275,7 +362,7 @@ def _generate_one(
         difficulty=difficulty,
         input=rendered,
         expected_output=expected,
-        oracle=oracle_meta(world),
+        oracle=oracle_meta(world, generator_revision=generator_revision),
         provenance=Provenance(
             split=split_spec.name,
             template_family=template_family,
@@ -299,5 +386,17 @@ def _deterministic_shuffle(
     )
 
 
-def _hash_examples(examples: list[FinanceTaskEnvelope]) -> str:
+def _hash_examples(examples: Sequence[FinanceTaskEnvelope]) -> str:
     return content_sha256([example.model_dump(mode="json") for example in examples])
+
+
+__all__ = [
+    "CORPUS_FULL",
+    "CORPUS_FULL_V2",
+    "CORPUS_SMOKE",
+    "CORPUS_SMOKE_V2",
+    "CorpusSpec",
+    "GeneratedCorpus",
+    "GENERATOR_REVISION",
+    "generate_corpus",
+]

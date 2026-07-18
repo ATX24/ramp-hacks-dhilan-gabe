@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from distillery.data.world import CashRegime, TxnHardNegative, VarianceRegime
+from distillery.data.world import (
+    CashRegime,
+    MerchantHardNegative,
+    TxnHardNegative,
+    VarianceRegime,
+)
 
 TRANSACTION_HARD_NEGATIVES: frozenset[TxnHardNegative] = frozenset(
     {
@@ -40,5 +45,18 @@ CASH_HARD_REGIMES: frozenset[CashRegime] = frozenset(
         CashRegime.MANY_TO_ONE,
         CashRegime.PARTIAL,
         CashRegime.SAME_AMOUNT_COLLISION,
+    }
+)
+
+MERCHANT_HARD_NEGATIVES: frozenset[MerchantHardNegative] = frozenset(
+    {
+        MerchantHardNegative.PROCESSOR_PREFIX,
+        MerchantHardNegative.TRUNCATED_DESCRIPTOR,
+        MerchantHardNegative.TRANSPOSED_TOKENS,
+        MerchantHardNegative.NUMERIC_NOISE,
+        MerchantHardNegative.LOOKALIKE_FAMILY,
+        MerchantHardNegative.MCC_NEAR_MISS,
+        MerchantHardNegative.CATEGORY_COLLISION,
+        MerchantHardNegative.RECEIPT_CONTRADICTION,
     }
 )

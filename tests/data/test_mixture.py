@@ -88,3 +88,16 @@ def test_hamilton_rejects_bad_weights() -> None:
         raise AssertionError("expected ValueError")
     except ValueError:
         pass
+
+
+def test_v2_mixture_weights_and_full_merchant_floor() -> None:
+    from distillery.data.mixture import TASK_MIXTURE_V2, TASK_ORDER_V2
+
+    assert abs(sum(TASK_MIXTURE_V2.values()) - 1.0) < 1e-12
+    assert TASK_MIXTURE_V2[TaskId.MERCHANT_TAGGING] == 0.20
+    full = task_counts(6240, mixture=TASK_MIXTURE_V2, order=TASK_ORDER_V2)
+    assert full[TaskId.MERCHANT_TAGGING] >= 1000
+    assert full[TaskId.MERCHANT_TAGGING] == 1248
+    # v1 mixture object remains the locked 45/45/10 path.
+    assert TaskId.MERCHANT_TAGGING not in TASK_MIXTURE
+    assert task_counts(320)[TaskId.TRANSACTION_REVIEW] == 144

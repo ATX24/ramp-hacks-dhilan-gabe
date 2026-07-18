@@ -1,0 +1,151 @@
+{
+  "ex_v2_cash_medium_05": {
+    "expected_output": {
+      "adjusted_bank_balance_minor": 7320572,
+      "adjusted_book_balance_minor": 7320572,
+      "confidence": 0.89,
+      "difference_minor": 0,
+      "exceptions": [
+        {
+          "amount_minor": 27679,
+          "event_ids": [
+            "bnk_69a44ef6994b85a790"
+          ],
+          "type": "bank_fee"
+        }
+      ],
+      "matched_groups": [
+        {
+          "bank_ids": [
+            "bnk_78d15a0f54b0dc94e9"
+          ],
+          "book_ids": [
+            "bok_21e683a4d187383a40"
+          ]
+        }
+      ],
+      "schema_version": "cash_reconciliation.v1",
+      "status": "exceptions",
+      "task": "cash_reconciliation"
+    },
+    "generator_revision": "finance_world.v2",
+    "latent_state_hash": "sha256:499096ecff151cf5023873acfd9ce7637175a0121692982d06b6f1baba1c9678",
+    "task": "cash_reconciliation"
+  },
+  "ex_v2_merc_easy_02": {
+    "expected_output": {
+      "confidence": 0.97,
+      "merchant_id": "mrc_3e1e195d9dff359d1d",
+      "merchant_name": "Quartz Willow Willow Collective Pbvbbdm",
+      "schema_version": "merchant_tagging.v1",
+      "spend_category": "cloud",
+      "tags": [
+        "infrastructure",
+        "recurring"
+      ],
+      "task": "merchant_tagging"
+    },
+    "generator_revision": "finance_world.v2",
+    "latent_state_hash": "sha256:3698829659962525901fbd73ac75ef017c44e9c0a7ee0ad1fe751742da21c07e",
+    "task": "merchant_tagging"
+  },
+  "ex_v2_merc_hard_03": {
+    "expected_output": {
+      "confidence": 0.83,
+      "merchant_id": "mrc_38abe4d6aa43d11d42",
+      "merchant_name": "Amber Reed Hazel Logistics Gopbdoh",
+      "schema_version": "merchant_tagging.v1",
+      "spend_category": "advertising",
+      "tags": [
+        "card_not_present",
+        "vendor_bill"
+      ],
+      "task": "merchant_tagging"
+    },
+    "generator_revision": "finance_world.v2",
+    "latent_state_hash": "sha256:4cb6dea07b893765092a5b9b423c7992368e51fd8099a07083ca7b045fc69706",
+    "task": "merchant_tagging"
+  },
+  "ex_v2_merc_hard_04": {
+    "expected_output": {
+      "confidence": 0.89,
+      "merchant_id": "mrc_3a3ec579a06f13adf9",
+      "merchant_name": "Navy Sable Willow Digital Rehtrpd",
+      "schema_version": "merchant_tagging.v1",
+      "spend_category": "fees",
+      "tags": [
+        "processor",
+        "vendor_bill"
+      ],
+      "task": "merchant_tagging"
+    },
+    "generator_revision": "finance_world.v2",
+    "latent_state_hash": "sha256:6c0fafd69457dfda631d1f8c769e57e179d456ab8828c02217fbb06cf233cf35",
+    "task": "merchant_tagging"
+  },
+  "ex_v2_tran_easy_00": {
+    "expected_output": {
+      "confidence": 0.97,
+      "evidence": [
+        {
+          "field": "amount_minor",
+          "source_id": "txn_1b606fb2022c28a8cf",
+          "value": "1888187"
+        },
+        {
+          "field": "descriptor",
+          "source_id": "txn_1b606fb2022c28a8cf",
+          "value": "elm-linden-foundry-ehmtucg Flint Flint Group Nnkpdhn compute merchant reference Stone Silver Travel Ggnuifs"
+        }
+      ],
+      "gl_account": "6500",
+      "journal_entry": [
+        {
+          "account": "6500",
+          "amount_minor": 1888187,
+          "side": "debit"
+        },
+        {
+          "account": "2100",
+          "amount_minor": 1888187,
+          "side": "credit"
+        }
+      ],
+      "policy_action": "approve",
+      "rule_ids": [
+        "POL-CLOUD-BASE-F067A753"
+      ],
+      "schema_version": "transaction_review.v1",
+      "task": "transaction_review"
+    },
+    "generator_revision": "finance_world.v2",
+    "latent_state_hash": "sha256:8de7cb292a3a4f060bd891f17e260265d538f6a808332d4f32b115ed036d14c6",
+    "task": "transaction_review"
+  },
+  "ex_v2_vari_medium_01": {
+    "expected_output": {
+      "confidence": 0.96,
+      "direction": "favorable",
+      "evidence_ids": [
+        "src_43d51e1c1e2362494e"
+      ],
+      "other_impact_minor": 0,
+      "profit_impact_minor": 68215,
+      "rule_ids": [
+        "VAR-MAT-849FDD1B"
+      ],
+      "schema_version": "variance_analysis.v1",
+      "task": "variance_analysis",
+      "top_drivers": [
+        {
+          "driver_id": "staffing",
+          "impact_minor": 68215,
+          "rank": 1
+        }
+      ]
+    },
+    "generator_revision": "finance_world.v2",
+    "latent_state_hash": "sha256:127fbabcbb3d05cac68f6bafae931569f9ecc4dcc9bd3214a49f106def498cae",
+    "task": "variance_analysis"
+  }
+}

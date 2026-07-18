@@ -46,6 +46,7 @@ from distillery.proof.gates import (
 )
 from distillery.proof.metrics import (
     PRIMARY_INDEX_WEIGHTS,
+    PRIMARY_INDEX_WEIGHTS_V2,
     ArmMetrics,
     CalibrationMetrics,
     ExampleScore,
@@ -54,7 +55,13 @@ from distillery.proof.metrics import (
     SliceReport,
     compute_arm_metrics,
     compute_primary_index,
+    compute_primary_index_v2,
     score_prediction,
+)
+from distillery.proof.protocol_v2 import (
+    PROOF_PROTOCOL_ID_V2,
+    finance_proof_v2_document,
+    finance_proof_v2_sha256,
 )
 from distillery.proof.report import render_html_report, render_json_report
 from distillery.proof.systems import SystemsSummary, summarize_systems
@@ -63,6 +70,8 @@ __all__ = [
     "BREAK_EVEN_NEVER",
     "GATE_ORDER",
     "PRIMARY_INDEX_WEIGHTS",
+    "PRIMARY_INDEX_WEIGHTS_V2",
+    "PROOF_PROTOCOL_ID_V2",
     "PRIMARY_METRICS",
     "ArmEvaluationInput",
     "ArmAccountingEvidence",
@@ -92,6 +101,9 @@ __all__ = [
     "compute_arm_metrics",
     "compute_economics",
     "compute_primary_index",
+    "compute_primary_index_v2",
+    "finance_proof_v2_document",
+    "finance_proof_v2_sha256",
     "evaluate_gates",
     "evaluate_proof",
     "paired_cluster_bootstrap",

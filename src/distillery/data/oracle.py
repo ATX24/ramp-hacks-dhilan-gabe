@@ -9,6 +9,7 @@ from distillery.contracts.tasks import (
     EvidenceRef,
     JournalLine,
     MatchedGroup,
+    MerchantTaggingOutput,
     OracleMeta,
     ReconciliationException,
     TaskId,
@@ -16,14 +17,22 @@ from distillery.contracts.tasks import (
     VarianceAnalysisOutput,
     VarianceDriver,
 )
-from distillery.data.world import CashLatent, LatentWorld
+from distillery.data.world import MCC_CATEGORY_MAP, CashLatent, LatentWorld
 
-GENERATOR_REVISION = "finance_world.v2"
+GENERATOR_REVISION_V1 = "finance_world.v1"
+GENERATOR_REVISION_V2 = "finance_world.v2"
+# Backward-compatible alias: default generator revision tracks the active
+# finance_world.v1 smoke path until a campaign opts into v2.
+GENERATOR_REVISION = GENERATOR_REVISION_V1
 
 
-def oracle_meta(world: LatentWorld) -> OracleMeta:
+def oracle_meta(
+    world: LatentWorld,
+    *,
+    generator_revision: str = GENERATOR_REVISION,
+) -> OracleMeta:
     return OracleMeta(
-        generator_revision=GENERATOR_REVISION,
+        generator_revision=generator_revision,
         latent_state_hash=world.latent_state_hash(),
     )
 
@@ -35,6 +44,8 @@ def solve_task(world: LatentWorld, task: TaskId) -> dict[str, Any]:
         return solve_variance_analysis(world).model_dump(mode="json")
     if task == TaskId.CASH_RECONCILIATION:
         return solve_cash_reconciliation(world).model_dump(mode="json")
+    if task == TaskId.MERCHANT_TAGGING:
+        return solve_merchant_tagging(world).model_dump(mode="json")
     raise ValueError(f"oracle has no solver for task {task}")
 
 
@@ -228,4 +239,35 @@ def cash_latent_adjusted(cash: CashLatent) -> tuple[int, int]:
         cash.book_balance_minor,
         cash.bank_balance_minor,
         cash.exceptions,
+    )
+
+
+def solve_merchant_tagging(world: LatentWorld) -> MerchantTaggingOutput:
+    merchant = world.merchant
+    if merchant is None:
+        raise ValueError("world missing merchant latent")
+    expected_category = MCC_CATEGORY_MAP.get(merchant.mcc)
+    if expected_category is None:
+        raise ValueError(f"unknown MCC {merchant.mcc!r}")
+    if merchant.spend_category != expected_category:
+        raise ValueError(
+            f"latent MCC/category mismatch: {merchant.mcc}->{merchant.spend_category}"
+        )
+    confidence = {
+        "none": 0.97,
+        "processor_prefix": 0.90,
+        "truncated_descriptor": 0.88,
+        "transposed_tokens": 0.87,
+        "numeric_noise": 0.89,
+        "lookalike_family": 0.84,
+        "mcc_near_miss": 0.83,
+        "category_collision": 0.82,
+        "receipt_contradiction": 0.81,
+    }[merchant.corruption_template.value]
+    return MerchantTaggingOutput(
+        merchant_id=merchant.merchant_id,
+        merchant_name=merchant.merchant_name,
+        spend_category=merchant.spend_category,
+        tags=merchant.tags,
+        confidence=confidence,
     )

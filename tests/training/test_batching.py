@@ -146,6 +146,7 @@ def test_unknown_task_and_difficulty_are_rejected() -> None:
         examples[0].model_copy(update={"task": "merchant_tagging"}),
         *examples[1:],
     ]
+    # Default v1 mixture still rejects merchant_tagging (v2 uses FINANCE_MIXTURE_V2).
     with pytest.raises(ValueError, match="unknown tasks"):
         plan_batches(unknown_task, seed=17)
     unknown_difficulty = [

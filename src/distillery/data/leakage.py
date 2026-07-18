@@ -20,7 +20,7 @@ DEFAULT_JACCARD_THRESHOLD = 0.85
 _PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
 _WS_RE = re.compile(r"\s+")
 _OPAQUE_ID_RE = re.compile(
-    r"\b(?:world|grp|ent|txn|vnd|src|bok|bnk|ex)_[0-9a-f]{8,}\b",
+    r"\b(?:world|grp|ent|txn|vnd|src|bok|bnk|ex|mrc|mem)_[0-9a-f]{8,}\b",
     re.IGNORECASE,
 )
 _RULE_ID_RE = re.compile(r"\b(?:POL|VAR)-[A-Z0-9-]+-[A-F0-9]{8}\b")
@@ -174,6 +174,27 @@ def example_fingerprint(
                     f"driver_budget_{item.get('budget_minor')}",
                     f"driver_actual_{item.get('actual_minor')}",
                 )
+            )
+    elif task == TaskId.MERCHANT_TAGGING.value:
+        tokens.extend(
+            (
+                f"amount_{finance_input.get('amount_minor')}",
+                f"currency_{finance_input.get('currency')}",
+                f"mcc_{finance_input.get('mcc')}",
+            )
+        )
+        tokens.extend(
+            f"descriptor_{word}"
+            for word in normalize_text(str(finance_input.get("descriptor", ""))).split()
+        )
+        tokens.extend(
+            f"memo_{word}"
+            for word in normalize_text(str(finance_input.get("memo", ""))).split()
+        )
+        if finance_input.get("receipt_text"):
+            tokens.extend(
+                f"receipt_{word}"
+                for word in normalize_text(str(finance_input.get("receipt_text"))).split()
             )
     else:
         tokens.extend(
@@ -578,8 +599,19 @@ def _source_ids(example: FinanceTaskEnvelope) -> list[str]:
 
 
 def _merchant_names(example: FinanceTaskEnvelope) -> list[str]:
+    values: list[str] = []
     merchant = example.input.get("merchant")
-    return [normalize_text(str(merchant))] if merchant else []
+    if merchant:
+        values.append(normalize_text(str(merchant)))
+    expected = example.expected_output
+    if example.task.value == "merchant_tagging" and isinstance(expected, Mapping):
+        name = expected.get("merchant_name")
+        if name:
+            values.append(normalize_text(str(name)))
+        merchant_id = expected.get("merchant_id")
+        if merchant_id:
+            values.append(normalize_text(str(merchant_id)))
+    return values
 
 
 def _descriptor_families(example: FinanceTaskEnvelope) -> list[str]:
@@ -587,6 +619,13 @@ def _descriptor_families(example: FinanceTaskEnvelope) -> list[str]:
     vendor = example.input.get("vendor")
     if not descriptor:
         return []
+    if example.task == TaskId.MERCHANT_TAGGING:
+        # Compact corruption templates can share truncated stems; bind MCC/amount.
+        return [
+            normalize_text(
+                f"{descriptor}|{example.input.get('mcc')}|{example.input.get('amount_minor')}"
+            )
+        ]
     descriptor_tokens = normalize_text(str(descriptor)).split()
     vendor_tokens = set(normalize_text(str(vendor or "")).split())
     family = " ".join(
@@ -644,6 +683,16 @@ def _numeric_case_signature(example: FinanceTaskEnvelope) -> str:
                 for item in finance_input.get("driver_observations", [])
                 if isinstance(item, Mapping)
             ],
+        }
+    elif example.task == TaskId.MERCHANT_TAGGING:
+        material = {
+            "amount": finance_input.get("amount_minor"),
+            "currency": finance_input.get("currency"),
+            "descriptor": finance_input.get("descriptor"),
+            "entity_id": finance_input.get("entity_id"),
+            "mcc": finance_input.get("mcc"),
+            "memo": finance_input.get("memo"),
+            "receipt": finance_input.get("receipt_text"),
         }
     else:
         material = {

@@ -7,7 +7,9 @@ from pydantic import ValidationError
 
 from distillery.contracts.budgets import (
     PRIMARY_INDEX_WEIGHTS,
+    PRIMARY_INDEX_WEIGHTS_V2,
     EvaluationBudget,
+    EvaluationBudgetV2,
     ProofGates,
     SmokeTrainingBudget,
     TrainingBudget,
@@ -38,6 +40,29 @@ def test_primary_index_weights_locked() -> None:
         + PRIMARY_INDEX_WEIGHTS.json_schema_validity
     )
     assert abs(total - 1.0) < 1e-12
+
+
+def test_primary_index_weights_v2_locked() -> None:
+    assert PRIMARY_INDEX_WEIGHTS_V2.transaction_joint_exact == 0.35
+    assert PRIMARY_INDEX_WEIGHTS_V2.variance_joint_exact == 0.35
+    assert PRIMARY_INDEX_WEIGHTS_V2.merchant_joint_exact == 0.20
+    assert PRIMARY_INDEX_WEIGHTS_V2.json_schema_validity == 0.10
+    total = (
+        PRIMARY_INDEX_WEIGHTS_V2.transaction_joint_exact
+        + PRIMARY_INDEX_WEIGHTS_V2.variance_joint_exact
+        + PRIMARY_INDEX_WEIGHTS_V2.merchant_joint_exact
+        + PRIMARY_INDEX_WEIGHTS_V2.json_schema_validity
+    )
+    assert abs(total - 1.0) < 1e-12
+    eval_v2 = EvaluationBudgetV2()
+    assert eval_v2.mixture_merchant_tagging == 0.20
+    assert abs(
+        eval_v2.mixture_transaction_review
+        + eval_v2.mixture_variance_analysis
+        + eval_v2.mixture_merchant_tagging
+        + eval_v2.mixture_cash_reconciliation
+        - 1.0
+    ) < 1e-12
 
 
 def test_proof_statuses_fixed() -> None:
