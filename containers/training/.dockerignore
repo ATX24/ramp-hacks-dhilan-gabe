@@ -1,0 +1,39 @@
+# This file is copied to the staged context root. Deny everything, then allow
+# only files required by the Dockerfile. stage_context.py independently creates
+# the same explicit allowlist and records every staged path in SOURCE_FILES.json.
+**
+
+!/.dockerignore
+!/SOURCE_FILES.json
+!/pyproject.toml
+!/uv.lock
+!/README.md
+!/LICENSE
+
+!/src/
+!/src/distillery/
+!/src/distillery/**
+
+!/experiments/
+!/experiments/__init__.py
+!/experiments/aws_smoke/
+!/experiments/aws_smoke/__init__.py
+!/experiments/aws_smoke/artifacts.py
+!/experiments/aws_smoke/channels.py
+!/experiments/aws_smoke/deadline.py
+!/experiments/aws_smoke/device_mapping.py
+!/experiments/aws_smoke/loss_wiring.py
+!/experiments/aws_smoke/manifests.py
+!/experiments/aws_smoke/memory.py
+!/experiments/aws_smoke/model_evidence.py
+!/experiments/aws_smoke/pins.py
+!/experiments/aws_smoke/profile.py
+!/experiments/aws_smoke/tokenization.py
+!/experiments/aws_smoke/train.py
+
+!/containers/
+!/containers/training/
+!/containers/training/Dockerfile
+!/containers/training/container_entrypoint.py
+!/containers/training/ml-compatibility.json
+!/containers/training/verify_ml_compatibility.py

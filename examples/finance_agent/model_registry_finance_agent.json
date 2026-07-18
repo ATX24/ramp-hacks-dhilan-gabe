@@ -1,0 +1,21 @@
+{
+  "schema_version": "finance_agent.model_registry_metadata.v1",
+  "mode_id": "finance_agent",
+  "availability": "not_materialized",
+  "default_model_arm": null,
+  "models": [],
+  "required_before_registration": [
+    "pinned_model_revision",
+    "model_artifact_sha256",
+    "tokenizer_sha256",
+    "chat_template_sha256",
+    "approved_license_output_use_disposition",
+    "measured_cost_artifact",
+    "ready_finance-agent-proof.v1"
+  ],
+  "routing": {
+    "kind": "none",
+    "specialist_routes": []
+  },
+  "integration_status": "contract_only_not_wired"
+}

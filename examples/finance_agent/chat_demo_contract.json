@@ -1,0 +1,34 @@
+{
+  "schema_version": "finance_agent.chat_demo.v2",
+  "mode_id": "finance_agent",
+  "display_name": "Finance Agent",
+  "description": "Synthetic finance Q&A with deterministic sandbox tools; no live finance access.",
+  "technique_id": "agent_trajectory.v1",
+  "envelope_schema_version": "finance_agent.v1",
+  "proof_protocol_id": "finance-agent-proof.v1",
+  "ui_hints": {
+    "show_tool_calls": true,
+    "show_provenance": true,
+    "allow_live_tools": false,
+    "default_model_arm": null
+  },
+  "tools": [
+    "chart_of_accounts_lookup",
+    "policy_lookup",
+    "ledger_query",
+    "calculator",
+    "transaction_matching",
+    "variance_drill_down"
+  ],
+  "sample_user_messages": [
+    "Review the posted amount for the public account and period.",
+    "Inspect a historical policy version, then answer for the current as-of date.",
+    "Match the public book and bank IDs, then verify the returned difference."
+  ],
+  "model_availability": "not_materialized",
+  "integration_status": "contract_only_not_wired",
+  "notes": [
+    "Do not wire active UI, API, BYODT, or training paths before re-review.",
+    "Model registry metadata intentionally contains no model or specialist entries."
+  ]
+}

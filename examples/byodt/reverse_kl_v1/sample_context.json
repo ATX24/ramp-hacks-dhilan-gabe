@@ -1,0 +1,18 @@
+{
+  "backend_kind": "sagemaker",
+  "student_model_id": "Qwen/Qwen2.5-0.5B",
+  "student_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "teacher_model_id": "Qwen/Qwen2.5-1.5B",
+  "teacher_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "tokenizer_sha256_student": "1111111111111111111111111111111111111111111111111111111111111111",
+  "tokenizer_sha256_teacher": "1111111111111111111111111111111111111111111111111111111111111111",
+  "chat_template_sha256_student": "2222222222222222222222222222222222222222222222222222222222222222",
+  "chat_template_sha256_teacher": "2222222222222222222222222222222222222222222222222222222222222222",
+  "special_token_map_match": true,
+  "local_white_box": true,
+  "memory_dry_run_ok": true,
+  "usable_responses": true,
+  "network_isolation": true,
+  "instance_type": "ml.g5.xlarge",
+  "run_id": "run_byodt_example_0001"
+}

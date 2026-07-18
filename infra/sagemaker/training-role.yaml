@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Least-privilege execution role for one sealed Distillery training run.
+
+Parameters:
+  ArtifactBucketName:
+    Type: String
+    MinLength: 3
+    MaxLength: 63
+  ModelBucketName:
+    Type: String
+    MinLength: 3
+    MaxLength: 63
+  EcrRepositoryArn:
+    Type: String
+    AllowedPattern: "^arn:[^:]+:ecr:[a-z0-9-]+:[0-9]{12}:repository/[a-z0-9._/-]+$"
+  RunArtifactPrefix:
+    Type: String
+    AllowedPattern: '^(?!.*//)(?!.*\.\.)(?!.*/\.)[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$'
+  DatasetPrefix:
+    Type: String
+    AllowedPattern: '^(?!.*//)(?!.*\.\.)(?!.*/\.)[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$'
+  ModelChannelPrefix:
+    Type: String
+    AllowedPattern: '^(?!.*//)(?!.*\.\.)(?!.*/\.)[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$'
+  ModelPrefix:
+    Type: String
+    AllowedPattern: '^(?!.*//)(?!.*\.\.)(?!.*/\.)[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$'
+  ModelMaterializationKey:
+    Type: String
+    AllowedPattern: '^(?!.*//)(?!.*\.\.)(?!.*/\.)[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$'
+  RoleName:
+    Type: String
+    Default: distillery-sagemaker-training
+    AllowedPattern: ^[A-Za-z0-9+=,.@_-]{1,64}$
+
+Resources:
+  TrainingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DistilleryTrainingLeastPrivilege
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: RunAndDatasetList
+                Effect: Allow
+                Action: [s3:ListBucket, s3:GetBucketLocation]
+                Resource: !Sub "arn:aws:s3:::${ArtifactBucketName}"
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - !Sub "${RunArtifactPrefix}/manifest/*"
+                      - !Sub "${RunArtifactPrefix}/sagemaker-output/*"
+                      - !Sub "${DatasetPrefix}/*"
+              - Sid: ManifestAndDatasetRead
+                Effect: Allow
+                Action: [s3:GetObject]
+                Resource:
+                  - !Sub "arn:aws:s3:::${ArtifactBucketName}/${RunArtifactPrefix}/manifest/*"
+                  - !Sub "arn:aws:s3:::${ArtifactBucketName}/${DatasetPrefix}/*"
+              - Sid: ModelBucketList
+                Effect: Allow
+                Action: [s3:ListBucket, s3:GetBucketLocation]
+                Resource: !Sub "arn:aws:s3:::${ModelBucketName}"
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - !Ref ModelChannelPrefix
+                      - !Sub "${ModelChannelPrefix}/"
+                      - !Sub "${ModelChannelPrefix}/*"
+              - Sid: ModelInputRead
+                Effect: Allow
+                Action: [s3:GetObject]
+                Resource:
+                  - !Sub "arn:aws:s3:::${ModelBucketName}/${ModelPrefix}/*"
+                  - !Sub "arn:aws:s3:::${ModelBucketName}/${ModelMaterializationKey}"
+              - Sid: RunOutputWrite
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                  - s3:ListMultipartUploadParts
+                Resource: !Sub "arn:aws:s3:::${ArtifactBucketName}/${RunArtifactPrefix}/sagemaker-output/*"
+              - Sid: DenyManifestMutation
+                Effect: Deny
+                Action: [s3:PutObject, s3:DeleteObject, s3:DeleteObjectVersion]
+                Resource: !Sub "arn:aws:s3:::${ArtifactBucketName}/*/manifest/*"
+              - Sid: ECRAuthorization
+                Effect: Allow
+                Action: [ecr:GetAuthorizationToken]
+                Resource: "*"
+              - Sid: ECRPullRepository
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Resource: !Ref EcrRepositoryArn
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: "arn:aws:logs:*:*:log-group:/aws/sagemaker/TrainingJobs*"
+              - Sid: DenyUnrelatedSageMakerMutations
+                Effect: Deny
+                Action:
+                  - sagemaker:CreateEndpoint
+                  - sagemaker:CreateEndpointConfig
+                  - sagemaker:CreateNotebookInstance
+                  - sagemaker:CreateProcessingJob
+                  - sagemaker:CreateTransformJob
+                Resource: "*"
+
+Outputs:
+  TrainingRoleArn:
+    Value: !GetAtt TrainingRole.Arn

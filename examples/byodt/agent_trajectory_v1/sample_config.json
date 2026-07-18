@@ -1,0 +1,20 @@
+{
+  "max_length": 16384,
+  "max_supervised_tokens": 8192,
+  "pad_token_id": 0,
+  "seed": 17,
+  "corpus_seed": 17,
+  "trajectory_corpus_sha256": "5151aa2db15212155ddf978e0c8893c203c03cc1256366bad3bcf74de3687355",
+  "corpus_order_sha256": "2e253ca2cad7e1b0d54ae563d7d3724a87e79260f9a42fe41191ecec44440a45",
+  "system_prompt_set_sha256": "f6bb8a88370b0ec800f34164fba99d8d99391b58359c5b0df5bb54cf22b436e5",
+  "tool_schema_set_sha256": "32b173d22ff8f65f001c34576dc20e9da0f8cbb04bb6c758f37b98880b056070",
+  "trajectory_render_template_sha256": "ec514711ebf75e1c7e3f2dd4ba0bd42774dd1b098043f9ed180efed088a5be55",
+  "mask_tool_results": true,
+  "label_source": "oracle",
+  "student_model_id": null,
+  "student_revision": null,
+  "tokenizer_sha256": null,
+  "chat_template_sha256": null,
+  "license_status": "unknown",
+  "cost_status": "unknown"
+}
