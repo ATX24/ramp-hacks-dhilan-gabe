@@ -13,12 +13,21 @@ export const metadata: Metadata = {
     url: "https://anthropic2.dev",
     siteName: "Anthropic 2",
     type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1731,
+        height: 909,
+        alt: "Anthropic 2 presents TinyFable. Smaller models. Proven economics.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Anthropic 2 | TinyFable",
     description:
       "TinyFable is one smaller, portable finance generalist. The model, method, and proof publish together.",
+    images: ["/og.png"],
   },
 };
 
