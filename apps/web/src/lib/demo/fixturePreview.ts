@@ -6,7 +6,7 @@ function clone<T>(value: T): T {
 
 /**
  * Deterministic labeled fixture-preview outputs.
- * These are not live inference — callers must stamp provenance="fixture_preview".
+ * These are not live outputs. Callers must stamp provenance="fixture_preview".
  */
 export function buildFixturePreviewOutput(
   armId: DemoModelArmId,
@@ -71,7 +71,7 @@ function degradeSlightly(
     confidence: clampConfidence(numberOr(gold.confidence, 0.8) - 0.05),
   };
   if (task === "transaction_review" && next.policy_action === "reject") {
-    // Ablation sometimes softens to review — still schema-valid.
+    // Ablation sometimes softens to review and remains schema-valid.
     return { ...next, policy_action: "review" };
   }
   return next;

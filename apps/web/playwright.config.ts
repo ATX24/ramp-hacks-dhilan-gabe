@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+const portlessUrl =
+  process.env.PLAYWRIGHT_BASE_URL ?? "https://distillery-demo.localhost:1355";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -7,12 +10,18 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: portlessUrl,
+    ignoreHTTPSErrors: true,
     trace: "on-first-retry",
   },
-  webServer: {
-    command: "pnpm dev",
-    url: "http://127.0.0.1:3000/curate",
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer:
+    process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1"
+      ? undefined
+      : {
+          command: "portless distillery-demo pnpm exec next dev",
+          url: portlessUrl,
+          reuseExistingServer: true,
+          ignoreHTTPSErrors: true,
+          timeout: 120_000,
+        },
 });

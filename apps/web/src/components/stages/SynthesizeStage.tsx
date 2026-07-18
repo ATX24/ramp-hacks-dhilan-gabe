@@ -2,6 +2,17 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { ErrorPayload, SynthesisSummary } from "@/lib/types";
 
+function sourceLabel(source: string): string {
+  const labels: Record<string, string> = {
+    imported: "Provided",
+    oracle: "Known correct",
+    teacher_generated: "Filled by source model",
+    relabeled: "Fixed",
+    rejected: "Rejected",
+  };
+  return labels[source] ?? source;
+}
+
 export function SynthesizeStage({
   synthesis,
   error,
@@ -14,36 +25,40 @@ export function SynthesizeStage({
   return (
     <section aria-labelledby="synthesize-heading">
       <div className="panel">
-        <h2 id="synthesize-heading">Synthesize</h2>
+        <p className="text-kicker text-[var(--orange)]">Synthesize</p>
+        <h1 id="synthesize-heading">Fill the missing answers</h1>
         <p>
-          Teacher calls fill missing or rejected labels only. Valid imported responses
-          can skip synthesis entirely with an explicit reason.
+          Good answers stay as they are. A larger source model only fills gaps or
+          replaces answers that fail the checks.
         </p>
         {priorRun ? (
           <div className="banner banner-info" role="status" data-testid="prior-synthesis">
-            <strong>Prior-run provenance</strong>
+            <strong>This came from a saved run</strong>
             <p style={{ margin: 0 }}>
-              These counts and provenance records come from a precomputed prior run.
-              Nothing is active.
+              The counts and source records were saved earlier. Nothing is running now.
             </p>
           </div>
         ) : null}
         <ErrorBanner error={error} />
         {synthesis.skipped ? (
           <div className="banner banner-info" data-testid="synthesis-skipped" role="status">
-            <strong>Synthesis skipped</strong>
+            <strong>Nothing needed filling</strong>
             <p style={{ margin: 0 }}>
-              skip_reason=<code>{synthesis.skip_reason}</code>
+              The provided answers already passed the saved checks.
             </p>
           </div>
         ) : null}
       </div>
 
       <div className="panel">
-        <h3>Response provenance counts</h3>
+        <h3>What happened to the answers</h3>
+        <p>
+          This shows which answers were kept, rejected, fixed, or added. The default
+          keeps valid answers and only pays to fill gaps.
+        </p>
         <div className="grid-3">
           <div className="stat">
-            <span className="label">Imported</span>
+            <span className="label">Kept as provided</span>
             <span className="value">{synthesis.counts.imported}</span>
           </div>
           <div className="stat">
@@ -51,11 +66,11 @@ export function SynthesizeStage({
             <span className="value">{synthesis.counts.rejected}</span>
           </div>
           <div className="stat">
-            <span className="label">Relabeled</span>
+            <span className="label">Fixed</span>
             <span className="value">{synthesis.counts.relabeled}</span>
           </div>
           <div className="stat">
-            <span className="label">Generated</span>
+            <span className="label">Added</span>
             <span className="value">{synthesis.counts.generated}</span>
           </div>
         </div>
@@ -64,52 +79,66 @@ export function SynthesizeStage({
       <div className="panel">
         <h3>
           {priorRun
-            ? "Recorded teacher provenance & cost estimate"
-            : "Teacher identity & cost estimate"}
+            ? "Saved source model and cost"
+            : "Source model and estimated cost"}
         </h3>
+        <p>
+          The source model supplies missing answers. The estimate matters because each
+          call can add cost. Leaving auto on only calls it when an answer is missing.
+        </p>
         {synthesis.teacher ? (
           <>
             <div className="meta-row">
               <span>
-                Teacher <code>{synthesis.teacher.id}</code>
-              </span>
-              <span>
-                Revision <code>{synthesis.teacher.revision}</code>
-              </span>
-              <span>
-                {priorRun ? "Recorded calls" : "Planned calls"}{" "}
+                {priorRun ? "Saved calls" : "Planned calls"}{" "}
                 <strong>{synthesis.teacher.calls_planned}</strong>
               </span>
               <span>
-                Estimated cost{" "}
+                Cost estimate{" "}
                 <strong>${synthesis.teacher.estimated_cost_usd.toFixed(2)}</strong>
               </span>
             </div>
             <p>
-              Estimate only. {priorRun ? "This is prior-run metadata. " : ""}
-              No live teacher calls are issued from this UI.
+              This is an estimate. {priorRun ? "It came from the saved run. " : ""}
+              This page does not call the source model.
             </p>
+            <details className="rounded-[14px] border border-border px-3">
+              <summary className="min-h-11 cursor-pointer py-3 font-medium">
+                Advanced source model record
+              </summary>
+              <p>
+                Model ID: <code>{synthesis.teacher.id}</code>
+                <br />
+                Version: <code>{synthesis.teacher.revision}</code>
+              </p>
+            </details>
           </>
         ) : (
           <p>
-            No teacher calls planned.
+            The plan does not need the source model.
             {synthesis.skipped
-              ? " Synthesis skipped because usable responses already exist."
+              ? " The provided answers already passed the checks."
               : ""}
           </p>
         )}
       </div>
 
-      <div className="panel">
-        <h3>Provenance examples</h3>
+      <details className="panel">
+        <summary className="min-h-11 cursor-pointer py-3 font-serif text-xl">
+          Advanced answer sources
+        </summary>
+        <p>
+          Each row keeps its source so a reviewer can tell which answers were provided
+          and which ones the source model created.
+        </p>
         <div className="table-wrap">
           <table className="data">
             <thead>
               <tr>
-                <th scope="col">Example</th>
-                <th scope="col">Task</th>
+                <th scope="col">Record</th>
+                <th scope="col">Job</th>
                 <th scope="col">Source</th>
-                <th scope="col">Note</th>
+                <th scope="col">What happened</th>
               </tr>
             </thead>
             <tbody>
@@ -130,7 +159,7 @@ export function SynthesizeStage({
                             : "pass"
                       }
                     >
-                      {example.label_source}
+                      {sourceLabel(example.label_source)}
                     </StatusBadge>
                   </td>
                   <td>{example.note}</td>
@@ -139,7 +168,7 @@ export function SynthesizeStage({
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     </section>
   );
 }

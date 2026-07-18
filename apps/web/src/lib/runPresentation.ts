@@ -16,35 +16,35 @@ const ACTIVE_RUN_STATES: ReadonlySet<RunState> = new Set([
 export type TrainPresentation =
   | {
       kind: "preparation";
-      title: "Preparation only";
+      title: "The plan is ready";
       body: string;
-      badge: "No active run";
-      configurationHeading: "Planned finite job";
-      costHeading: "Cost ceiling";
+      badge: "Not started";
+      configurationHeading: "Planned job";
+      costHeading: "Spending limit";
     }
   | {
       kind: "prior_completion";
-      title: "Prior run artifact";
+      title: "This run finished earlier";
       body: string;
-      badge: "Precomputed prior completion";
-      configurationHeading: "Recorded finite-job configuration";
-      costHeading: "Recorded cost ceiling";
+      badge: "Saved run";
+      configurationHeading: "Saved job setup";
+      costHeading: "Saved spending limit";
     }
   | {
       kind: "failed";
-      title: "Preparation failed";
+      title: "The plan could not start";
       body: string;
-      badge: "No active run";
-      configurationHeading: "Attempted configuration";
-      costHeading: "Configured cost ceiling";
+      badge: "Not running";
+      configurationHeading: "Attempted setup";
+      costHeading: "Spending limit";
     }
   | {
       kind: "active";
-      title: "Active run";
+      title: "The job is running";
       body: string;
-      badge: "Active";
-      configurationHeading: "Finite-job configuration";
-      costHeading: "Cost ceiling";
+      badge: "Running";
+      configurationHeading: "Job setup";
+      costHeading: "Spending limit";
     };
 
 export function hasPrecomputedPriorCompletion(
@@ -74,45 +74,45 @@ export function deriveTrainPresentation(
   if (hasPrecomputedPriorCompletion(run, artifact)) {
     return {
       kind: "prior_completion",
-      title: "Prior run artifact",
+      title: "This run finished earlier",
       body:
-        "This checksum-verified artifact records a completed prior run. Nothing is active in this UI; proof status is reported separately on Prove.",
-      badge: "Precomputed prior completion",
-      configurationHeading: "Recorded finite-job configuration",
-      costHeading: "Recorded cost ceiling",
+        "The saved model files came from an earlier run. Nothing is running now. Open Check result to see whether it passed.",
+      badge: "Saved run",
+      configurationHeading: "Saved job setup",
+      costHeading: "Saved spending limit",
     };
   }
 
   if (run.failure || run.state === "FAILED" || run.state === "CANCELLED") {
     return {
       kind: "failed",
-      title: "Preparation failed",
+      title: "The plan could not start",
       body:
-        "The fixture records a terminal preparation failure. No active run or stoppable job is represented.",
-      badge: "No active run",
-      configurationHeading: "Attempted configuration",
-      costHeading: "Configured cost ceiling",
+        "The saved sample stops before training. There is no running job to stop.",
+      badge: "Not running",
+      configurationHeading: "Attempted setup",
+      costHeading: "Spending limit",
     };
   }
 
   if (run.training_launched && ACTIVE_RUN_STATES.has(run.state)) {
     return {
       kind: "active",
-      title: "Active run",
-      body: "The run record reports active work for a previously started finite job.",
-      badge: "Active",
-      configurationHeading: "Finite-job configuration",
-      costHeading: "Cost ceiling",
+      title: "The job is running",
+      body: "This record says a bounded training job is still running.",
+      badge: "Running",
+      configurationHeading: "Job setup",
+      costHeading: "Spending limit",
     };
   }
 
   return {
     kind: "preparation",
-    title: "Preparation only",
+    title: "The plan is ready",
     body:
-      "This fixture contains preflight and finite-job planning metadata. No active or previously completed run is represented.",
-    badge: "No active run",
-    configurationHeading: "Planned finite job",
-    costHeading: "Cost ceiling",
+      "This saved sample contains a plan only. It has not started or finished a training job.",
+    badge: "Not started",
+    configurationHeading: "Planned job",
+    costHeading: "Spending limit",
   };
 }

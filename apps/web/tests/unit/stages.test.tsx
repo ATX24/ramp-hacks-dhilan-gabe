@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe("stage components", () => {
-  it("Curate shows mixture, hashes, and leakage", () => {
+  it("shows the data checks in plain language", () => {
     const bundle = buildStageBundle("default");
     render(
       <CurateStage
@@ -49,9 +49,13 @@ describe("stage components", () => {
         runId={bundle.run.run_id}
       />,
     );
-    expect(screen.getByRole("heading", { name: "Curate" })).toBeInTheDocument();
-    expect(screen.getByText("Task mixture")).toBeInTheDocument();
-    expect(screen.getByText("Leakage checks")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Check the data" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("What is in the sample")).toBeInTheDocument();
+    expect(
+      screen.getByText("Checks for copied test examples (leakage)"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/content:/i)).toBeInTheDocument();
   });
 
@@ -59,7 +63,7 @@ describe("stage components", () => {
     const bundle = buildStageBundle("skipped_synthesis");
     render(<SynthesizeStage synthesis={bundle.synthesis} error={null} />);
     expect(screen.getByTestId("synthesis-skipped")).toHaveTextContent(
-      "responses_already_present",
+      "The provided answers already passed the saved checks.",
     );
   });
 
@@ -81,8 +85,12 @@ describe("stage components", () => {
     );
     expect(screen.getByTestId("job-activity")).toHaveTextContent("none");
     expect(screen.getByTestId("training-telemetry-not-started")).toHaveTextContent(
-      "Not started · no metrics",
+      "The job has not started",
     );
+    expect(screen.getByTestId("run-presentation")).not.toHaveTextContent("QUEUED");
+    expect(
+      screen.getByRole("link", { name: "Return to the project setup" }),
+    ).toBeInTheDocument();
   });
 
   it("Train exposes cancellation only for an active started run", () => {
@@ -131,9 +139,9 @@ describe("stage components", () => {
   it("Prove shows projected economics and insufficient evidence", () => {
     const bundle = buildStageBundle("insufficient_evidence");
     render(<ProveStage proof={bundle.proof} error={null} />);
-    expect(screen.getByText("insufficient_evidence")).toBeInTheDocument();
-    expect(screen.getAllByText(/Projected/).length).toBeGreaterThan(0);
-    expect(screen.getByText("Arm comparison")).toBeInTheDocument();
+    expect(screen.getByText("More proof needed")).toBeInTheDocument();
+    expect(screen.getAllByText(/Estimate/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Compare the candidates")).toBeInTheDocument();
   });
 
   it("Train labels prior-run events and metrics as immutable", () => {
@@ -149,7 +157,7 @@ describe("stage components", () => {
       />,
     );
     expect(screen.getByTestId("training-telemetry-prior")).toHaveTextContent(
-      "Immutable prior-run record",
+      "Saved run record",
     );
     expect(screen.getAllByText("completion_ce")).toHaveLength(3);
     expect(screen.getByText("30")).toBeInTheDocument();
@@ -168,7 +176,7 @@ describe("stage components", () => {
       />,
     );
     expect(screen.getByTestId("training-telemetry-error")).toHaveTextContent(
-      "Metrics unavailable",
+      "There are no measurements",
     );
   });
 
@@ -186,13 +194,17 @@ describe("stage components", () => {
       ),
     );
     render(<ProveStage proof={proof} error={null} />);
-    expect(screen.getByText("Measured serving economics")).toBeInTheDocument();
-    expect(screen.getByText("Measured $/request")).toBeInTheDocument();
+    expect(screen.getByText("Measured running cost")).toBeInTheDocument();
+    expect(screen.getByText("Measured cost per request")).toBeInTheDocument();
   });
 
   it("Prove empty state when no report", () => {
     render(<ProveStage proof={null} error={null} />);
     expect(screen.getByTestId("prove-empty")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Set up a run" })).toHaveAttribute(
+      "href",
+      "/",
+    );
   });
 });
 
@@ -209,7 +221,9 @@ describe("stage navigation contract", () => {
 
   it("renders accessible nav links", () => {
     render(<StageNav mode="default" runId="run_fixture_tinyfable_001" />);
-    expect(screen.getByRole("navigation", { name: "Distillery stages" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Project and evidence pages" }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("stage-link-curate")).toHaveAttribute(
       "href",
       "/curate?mode=default&run=run_fixture_tinyfable_001",

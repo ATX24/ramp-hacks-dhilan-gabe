@@ -52,7 +52,9 @@ export function assertProofProvenance(proof: ProofReportView): void {
     );
   }
 
-  const noteClaimsProjection = /\bprojected\b/i.test(proof.economics.note);
+  const noteClaimsProjection = /\b(projected|estimated|estimate|estimates)\b/i.test(
+    proof.economics.note,
+  );
   if (proof.economics.serving_cost_projected !== noteClaimsProjection) {
     throw fixtureClientError(
       "FIXTURE_INTEGRITY_ERROR",
@@ -67,7 +69,9 @@ export function assertProofProvenance(proof: ProofReportView): void {
   }
   if (
     !proof.economics.serving_cost_projected &&
-    proof.limitations.some((limitation) => /\bprojected\b/i.test(limitation))
+    proof.limitations.some((limitation) =>
+      /\b(projected|estimated|estimate|estimates)\b/i.test(limitation),
+    )
   ) {
     throw fixtureClientError(
       "FIXTURE_INTEGRITY_ERROR",

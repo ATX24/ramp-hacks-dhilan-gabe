@@ -36,7 +36,7 @@ export interface DemoTeacherStudentRef {
 
 /**
  * Evidence-backed model stats. Missing evidence must stay `null`
- * and render as "unknown" in the UI — never invent values.
+ * and render as "unknown" in the UI. Never invent values.
  */
 export interface DemoModelStats {
   advertised_parameter_count: number | null;
@@ -79,11 +79,28 @@ export interface DemoModelEntry {
   stats: DemoModelStats;
 }
 
+export type DemoPortfolioRole = "generalist" | "specialist";
+
+export interface DemoPortfolioEntry {
+  portfolio_id: string;
+  display_name: string;
+  role: DemoPortfolioRole;
+  recommended: boolean;
+  task_scope: readonly FinanceTaskId[];
+  base_model_id: string;
+  adapter_id: string | null;
+  artifact_id: string | null;
+  availability: DemoServingAvailability;
+  selection_policy: "auto_default" | "explicit_only";
+  purpose: string;
+}
+
 export interface DemoModelRegistry {
   schema_version: "distillery.demo_model_registry.v1";
   run_id: string;
   dataset_id: string;
   models: DemoModelEntry[];
+  portfolio: DemoPortfolioEntry[];
 }
 
 export interface DemoExpectedOutputSchema {

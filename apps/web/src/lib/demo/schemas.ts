@@ -15,7 +15,7 @@ const SCHEMAS: Record<FinanceTaskId, DemoExpectedOutputSchema> = {
       "confidence",
     ],
     description:
-      "Balanced journal entry, GL account, policy action (approve|review|reject), rule IDs, evidence, confidence.",
+      "A balanced journal entry, account choice, policy action, supporting rules, and confidence.",
   },
   variance_analysis: {
     schema_version: "variance_analysis.v1",
@@ -32,7 +32,7 @@ const SCHEMAS: Record<FinanceTaskId, DemoExpectedOutputSchema> = {
       "confidence",
     ],
     description:
-      "Profit impact with arithmetic-closed top drivers, favorable/unfavorable direction, evidence IDs, confidence.",
+      "The profit impact, main causes, direction, supporting records, and confidence.",
   },
   cash_reconciliation: {
     schema_version: "cash_reconciliation.v1",
@@ -49,7 +49,7 @@ const SCHEMAS: Record<FinanceTaskId, DemoExpectedOutputSchema> = {
       "confidence",
     ],
     description:
-      "Balanced or exceptions status, matched groups, exceptions, adjusted balances, difference_minor = book − bank.",
+      "The match status, grouped entries, exceptions, adjusted balances, and book minus bank difference.",
   },
 };
 
@@ -66,19 +66,19 @@ export function validateStructuredOutput(
   if (missing.length > 0) {
     return {
       state: "invalid",
-      detail: `Missing required fields: ${missing.join(", ")}`,
+      detail: `The result is missing these required fields: ${missing.join(", ")}.`,
     };
   }
   if (output.task !== task) {
     return {
       state: "invalid",
-      detail: `Output task ${String(output.task)} does not match selected task ${task}`,
+      detail: `The result is for ${String(output.task)}, not the selected job ${task}.`,
     };
   }
   if (output.schema_version !== schema.schema_version) {
     return {
       state: "invalid",
-      detail: `Unexpected schema_version ${String(output.schema_version)}`,
+      detail: `The result uses an unexpected schema version: ${String(output.schema_version)}.`,
     };
   }
   return { state: "valid", detail: null };

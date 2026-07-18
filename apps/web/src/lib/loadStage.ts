@@ -26,7 +26,8 @@ export function withStageLoadFailure(
   const title = isFixtureClientError(error)
     ? error.payload.code
     : "FIXTURE_LOAD_FAILED";
-  const message = error instanceof Error ? error.message : "Fixture data could not be loaded.";
+  const message =
+    error instanceof Error ? error.message : "The saved sample could not be opened.";
   return {
     ...bundle,
     load_state: {
@@ -49,7 +50,7 @@ export async function loadStageRequest(
   if (runSelection.kind === "invalid") {
     const error = fixtureClientError(
       "INVALID_RESOURCE_ID",
-      "Invalid run fixture ID in navigation.",
+      "The run ID in this link is not valid.",
       "run",
       Array.isArray(runSelection.rawValue)
         ? runSelection.rawValue.join(",")

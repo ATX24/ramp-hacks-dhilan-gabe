@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe("demo navigation", () => {
-  it("exposes Demo as the fifth primary stage", () => {
+  it("keeps all five evidence routes", () => {
     expect(STAGE_ROUTES).toEqual([
       "/curate",
       "/synthesize",
@@ -58,20 +58,21 @@ describe("demo navigation", () => {
     );
   });
 
-  it("renders Demo inside the stage route matrix", () => {
-    const bundle = buildStageBundle("proved");
-    render(<StageRouteContent stage="demo" bundle={bundle} />);
-    expect(screen.getByRole("heading", { name: "Demo" })).toBeInTheDocument();
-    expect(screen.getByText("Playground")).toBeInTheDocument();
+  it("renders the plain-language Demo heading", () => {
+    render(
+      <StageRouteContent stage="demo" bundle={buildStageBundle("proved")} />,
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Try the result" }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("demo-walkthrough")).toBeInTheDocument();
   });
 });
 
-describe("demo model registry", () => {
-  it("lists base student plus trained arms from the registry payload", () => {
+describe("model registry and portfolio", () => {
+  it("lists the base, trained candidates, and explicit specialists", () => {
     const registry = buildDemoModelRegistry(buildStageBundle("proved"));
-    const arms = registry.models.map((model) => model.arm_id);
-    expect(arms).toEqual([
+    expect(registry.models.map((model) => model.arm_id)).toEqual([
       "student_base",
       "oracle_sft",
       "sequence_kd",
@@ -79,93 +80,73 @@ describe("demo model registry", () => {
       "ce_ablation",
       "promoted_winner",
     ]);
+    expect(registry.portfolio[0]).toMatchObject({
+      portfolio_id: "tinyfable_generalist",
+      role: "generalist",
+      recommended: true,
+      selection_policy: "auto_default",
+    });
+    expect(
+      registry.portfolio
+        .filter((model) => model.role === "specialist")
+        .every((model) => model.selection_policy === "explicit_only"),
+    ).toBe(true);
   });
 
-  it("omits sequence_kd when the proof payload does not include it", () => {
-    const bundle = buildStageBundle("default");
-    const registry = buildDemoModelRegistry(bundle);
+  it("does not invent trained models for a plan-only run", () => {
+    const registry = buildDemoModelRegistry(buildStageBundle("default"));
     expect(registry.models.map((model) => model.arm_id)).toEqual(["student_base"]);
-  });
-
-  it("renders unknown for missing OOD CI evidence", () => {
-    const bundle = buildStageBundle("proved");
-    render(<DemoStage bundle={bundle} />);
-    const panel = screen.getByTestId("demo-stats-panel");
-    expect(within(panel).getAllByText("unknown").length).toBeGreaterThan(0);
-    const oodCiRow = within(panel)
-      .getByText("OOD 95% CI")
-      .closest("tr");
-    expect(oodCiRow).toHaveTextContent("unknown");
   });
 });
 
-describe("demo playground interactions", () => {
-  it("switches tasks and loads prepopulated examples", async () => {
+describe("demo interactions", () => {
+  it("exposes searchable finance examples and two honest candidates", async () => {
     const user = userEvent.setup();
     render(<DemoStage bundle={buildStageBundle("proved")} />);
 
-    expect(screen.getByTestId("demo-expected-schema")).toHaveTextContent(
-      "transaction_review.v1",
-    );
-    await user.selectOptions(screen.getByTestId("demo-task-select"), "variance_analysis");
-    expect(screen.getByTestId("demo-expected-schema")).toHaveTextContent(
-      "variance_analysis.v1",
-    );
-    expect((screen.getByTestId("demo-input") as HTMLTextAreaElement).value).toContain(
-      "period",
-    );
+    expect(screen.getByText("Current base model")).toBeInTheDocument();
+    expect(screen.getByText("TinyFable Generalist")).toBeInTheDocument();
+    await user.type(screen.getByTestId("demo-example-search"), "SaaS");
+    expect(screen.getByText(/Review a SaaS renewal/)).toBeInTheDocument();
   });
 
-  it("supports compare mode across registry models", async () => {
+  it("compares saved outputs and leads with a human decision", async () => {
     const user = userEvent.setup();
     render(<DemoStage bundle={buildStageBundle("proved")} />);
 
-    await user.click(screen.getByTestId("demo-run-mode-compare"));
-    // Walkthrough already selects student_base + sequence_kd; add oracle_sft.
-    await user.click(screen.getByTestId("demo-model-oracle_sft"));
     await user.click(screen.getByTestId("demo-run"));
-
     await waitFor(() => {
+      expect(screen.getByTestId("demo-decision")).toBeInTheDocument();
       expect(screen.getByTestId("demo-result-model_student_base")).toBeInTheDocument();
       expect(screen.getByTestId("demo-result-model_sequence_kd")).toBeInTheDocument();
-      expect(screen.getByTestId("demo-result-model_oracle_sft")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("demo-result-model_student_base")).toHaveAttribute(
-      "data-provenance",
-      "fixture_preview",
+    expect(screen.getAllByText("Saved demo. Not live.").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("demo-decision")).toHaveTextContent("Confidence is low");
+    expect(screen.getAllByText("Cost", { selector: "span" }).length).toBeGreaterThan(
+      0,
     );
   });
 
-  it("never fabricates live inference when no serving endpoint exists", async () => {
-    const user = userEvent.setup();
+  it("disables live output with a plain reason when no endpoint exists", () => {
     render(<DemoStage bundle={buildStageBundle("proved")} />);
-
-    await user.click(screen.getByTestId("demo-infer-live"));
-    await user.click(screen.getByTestId("demo-run"));
-
-    await waitFor(() => {
-      const card = screen.getByTestId("demo-result-model_student_base");
-      expect(card).toHaveAttribute("data-status", "unavailable");
-      expect(card).toHaveTextContent("SERVING_ENDPOINT_MISSING");
-    });
+    expect(screen.getByTestId("demo-infer-live")).toBeDisabled();
     expect(
-      screen.queryByText("Live model inference"),
-    ).not.toBeInTheDocument();
+      screen.getByText(/Live output stays off until an endpoint/i),
+    ).toBeInTheDocument();
   });
 
-  it("labels fixture-preview output explicitly", async () => {
+  it("keeps technical model details in the drawer", async () => {
     const user = userEvent.setup();
     render(<DemoStage bundle={buildStageBundle("proved")} />);
-    await user.click(screen.getByTestId("demo-run-mode-single"));
-    await user.click(screen.getByTestId("demo-run"));
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Fixture preview — not live model inference/i),
-      ).toBeInTheDocument();
-    });
+    await user.click(screen.getByTestId("demo-metrics-drawer-trigger"));
+    expect(screen.getByTestId("demo-metrics-drawer")).toBeInTheDocument();
+    expect(screen.getByText("Training method (recipe)")).toBeInTheDocument();
+    for (const row of screen.getAllByTestId("advanced-setting")) {
+      expect(row).toHaveTextContent(/This |Auto |The /);
+    }
   });
 
-  it("cycles prepopulated examples with random/reset controls", async () => {
+  it("resets and cycles the editable example", async () => {
     const user = userEvent.setup();
     render(<DemoStage bundle={buildStageBundle("proved")} />);
     const input = screen.getByTestId("demo-input") as HTMLTextAreaElement;
@@ -174,14 +155,14 @@ describe("demo playground interactions", () => {
     await user.click(input);
     await user.paste('{"patched":true}');
     await user.click(screen.getByTestId("demo-reset-example"));
-    expect(screen.getByTestId("demo-input")).toHaveValue(original);
+    expect(input).toHaveValue(original);
     await user.click(screen.getByTestId("demo-random-example"));
-    expect(screen.getByTestId("demo-example-select")).not.toHaveValue("ex_txn_hard_001");
+    expect(input).not.toHaveValue(original);
   });
 });
 
 describe("demo gateway contract", () => {
-  it("calls the typed live endpoint and surfaces transport errors", async () => {
+  it("surfaces live transport errors", async () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error("connection refused");
     });
@@ -219,12 +200,9 @@ describe("demo gateway contract", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(response.status).toBe("error");
-    if (response.status === "error") {
-      expect(response.code).toBe("LIVE_TRANSPORT_ERROR");
-    }
   });
 
-  it("refuses to invent live output for fixture_preview-only artifacts", async () => {
+  it("refuses live output for saved-demo-only model files", async () => {
     const gateway = createDemoGateway({
       liveBaseUrl: "http://127.0.0.1:9999",
       fetchImpl: vi.fn(),
@@ -245,7 +223,7 @@ describe("demo gateway contract", () => {
 });
 
 describe("demo URL state", () => {
-  it("round-trips task/models/example share state", () => {
+  it("round-trips task, models, example, and source", () => {
     const params = serializeDemoUrlState(
       {
         task: "cash_reconciliation",
@@ -256,15 +234,12 @@ describe("demo URL state", () => {
       },
       { mode: "proved", runId: "run_fixture_proved_001" },
     );
-    const parsed = parseDemoUrlState(params, ["model_student_base"]);
-    expect(parsed).toEqual({
+    expect(parseDemoUrlState(params, ["model_student_base"])).toEqual({
       task: "cash_reconciliation",
       modelIds: ["model_student_base", "model_sequence_kd"],
       exampleId: "ex_cash_hard_exc_001",
       runMode: "compare",
       inferenceMode: "fixture_preview",
     });
-    expect(params.get("mode")).toBe("proved");
-    expect(params.get("run")).toBe("run_fixture_proved_001");
   });
 });

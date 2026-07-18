@@ -1,29 +1,45 @@
 import { StatusBadge, gateTone } from "@/components/StatusBadge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { PreflightGate } from "@/lib/types";
 
 export function GateList({ gates }: { gates: PreflightGate[] }) {
   return (
-    <div className="table-wrap" role="region" aria-label="Preflight gates">
-      <table className="data">
-        <thead>
-          <tr>
-            <th scope="col">Gate</th>
-            <th scope="col">Status</th>
-            <th scope="col">Detail</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="table-wrap" role="region" aria-label="Safety checks">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Check</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>What it means</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {gates.map((gate) => (
-            <tr key={gate.gate_id}>
-              <td>{gate.label}</td>
-              <td>
-                <StatusBadge tone={gateTone(gate.status)}>{gate.status}</StatusBadge>
-              </td>
-              <td>{gate.detail}</td>
-            </tr>
+            <TableRow key={gate.gate_id}>
+              <TableCell>{gate.label}</TableCell>
+              <TableCell>
+                <StatusBadge tone={gateTone(gate.status)}>
+                  {gate.status === "pass"
+                    ? "Passed"
+                    : gate.status === "fail"
+                      ? "Failed"
+                      : gate.status === "pending"
+                        ? "Waiting"
+                        : "Not available"}
+                </StatusBadge>
+              </TableCell>
+              <TableCell>{gate.detail}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

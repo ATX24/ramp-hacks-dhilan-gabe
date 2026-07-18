@@ -20,7 +20,7 @@ import type {
 /**
  * Typed web-side gateway for Demo/Playground inference.
  * Fixture preview is local and labeled. Live mode calls a serving contract
- * and must surface unavailable/error — never fabricate live outputs.
+ * and must surface unavailable or error states. Never fabricate live outputs.
  */
 export interface DemoInferenceGateway {
   infer(
@@ -64,7 +64,7 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
         task: request.task,
         example_id: request.example_id,
         code: "MODEL_NOT_IN_REGISTRY",
-        message: `Model ${request.model_id} is not present in the registry payload.`,
+        message: `This run does not list model ${request.model_id}.`,
       };
     }
 
@@ -105,7 +105,7 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
       completion_tokens: null,
       score: scored.score,
       score_detail: scored.detail,
-      label: "Fixture preview — not live model inference",
+      label: "Saved sample. Not live.",
     };
   }
 
@@ -127,7 +127,7 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
         example_id: request.example_id,
         code: "SERVING_ENDPOINT_MISSING",
         message:
-          "No live serving endpoint is configured (NEXT_PUBLIC_DISTILLERY_INFERENCE_URL).",
+          "This page has no live endpoint. Connect one with NEXT_PUBLIC_DISTILLERY_INFERENCE_URL.",
       };
     }
 
@@ -145,7 +145,7 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
         code: "ARTIFACT_NOT_SERVABLE",
         message:
           model.serving.reason ??
-          "Registry does not advertise a live-servable artifact for this model.",
+          "This model does not have a file that the live endpoint can load.",
       };
     }
 
@@ -175,7 +175,7 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
           task: request.task,
           example_id: request.example_id,
           code: "LIVE_TRANSPORT_ERROR",
-          message: `Live inference failed with HTTP ${response.status}.`,
+          message: `The live endpoint returned HTTP ${response.status}.`,
           retryable: response.status >= 500,
         };
       }
@@ -188,7 +188,7 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
           task: request.task,
           example_id: request.example_id,
           code: "LIVE_RESPONSE_INVALID",
-          message: "Live inference response did not include structured_output.",
+          message: "The live endpoint did not return a structured result.",
           retryable: false,
         };
       }
@@ -212,7 +212,7 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
         completion_tokens: body.completion_tokens,
         score: scored.score,
         score_detail: scored.detail,
-        label: "Live model inference",
+        label: "Live output",
       };
     } catch (error) {
       return {
@@ -222,7 +222,10 @@ export class DistilleryDemoGateway implements DemoInferenceGateway {
         task: request.task,
         example_id: request.example_id,
         code: "LIVE_TRANSPORT_ERROR",
-        message: error instanceof Error ? error.message : "Live inference transport failed.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The live endpoint could not be reached.",
         retryable: true,
       };
     }

@@ -24,9 +24,10 @@ describe("ModeSwitcher", () => {
     const user = userEvent.setup();
     render(<ModeSwitcher current="precomputed" />);
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Fixture mode" }), [
-      "fetch_failure",
-    ]);
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Choose a saved sample state" }),
+      ["fetch_failure"],
+    );
 
     expect(navigation.replace).toHaveBeenCalledWith("/train?mode=fetch_failure");
     expect(navigation.refresh).toHaveBeenCalledOnce();

@@ -3,7 +3,7 @@ import type { DemoExample, FinanceTaskId } from "@/lib/demo/types";
 
 /**
  * Safe, deterministic prepopulated Demo examples.
- * Held-out / demo-catalog only — never train-split gold as the default pitch case.
+ * Held-out and demo-catalog only. Never use training gold as the default case.
  */
 const EXAMPLES: readonly DemoExample[] = [
   {
@@ -11,7 +11,7 @@ const EXAMPLES: readonly DemoExample[] = [
     task: "transaction_review",
     difficulty: "hard",
     split: "iid_test",
-    label: "Capex conflict · Dell cluster",
+    label: "Review a Dell server purchase",
     input: {
       amount_minor: 5000000,
       currency: "USD",
@@ -41,7 +41,7 @@ const EXAMPLES: readonly DemoExample[] = [
     task: "transaction_review",
     difficulty: "medium",
     split: "demo_catalog",
-    label: "SaaS renewal · review threshold",
+    label: "Review a SaaS renewal",
     input: {
       amount_minor: 189900,
       currency: "USD",
@@ -70,7 +70,7 @@ const EXAMPLES: readonly DemoExample[] = [
     task: "variance_analysis",
     difficulty: "hard",
     split: "ood_test",
-    label: "Offsetting price / volume / FX",
+    label: "Explain offsetting price, volume, and currency changes",
     input: {
       drivers: [
         {
@@ -116,7 +116,7 @@ const EXAMPLES: readonly DemoExample[] = [
     task: "variance_analysis",
     difficulty: "hard",
     split: "ood_test",
-    label: "Equal-impact driver tie-break",
+    label: "Break a tie between equal drivers",
     input: {
       actual_minor: 1400000,
       budget_minor: 1200000,
@@ -156,7 +156,7 @@ const EXAMPLES: readonly DemoExample[] = [
     task: "cash_reconciliation",
     difficulty: "hard",
     split: "iid_test",
-    label: "Bank fee + deposit in transit",
+    label: "Reconcile a bank fee and a deposit in transit",
     input: {
       bank_balance_minor: 8119900,
       bank_events: [
@@ -203,7 +203,7 @@ const EXAMPLES: readonly DemoExample[] = [
     task: "cash_reconciliation",
     difficulty: "easy",
     split: "demo_catalog",
-    label: "Clean one-to-one match",
+    label: "Reconcile a clean one-to-one match",
     input: {
       bank_balance_minor: 250000,
       bank_events: [{ amount_minor: 250000, id: "bank_demo_match" }],

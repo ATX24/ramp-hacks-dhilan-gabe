@@ -10,11 +10,11 @@ export type RunSelection =
   | { kind: "invalid"; rawValue: string | string[] };
 
 export const STAGES = [
-  { id: "curate", href: "/curate", index: "01", name: "Curate" },
-  { id: "synthesize", href: "/synthesize", index: "02", name: "Synthesize" },
-  { id: "train", href: "/train", index: "03", name: "Train" },
-  { id: "prove", href: "/prove", index: "04", name: "Prove" },
-  { id: "demo", href: "/demo", index: "05", name: "Demo" },
+  { id: "curate", href: "/curate", index: "01", name: "Check data" },
+  { id: "synthesize", href: "/synthesize", index: "02", name: "Fill gaps" },
+  { id: "train", href: "/train", index: "03", name: "Run" },
+  { id: "prove", href: "/prove", index: "04", name: "Check result" },
+  { id: "demo", href: "/demo", index: "05", name: "Try it" },
 ] as const satisfies ReadonlyArray<{
   id: StageId;
   href: `/${StageId}`;
@@ -59,6 +59,17 @@ export function buildStageHref(
   return `${route}?${params.toString()}`;
 }
 
+export function buildProjectHref(mode: UiMode, runId?: string): string {
+  const params = new URLSearchParams({ mode });
+  if (runId !== undefined) {
+    if (!isResourceId("run", runId)) {
+      throw new Error("Project navigation received an invalid run ID");
+    }
+    params.set("run", runId);
+  }
+  return `/?${params.toString()}`;
+}
+
 export function buildRootRedirect(searchParams: SearchParams | undefined): string {
   const rawMode = singleModeParam(searchParams);
   const runSelection = parseRunSelection(searchParams);
@@ -78,5 +89,6 @@ export function isStageRoute(pathname: string): pathname is StageRoute {
 }
 
 export function buildModeHref(pathname: string, mode: UiMode): string {
+  if (pathname === "/") return buildProjectHref(mode);
   return buildStageHref(isStageRoute(pathname) ? pathname : "/curate", mode);
 }

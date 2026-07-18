@@ -8,6 +8,7 @@ import {
   type DemoServingAvailability,
 } from "@/lib/demo/types";
 import { HASH } from "@/lib/fixtures/hashes";
+import { buildModelPortfolio } from "@/lib/modelPortfolio";
 import type { ArmComparison, StageBundle } from "@/lib/types";
 
 const ARM_DISPLAY: Record<
@@ -15,28 +16,28 @@ const ARM_DISPLAY: Record<
   { display_name: string; purpose: string }
 > = {
   student_base: {
-    display_name: "Base student",
-    purpose: "Frozen student starting point before distillation",
+    display_name: "Base smaller model",
+    purpose: "The smaller model before it learns this job",
   },
   oracle_sft: {
-    display_name: "Oracle SFT",
-    purpose: "Oracle-gold sequence upper bound",
+    display_name: "Known-answer training",
+    purpose: "Known-correct answers used as an upper comparison",
   },
   sequence_kd: {
-    display_name: "Sequence KD",
-    purpose: "Implemented sequence.v1 treatment",
+    display_name: "Answer distillation",
+    purpose: "Training from complete source-model answers",
   },
   logit_kd: {
-    display_name: "Logit KD",
-    purpose: "Implemented logit.v1 treatment",
+    display_name: "Score distillation",
+    purpose: "Training from source-model token scores",
   },
   ce_ablation: {
-    display_name: "CE ablation",
-    purpose: "Matched CE-only control",
+    display_name: "Plain training comparison",
+    purpose: "The same run without the extra distillation loss",
   },
   promoted_winner: {
-    display_name: "Promoted winner",
-    purpose: "Proof-promoted serving candidate",
+    display_name: "Chosen model",
+    purpose: "The model selected by the saved checks",
   },
 };
 
@@ -133,7 +134,7 @@ function servingForArm(
       availability: "fixture_preview" satisfies DemoServingAvailability,
       endpoint_id: null,
       artifact_id: null,
-      reason: "Base student is available as a labeled fixture preview only.",
+      reason: "The base model only has a saved sample output. It has no live endpoint.",
     };
   }
 
@@ -142,7 +143,7 @@ function servingForArm(
       availability: "unavailable",
       endpoint_id: null,
       artifact_id: null,
-      reason: "Arm excluded from the proof package; no serving artifact is advertised.",
+      reason: "This candidate was not part of the saved result and has no live model file.",
     };
   }
 
@@ -151,7 +152,7 @@ function servingForArm(
       availability: "unavailable",
       endpoint_id: null,
       artifact_id: null,
-      reason: "No trained artifact is present for this run.",
+      reason: "This run does not have a trained model file.",
     };
   }
 
@@ -161,7 +162,7 @@ function servingForArm(
     endpoint_id: null,
     artifact_id: artifactId,
     reason:
-      "Checksum-verified prior-run artifact is available for fixture preview. No live serving endpoint is configured.",
+      "A saved model file is available for sample output. No live endpoint is connected.",
   };
 }
 
@@ -229,7 +230,7 @@ function shouldIncludeArm(
 
 /**
  * Build the Demo model registry from the stage bundle.
- * UI selectors must iterate this payload — never hardcode arm branching.
+ * UI selectors must iterate this payload rather than hardcode candidate branches.
  */
 export function buildDemoModelRegistry(bundle: StageBundle): DemoModelRegistry {
   const armById = new Map((bundle.proof?.arms ?? []).map((arm) => [arm.arm_id, arm]));
@@ -257,6 +258,7 @@ export function buildDemoModelRegistry(bundle: StageBundle): DemoModelRegistry {
     run_id: bundle.run.run_id,
     dataset_id: bundle.dataset.dataset_id,
     models,
+    portfolio: buildModelPortfolio(bundle, models),
   };
 }
 

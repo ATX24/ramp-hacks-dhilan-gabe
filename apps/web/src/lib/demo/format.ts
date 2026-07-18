@@ -1,4 +1,4 @@
-/** Render missing evidence as unknown — never invent a placeholder number. */
+/** Render missing evidence as unknown. Never invent a placeholder number. */
 export function formatUnknown(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "unknown";
   return String(value);

@@ -9,11 +9,11 @@ import { hasPrecomputedPriorCompletion } from "@/lib/runPresentation";
 import type { StageBundle, StageId } from "@/lib/types";
 
 const STAGE_NAMES: Record<StageId, string> = {
-  curate: "Curate",
-  synthesize: "Synthesize",
-  train: "Train",
-  prove: "Prove",
-  demo: "Demo",
+  curate: "Check the data",
+  synthesize: "Fill the missing answers",
+  train: "Make the smaller model",
+  prove: "Check the result",
+  demo: "Try the result",
 };
 
 export function StageRouteContent({
@@ -69,7 +69,7 @@ export function StageRouteContent({
         <Suspense
           fallback={
             <p data-testid="demo-suspense" role="status">
-              Loading Demo / Playground…
+              Opening the saved examples...
             </p>
           }
         >

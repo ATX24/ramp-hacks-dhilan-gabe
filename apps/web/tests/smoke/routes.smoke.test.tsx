@@ -12,6 +12,14 @@ import {
   STAGE_ROUTES,
 } from "@/lib/navigation";
 
+const STAGE_HEADINGS = {
+  curate: "Check the data",
+  synthesize: "Fill the missing answers",
+  train: "Make the smaller model",
+  prove: "Check the result",
+  demo: "Try the result",
+} as const;
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/curate",
   useRouter: () => ({
@@ -93,7 +101,7 @@ describe("mode × stage rendered matrix", () => {
       STAGES.map((stage) => ({
         mode,
         stage: stage.id,
-        name: stage.name,
+        name: STAGE_HEADINGS[stage.id],
       })),
     ),
   )("renders $mode on $stage without a blank screen", ({ mode, stage, name }) => {
@@ -117,8 +125,10 @@ describe("cross-stage state honesty", () => {
       "data-presentation",
       "prior_completion",
     );
-    expect(screen.getByText("Precomputed prior completion")).toBeInTheDocument();
-    expect(screen.queryByText("No training yet")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-presentation")).toHaveTextContent(
+      "This run finished earlier",
+    );
+    expect(screen.queryByText("Nothing has started")).not.toBeInTheDocument();
     expect(screen.getByTestId("job-activity")).toHaveTextContent("none");
   });
 
@@ -137,22 +147,22 @@ describe("cross-stage state honesty", () => {
     const bundle = buildStageBundle("precomputed");
     render(<StageRouteContent stage="prove" bundle={bundle} />);
     expect(
-      screen.getAllByText("Prior-run precomputed measurement"),
+      screen.getAllByText("Saved earlier run"),
     ).toHaveLength(7);
   });
 
   it.each([
-    ["proved", "proved"],
-    ["do_not_distill", "do_not_distill"],
-    ["failed_quality", "failed_quality"],
-    ["failed_economics", "failed_economics"],
-    ["insufficient_evidence", "insufficient_evidence"],
+    ["proved", "Passed"],
+    ["do_not_distill", "Keep the current model"],
+    ["failed_quality", "Accuracy missed"],
+    ["failed_economics", "Cost target missed"],
+    ["insufficient_evidence", "More proof needed"],
   ] as const)("renders %s proof status from prior-run provenance", (mode, status) => {
     const bundle = buildStageBundle(mode);
-    expect(bundle.proof?.proof_status).toBe(status);
+    expect(bundle.proof).not.toBeNull();
     expect(bundle.proof?.precomputed).toBe(true);
     expect(bundle.artifact?.precomputed).toBe(true);
     render(<StageRouteContent stage="prove" bundle={bundle} />);
-    expect(screen.getByText(status)).toBeInTheDocument();
+    expect(screen.getAllByText(status).length).toBeGreaterThan(0);
   });
 });

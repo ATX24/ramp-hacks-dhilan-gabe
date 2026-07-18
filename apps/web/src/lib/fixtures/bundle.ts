@@ -37,7 +37,7 @@ const BASE_DATASET: Dataset = {
   },
   uri: "fixture://datasets/ds_finance_world_v1_smoke",
   provenance_summary:
-    "Synthetic finance_world.v1 smoke corpus: sealed splits, oracle-backed labels, no customer data.",
+    "This made-up finance sample keeps teaching and test records separate. It contains no customer data.",
   task_mixture: {
     transaction_review: 0.45,
     variance_analysis: 0.45,
@@ -53,7 +53,7 @@ const BASE_DATASET: Dataset = {
     {
       example_id: "ex_invalid_json_001",
       path: "expected_output",
-      message: "Fixture negative: malformed JSON retained for validator coverage",
+      message: "This saved bad record has broken JSON so the format check can be shown.",
       severity: "warning",
     },
   ],
@@ -61,17 +61,17 @@ const BASE_DATASET: Dataset = {
     {
       check_id: "world_id_isolation",
       passed: true,
-      detail: "No world_id overlap across train/validation/IID/OOD.",
+      detail: "No generated world appears in both teaching and test data.",
     },
     {
       check_id: "template_family_holdout",
       passed: true,
-      detail: "OOD holds out renderer/template families.",
+      detail: "The unfamiliar test set uses templates that training did not see.",
     },
     {
       check_id: "near_duplicate_minhash",
       passed: true,
-      detail: "MinHash near-duplicate scan found no cross-split collisions.",
+      detail: "The near-copy scan found no records shared across data splits.",
     },
   ],
   world_hashes: {
@@ -109,21 +109,21 @@ function basePlan(runId: string): DistillationPlan {
     gates: [
       {
         gate_id: "tokenizer_fingerprint",
-        label: "Tokenizer fingerprint",
+        label: "Text format fingerprint (tokenizer)",
         status: "pass",
-        detail: "Teacher/student fingerprints recorded; sequence.v1 does not require match.",
+        detail: "Both text formats were recorded. The selected method does not require an exact match.",
       },
       {
         gate_id: "memory_dry_run",
-        label: "Memory dry-run",
+        label: "Memory fit check",
         status: "pass",
-        detail: "Bounded A10G peak-memory probe within ceiling.",
+        detail: "A short check shows that the plan fits on the selected A10G machine.",
       },
       {
         gate_id: "license_output_use",
-        label: "License / output-use",
+        label: "Model license and output use",
         status: "pass",
-        detail: "Pinned model licenses and output-use disposition approved for this run.",
+        detail: "The saved model versions and their output terms allow this run.",
       },
     ],
     planned_job: {
@@ -144,7 +144,7 @@ function basePlan(runId: string): DistillationPlan {
     cancellation_supported: true,
     training_launched: false,
     note:
-      "Planning estimates below are static; plan_distillation() performs no billable work.",
+      "These are saved planning estimates. Opening this page does not start paid work.",
   };
 }
 
@@ -168,7 +168,7 @@ function baseSynthesis(runId: string, skipped: boolean): SynthesisSummary {
           label_source: "imported",
           teacher_id: null,
           teacher_revision: null,
-          note: "Valid imported prompt-response pair; synthesis skipped.",
+          note: "The provided question and answer passed, so nothing replaced it.",
         },
         {
           example_id: "ex_var_0110",
@@ -176,7 +176,7 @@ function baseSynthesis(runId: string, skipped: boolean): SynthesisSummary {
           label_source: "oracle",
           teacher_id: null,
           teacher_revision: null,
-          note: "Oracle-gold sequence retained for oracle_sft arm materialization.",
+          note: "A known-correct answer was kept for the SFT comparison.",
         },
       ],
     };
@@ -205,7 +205,7 @@ function baseSynthesis(runId: string, skipped: boolean): SynthesisSummary {
         label_source: "imported",
         teacher_id: null,
         teacher_revision: null,
-        note: "Trace already contained a schema-valid teacher response.",
+        note: "The trace already had an answer in the expected format.",
       },
       {
         example_id: "ex_txn_0088",
@@ -213,7 +213,7 @@ function baseSynthesis(runId: string, skipped: boolean): SynthesisSummary {
         label_source: "rejected",
         teacher_id: null,
         teacher_revision: null,
-        note: "Unbalanced journal entry failed deterministic validator.",
+        note: "The entry did not balance, so the check rejected it.",
       },
       {
         example_id: "ex_var_0033",
@@ -221,7 +221,7 @@ function baseSynthesis(runId: string, skipped: boolean): SynthesisSummary {
         label_source: "relabeled",
         teacher_id: "Qwen/Qwen2.5-1.5B-Instruct",
         teacher_revision: "a1b2c3d4e5f6g7h8i9j0",
-        note: "Failed arithmetic-closure check; teacher relabel within cost ceiling.",
+        note: "The numbers did not add up. The source model supplied a replacement within the spending limit.",
       },
       {
         example_id: "ex_txn_0155",
@@ -229,7 +229,7 @@ function baseSynthesis(runId: string, skipped: boolean): SynthesisSummary {
         label_source: "teacher_generated",
         teacher_id: "Qwen/Qwen2.5-1.5B-Instruct",
         teacher_revision: "a1b2c3d4e5f6g7h8i9j0",
-        note: "Missing response filled by teacher generator.",
+        note: "The source model filled the missing answer.",
       },
     ],
   };
@@ -266,7 +266,7 @@ function baseArtifact(runId: string, artifactId: string): ModelArtifactMeta {
       "manifest.json": HASH.manifest,
     },
     load_instructions:
-      "Load adapter with pinned transformers + PEFT; optional merged weights load without repository code.",
+      "Load the adapter with the saved Transformers and PEFT versions. The merged file does not need repository code.",
     precomputed: false,
   };
 }
@@ -308,7 +308,7 @@ function baseProof(
     arms: [
       {
         arm_id: "rules",
-        purpose: "Deterministic accounting/policy baseline",
+        purpose: "Simple accounting and policy rules",
         primary_index: 0.71,
         ci_low: 0.68,
         ci_high: 0.74,
@@ -318,7 +318,7 @@ function baseProof(
       },
       {
         arm_id: "teacher",
-        purpose: "Upper reference / teacher-gap validation",
+        purpose: "Source model used as the upper reference",
         primary_index: 0.88,
         ci_low: 0.85,
         ci_high: 0.91,
@@ -328,7 +328,7 @@ function baseProof(
       },
       {
         arm_id: "student_base",
-        purpose: "Frozen student starting point",
+        purpose: "Smaller model before it learns the new job",
         primary_index: 0.62,
         ci_low: 0.58,
         ci_high: 0.66,
@@ -338,7 +338,7 @@ function baseProof(
       },
       {
         arm_id: "cheap_off_the_shelf",
-        purpose: "Cheap API substitute check",
+        purpose: "Low-cost hosted model used for comparison",
         primary_index: 0.69,
         ci_low: 0.65,
         ci_high: 0.73,
@@ -348,7 +348,7 @@ function baseProof(
       },
       {
         arm_id: "oracle_sft",
-        purpose: "Oracle-gold sequence upper bound",
+        purpose: "Known-correct answers used as an upper comparison",
         primary_index: 0.86,
         ci_low: 0.83,
         ci_high: 0.89,
@@ -358,7 +358,7 @@ function baseProof(
       },
       {
         arm_id: "sequence_kd",
-        purpose: "Implemented sequence.v1 treatment",
+        purpose: "Smaller model trained from complete source answers",
         primary_index: sequencePrimaryIndex,
         ci_low: failedQuality ? 0.66 : insufficient ? 0.78 : 0.82,
         ci_high: failedQuality ? 0.78 : insufficient ? 0.9 : 0.88,
@@ -368,7 +368,7 @@ function baseProof(
       },
       {
         arm_id: "logit_kd",
-        purpose: "Implemented logit.v1 treatment",
+        purpose: "Smaller model trained from source model scores",
         primary_index: includeLogitPair ? (failedQuality ? 0.7 : 0.84) : null,
         ci_low: includeLogitPair ? (failedQuality ? 0.64 : 0.81) : null,
         ci_high: includeLogitPair ? (failedQuality ? 0.76 : 0.87) : null,
@@ -376,11 +376,11 @@ function baseProof(
         excluded: !includeLogitPair,
         exclusion_reason: includeLogitPair
           ? null
-          : "CAPABILITY_UNAVAILABLE: memory dry-run failed for exact forward KL",
+          : "This comparison did not fit in memory. Code: CAPABILITY_UNAVAILABLE.",
       },
       {
         arm_id: "ce_ablation",
-        purpose: "Matched CE-only control",
+        purpose: "Matched training run without the extra distillation loss",
         primary_index: includeLogitPair ? (failedQuality ? 0.68 : 0.8) : null,
         ci_low: includeLogitPair ? (failedQuality ? 0.62 : 0.77) : null,
         ci_high: includeLogitPair ? (failedQuality ? 0.74 : 0.83) : null,
@@ -388,7 +388,7 @@ function baseProof(
         excluded: !includeLogitPair,
         exclusion_reason: includeLogitPair
           ? null
-          : "Matched comparator omitted because logit_kd arm is unavailable",
+          : "This matched comparison was left out because the logit method was unavailable.",
       },
     ],
     systems: {
@@ -413,20 +413,20 @@ function baseProof(
         { utilization: 0.5, cost_per_request_usd: 0.0011 },
         { utilization: 0.8, cost_per_request_usd: 0.0009 },
       ],
-      note: "Serving costs are projected from benchmark throughput, not measured production savings.",
+      note: "The running cost is estimated from the saved speed test. It is not a measured production saving.",
     },
     limitations: [
-      "Synthetic finance_world.v1 only; no customer-data generalization claim.",
-      "Serving economics are projected at disclosed utilization points.",
+      "The test only uses made-up finance data. It does not show how customer data would perform.",
+      "Running costs are estimates at the listed machine use levels.",
       ...(insufficient
-        ? ["Seed-23 replication missing; proof_status cannot be proved."]
+        ? ["The repeat run with seed 23 is missing, so the result is not final."]
         : failedQuality
-          ? ["Quality retention and OOD gates failed on the prior run."]
+          ? ["The earlier run missed its accuracy target on familiar and unfamiliar examples."]
           : failedEconomics
-            ? ["Per-request savings were nonpositive in the prior-run economics record."]
+            ? ["The earlier run did not lower the cost per request."]
             : doNotDistill
-              ? ["Baseline gate stopped the full treatment sweep."]
-              : ["Synthetic benchmark evidence does not establish production generalization."]),
+              ? ["A simpler baseline won, so the other training methods did not run."]
+              : ["A made-up benchmark cannot show how the model will behave in production."]),
     ],
     artifact_downloads: [
       {
@@ -450,7 +450,7 @@ function notStartedTelemetry(): TrainingTelemetry {
     provenance: "not_started",
     events: [],
     metrics: [],
-    message: "Not started. No events or training metrics exist for this planned fixture.",
+    message: "The saved sample has not started. There are no job events or measurements.",
   };
 }
 
@@ -459,27 +459,27 @@ function priorRunTelemetry(): TrainingTelemetry {
     provenance: "precomputed_prior_run",
     immutable: true,
     message:
-      "Immutable events and metrics recorded by a completed prior run. No live stream is active.",
+      "These events and measurements came from an earlier run. They cannot change, and no live updates are connected.",
     events: [
       {
         timestamp: "2026-07-18T12:11:00.000Z",
         state: "STARTING",
-        message: "Prior finite job validated its sealed manifest.",
+        message: "The earlier job checked the saved file list before it started.",
       },
       {
         timestamp: "2026-07-18T12:14:00.000Z",
         state: "TRAINING",
-        message: "Prior run entered its bounded training phase.",
+        message: "The earlier job started training within its time limit.",
       },
       {
         timestamp: "2026-07-18T12:34:00.000Z",
         state: "FINALIZING",
-        message: "Prior run wrote immutable artifacts and checksums.",
+        message: "The earlier job saved the model files and their fingerprints.",
       },
       {
         timestamp: "2026-07-18T12:36:00.000Z",
         state: "SUCCEEDED",
-        message: "Prior run completed; this record is read-only.",
+        message: "The earlier job finished. This record cannot change.",
       },
     ],
     metrics: [
@@ -519,7 +519,7 @@ function errorTelemetry(message: string): TrainingTelemetry {
       },
     ],
     metrics: [],
-    message: "No training metrics were produced because preparation failed.",
+    message: "The setup failed before training, so there are no measurements.",
   };
 }
 
@@ -594,12 +594,12 @@ export function buildStageBundle(
       }
       proof.limitations = [
         ...proof.limitations,
-        "Precomputed checksum-verified prior-run artifacts are displayed; no live job is active.",
+        "The displayed files and fingerprints came from an earlier run. No live job is running.",
       ];
       plan.note =
         entry.proofStatus === "insufficient_evidence"
-          ? "The configuration and cost ceiling below were recorded with that artifact; the evidence gate remains incomplete."
-          : "The configuration and cost ceiling below were recorded with that artifact.";
+          ? "The setup and spending limit came from that saved file set. One required result check is still missing."
+          : "The setup and spending limit came from that saved file set.";
       trainingTelemetry = priorRunTelemetry();
       break;
     }
@@ -607,14 +607,14 @@ export function buildStageBundle(
     case "error":
       error = errorPayload(
         "DATA_LEAKAGE_DETECTED",
-        "Leakage check failed: injected near-duplicate crossed train and OOD.",
+        "The copied-example check failed because a near duplicate appeared in teaching and unfamiliar test data.",
         runId,
       );
       dataset.leakage_checks = [
         {
           check_id: "near_duplicate_minhash",
           passed: false,
-          detail: "Near-duplicate hash collision between train and OOD splits.",
+          detail: "A near copy appears in both teaching data and the unfamiliar test set.",
         },
         ...dataset.leakage_checks.filter((c) => c.check_id !== "near_duplicate_minhash"),
       ];
@@ -627,7 +627,7 @@ export function buildStageBundle(
     case "unavailable":
       error = errorPayload(
         "RECIPE_NOT_IMPLEMENTED",
-        "Requested recipe on_policy_gkd is catalog-only and not implemented.",
+        "The requested method, on_policy_gkd, is listed but is not available.",
         runId,
       );
       plan.requested_recipe = "on_policy_gkd";
@@ -636,27 +636,27 @@ export function buildStageBundle(
       plan.gates = [
         {
           gate_id: "recipe_capability",
-          label: "Recipe capability",
+          label: "Training method availability",
           status: "unavailable",
-          detail: "RECIPE_NOT_IMPLEMENTED — no silent downgrade.",
+          detail: "This method is not available. Code: RECIPE_NOT_IMPLEMENTED. Distillery did not choose another method.",
         },
         {
           gate_id: "tokenizer_fingerprint",
-          label: "Tokenizer fingerprint",
+          label: "Text format fingerprint (tokenizer)",
           status: "pending",
-          detail: "Not evaluated after recipe capability failure.",
+          detail: "This check did not run because the training method was unavailable.",
         },
         {
           gate_id: "memory_dry_run",
-          label: "Memory dry-run",
+          label: "Memory fit check",
           status: "pending",
-          detail: "Not evaluated after recipe capability failure.",
+          detail: "This check did not run because the training method was unavailable.",
         },
         {
           gate_id: "license_output_use",
-          label: "License / output-use",
+          label: "Model license and output use",
           status: "pending",
-          detail: "Not evaluated after recipe capability failure.",
+          detail: "This check did not run because the training method was unavailable.",
         },
       ];
       run.requested_recipe = "on_policy_gkd";
@@ -669,16 +669,16 @@ export function buildStageBundle(
     case "loading":
       loadState = {
         status: "loading",
-        message: "Loading static fixture data. No network request is being made.",
+        message: "Opening the saved sample. The page is not making a network request.",
       };
       break;
 
     case "fetch_failure":
       loadState = {
         status: "failed",
-        title: "Fixture data unavailable",
+        title: "The saved sample is unavailable",
         message:
-          "The simulated data request failed before stage content was available. No live API was called.",
+          "The saved request failed before the page could open. No live service was called.",
         retryable: true,
       };
       break;

@@ -17,10 +17,10 @@ export function TrainingTelemetryPanel({
   switch (telemetry.provenance) {
     case "not_started":
       return (
-        <div className="panel" data-testid="training-telemetry-not-started">
-          <h3>Logs & metrics</h3>
+        <div className="grid gap-3 pt-3" data-testid="training-telemetry-not-started">
+          <h3>What happened during the job</h3>
           <div className="banner banner-info" role="status">
-            <strong>Not started · no metrics</strong>
+            <strong>The job has not started</strong>
             <p style={{ margin: 0 }}>{telemetry.message}</p>
           </div>
         </div>
@@ -28,18 +28,18 @@ export function TrainingTelemetryPanel({
 
     case "error":
       return (
-        <div className="panel" data-testid="training-telemetry-error">
-          <h3>Logs & metrics</h3>
+        <div className="grid gap-3 pt-3" data-testid="training-telemetry-error">
+          <h3>What happened during the job</h3>
           <div className="banner banner-error" role="alert">
-            <strong>Metrics unavailable</strong>
+            <strong>There are no measurements</strong>
             <p style={{ margin: 0 }}>{telemetry.message}</p>
           </div>
-          <h4>Recorded preparation event</h4>
+          <h4>Saved setup event</h4>
           <ul className="list-plain">
             {telemetry.events.map((event) => (
               <li key={`${event.timestamp}-${event.state}`}>
                 <time dateTime={event.timestamp}>{formatTimestamp(event.timestamp)}</time>{" "}
-                · <code>{event.state}</code> · {event.message}
+                . <code>{event.state}</code>. {event.message}
               </li>
             ))}
           </ul>
@@ -48,20 +48,24 @@ export function TrainingTelemetryPanel({
 
     case "precomputed_prior_run":
       return (
-        <div className="panel" data-testid="training-telemetry-prior">
+        <div className="grid gap-3 pt-3" data-testid="training-telemetry-prior">
           <div className="controls" style={{ justifyContent: "space-between" }}>
-            <h3>Logs & metrics</h3>
-            <StatusBadge tone="precomputed">Immutable prior-run record</StatusBadge>
+            <h3>What happened during the job</h3>
+            <StatusBadge tone="precomputed">Saved run record</StatusBadge>
           </div>
           <p>{telemetry.message}</p>
-          <h4>Prior-run event log</h4>
+          <p>
+            The event log lists each saved state change. The measurements below show
+            how the earlier training job changed over time.
+          </p>
+          <h4>Saved event log</h4>
           <div className="table-wrap">
             <table className="data">
               <thead>
                 <tr>
-                  <th scope="col">Timestamp (UTC)</th>
+                  <th scope="col">Time (UTC)</th>
                   <th scope="col">State</th>
-                  <th scope="col">Event</th>
+                  <th scope="col">What happened</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,14 +85,14 @@ export function TrainingTelemetryPanel({
               </tbody>
             </table>
           </div>
-          <h4>Prior-run training metrics</h4>
+          <h4>Saved training measurements (metrics)</h4>
           <div className="table-wrap">
             <table className="data">
               <thead>
                 <tr>
                   <th scope="col">Step</th>
-                  <th scope="col">Timestamp (UTC)</th>
-                  <th scope="col">Metric</th>
+                  <th scope="col">Time (UTC)</th>
+                  <th scope="col">Measurement</th>
                   <th scope="col">Value</th>
                 </tr>
               </thead>

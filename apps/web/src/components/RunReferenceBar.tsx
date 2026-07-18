@@ -14,41 +14,45 @@ export function RunReferenceBar({
   status: RunReferenceStatus;
 }) {
   return (
-    <div
-      className="meta-row"
+    <details
+      className="rounded-[14px] border border-border bg-card px-3"
       data-testid="run-reference"
       data-status={status}
-      aria-live="polite"
     >
-      <span>
-        Run reference:{" "}
-        <code>
+      <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
+        Advanced run details
+      </summary>
+      <div className="meta-row pb-3" aria-live="polite">
+        <span>
+          Run ID:{" "}
+          <code>
+            {status === "resolving"
+              ? "resolving..."
+              : status === "invalid"
+                ? "rejected"
+                : runId}
+          </code>
+        </span>
+        <span>
+          Data ID:{" "}
+          <code>
+            {status === "resolving"
+              ? "resolving..."
+              : status === "invalid"
+                ? "unresolved"
+                : datasetId}
+          </code>
+        </span>
+        <span>
           {status === "resolving"
-            ? "resolving…"
-            : status === "invalid"
-              ? "rejected"
-              : runId}
-        </code>
-      </span>
-      <span>
-        Dataset:{" "}
-        <code>
-          {status === "resolving"
-            ? "resolving…"
-            : status === "invalid"
-              ? "unresolved"
-              : datasetId}
-        </code>
-      </span>
-      <span>
-        {status === "resolving"
-          ? "Restoring this mode’s stored run"
-          : status === "stored"
-            ? "Stored locally for this mode"
-            : status === "invalid"
-              ? "Explicit run reference is invalid"
-              : "Local persistence unavailable; showing this session reference"}
-      </span>
-    </div>
+            ? "Opening the saved run"
+            : status === "stored"
+              ? "Saved in this browser"
+              : status === "invalid"
+                ? "The run ID is not valid"
+                : "This run will last for this visit only"}
+        </span>
+      </div>
+    </details>
   );
 }

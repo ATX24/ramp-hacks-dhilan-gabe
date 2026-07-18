@@ -94,7 +94,7 @@ export function StagePageClient({
         ...bundle,
         load_state: {
           status: "loading",
-          message: "Restoring this mode’s stored run reference from local storage.",
+          message: "Opening the saved run from this browser.",
         },
       };
 

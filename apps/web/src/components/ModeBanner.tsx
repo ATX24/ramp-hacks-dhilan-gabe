@@ -3,73 +3,73 @@ import type { UiMode } from "@/lib/types";
 
 const COPY: Record<UiMode, { title: string; body: string; tone: "info" | "warn" }> = {
   default: {
-    title: "Fixture-driven rehearsal",
-    body: "Static fixture responses only. No live API or active run.",
+    title: "This is a saved sample",
+    body: "The page uses made-up data. It will not call a service or start a job.",
     tone: "info",
   },
   no_training_yet: {
-    title: "No training yet",
-    body: "Preflight and planned finite-job metadata only. Nothing has been submitted.",
+    title: "Nothing has started",
+    body: "You can inspect the plan, but no job has been sent.",
     tone: "info",
   },
   skipped_synthesis: {
-    title: "Synthesis skipped",
-    body: "Valid responses already present (skip_reason=responses_already_present).",
+    title: "The answers were already there",
+    body: "This saved sample did not need to fill any gaps.",
     tone: "info",
   },
   precomputed: {
-    title: "Precomputed artifacts",
-    body: "Checksum-verified prior-run artifacts are shown with projected economics labels. Nothing is active.",
+    title: "This is a saved run",
+    body: "The files and results came from an earlier run. Nothing is running now.",
     tone: "warn",
   },
   proved: {
-    title: "Proved",
+    title: "The saved run passed",
     body:
-      "A precomputed prior-run report satisfies the frozen proof gates. Nothing is active.",
+      "The earlier run passed its saved checks. Nothing is running now.",
     tone: "info",
   },
   do_not_distill: {
-    title: "Do not distill",
+    title: "Keep the current model",
     body:
-      "A precomputed prior-run report records that a cheaper baseline won. Nothing is active.",
+      "The saved result says a smaller model would not be the better choice.",
     tone: "warn",
   },
   failed_quality: {
-    title: "Failed quality",
+    title: "The result was not accurate enough",
     body:
-      "A precomputed prior-run report failed its quality gate. Nothing is active.",
+      "The saved run missed its accuracy target. Nothing is running now.",
     tone: "warn",
   },
   failed_economics: {
-    title: "Failed economics",
+    title: "The result would not save money",
     body:
-      "A precomputed prior-run report failed its economics gate. Nothing is active.",
+      "The saved run cost more than the plan allowed.",
     tone: "warn",
   },
   error: {
-    title: "Error fixture mode",
-    body: "Rendering typed failure and failed leakage checks from static fixtures.",
+    title: "This sample has a data problem",
+    body: "The page shows what happens when copied examples fail a safety check.",
     tone: "warn",
   },
   unavailable: {
-    title: "Unavailable recipe mode",
-    body: "Catalog-only recipe fails loud with RECIPE_NOT_IMPLEMENTED. No silent downgrade.",
+    title: "This method is not available",
+    body: "The page stops instead of choosing another method.",
     tone: "warn",
   },
   insufficient_evidence: {
-    title: "Insufficient evidence",
+    title: "The saved run needs another check",
     body:
-      "A precomputed prior run completed, but missing replication leaves proof_status=insufficient_evidence. Nothing is active.",
+      "The earlier run finished, but one repeat is missing. The result is not final.",
     tone: "warn",
   },
   loading: {
-    title: "Loading fixture state",
-    body: "Showing the explicit loading interface. No network request is being made.",
+    title: "Loading the sample",
+    body: "The page is showing a saved loading state. It is not making a request.",
     tone: "info",
   },
   fetch_failure: {
-    title: "Fixture fetch failure",
-    body: "Showing the explicit request-failure interface without calling a live API.",
+    title: "The sample did not load",
+    body: "This is a saved error state. The page did not call a live service.",
     tone: "warn",
   },
 };
@@ -93,7 +93,7 @@ export function ModeBanner({ mode }: { mode: UiMode }) {
           "failed_economics",
           "insufficient_evidence",
         ].includes(mode) ? (
-          <StatusBadge tone="precomputed">Precomputed</StatusBadge>
+          <StatusBadge tone="precomputed">Saved result</StatusBadge>
         ) : null}
       </div>
       <p style={{ margin: 0 }}>{copy.body}</p>

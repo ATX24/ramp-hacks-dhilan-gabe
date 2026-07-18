@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { GateList } from "@/components/GateList";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TrainingTelemetryPanel } from "@/components/TrainingTelemetryPanel";
 import { createApiClient } from "@/lib/api";
+import { buildProjectHref } from "@/lib/navigation";
 import {
   deriveTrainPresentation,
   isRunCancellable,
@@ -49,11 +51,11 @@ export function TrainStage({
   return (
     <section aria-labelledby="train-heading">
       <div className="panel">
-        <h2 id="train-heading">Train</h2>
+        <p className="text-kicker text-[var(--orange)]">Train</p>
+        <h1 id="train-heading">Make the smaller model</h1>
         <p>
-          Preflight resolves recipe, tokenizer, memory, and license gates. A finite
-          one-job plan is shown with a cost ceiling. All views are read-only fixture
-          representations.
+          This page shows how the model would learn, which machine it would use, and
+          the most the job may spend. Exact run settings stay under Advanced.
         </p>
         <ErrorBanner error={error} />
         <div
@@ -69,11 +71,11 @@ export function TrainStage({
         </div>
         <div className="meta-row">
           <span>
-            Run <code>{run.run_id}</code>
-          </span>
-          <span>
-            {presentation.kind === "prior_completion" ? "Recorded state" : "Run state"}{" "}
-            <code>{run.state}</code>
+            {presentation.kind === "prior_completion"
+              ? "Saved demo record"
+              : presentation.kind === "active"
+                ? "Live job"
+                : "Saved job plan"}
           </span>
           <StatusBadge
             tone={
@@ -91,20 +93,35 @@ export function TrainStage({
         </div>
       </div>
 
-      <TrainingTelemetryPanel telemetry={telemetry} />
+      <details className="panel">
+        <summary className="min-h-11 cursor-pointer py-3 font-serif text-xl">
+          Advanced job history
+        </summary>
+        <p>
+          This record shows the exact saved events and measurements. It is not needed
+          for the usual path.
+        </p>
+        <TrainingTelemetryPanel telemetry={telemetry} />
+      </details>
 
-      <div className="panel">
-        <h3>Recipe resolution</h3>
+      <details className="panel">
+        <summary className="min-h-11 cursor-pointer py-3 font-serif text-xl">
+          Advanced training method
+        </summary>
+        <p>
+          The training method (recipe) changes how the smaller model learns. Auto uses
+          the supported method that fits the data and machine.
+        </p>
         <div className="meta-row">
           <span>
-            Requested <code>{plan.requested_recipe}</code>
+            You asked for <code>{plan.requested_recipe}</code>
           </span>
           <span>
-            Resolved{" "}
+            Auto chose{" "}
             <code>{plan.resolved_recipe ?? "null"}</code>
           </span>
         </div>
-        <p>Resolver reasons:</p>
+        <p>Reasons:</p>
         <ul className="list-plain">
           {plan.resolver_reasons.map((reason) => (
             <li key={reason}>
@@ -112,7 +129,7 @@ export function TrainStage({
             </li>
           ))}
         </ul>
-        <p>Rejected alternatives:</p>
+        <p>Other methods it did not choose:</p>
         <ul className="list-plain">
           {plan.rejected_alternatives.map((alt) => (
             <li key={alt}>
@@ -120,84 +137,104 @@ export function TrainStage({
             </li>
           ))}
         </ul>
-      </div>
+        <p>
+          Run ID: <code>{run.run_id}</code>
+          <br />
+          Internal state: <code>{run.state}</code>
+        </p>
+      </details>
 
-      <div className="panel">
-        <h3>Pinned models</h3>
+      <details className="panel">
+        <summary className="min-h-11 cursor-pointer py-3 font-serif text-xl">
+          Advanced model versions
+        </summary>
+        <p>
+          The source model provides answers. The smaller model learns from them.
+          Exact versions stay fixed so another run can use the same pair.
+        </p>
         <div className="grid-2">
           <div className="stat">
-            <span className="label">Teacher</span>
+            <span className="label">Source model (teacher)</span>
             <span className="value" style={{ fontSize: "1.05rem" }}>
               {plan.teacher.id}
             </span>
             <span className="mono">{plan.teacher.revision}</span>
           </div>
           <div className="stat">
-            <span className="label">Student (TinyFable base)</span>
+            <span className="label">Smaller model (student)</span>
             <span className="value" style={{ fontSize: "1.05rem" }}>
               {plan.student.id}
             </span>
             <span className="mono">{plan.student.revision}</span>
           </div>
         </div>
-      </div>
+      </details>
 
-      <div className="panel">
-        <h3>Tokenizer · memory · license gates</h3>
+      <details className="panel">
+        <summary className="min-h-11 cursor-pointer py-3 font-serif text-xl">
+          Advanced safety checks
+        </summary>
+        <p>
+          These checks make sure the text format matches, the job fits in memory, and
+          the model licenses allow this use. The run stops if a required check fails.
+        </p>
         <GateList gates={plan.gates} />
-      </div>
+      </details>
 
       <div className="grid-2">
-        <div className="panel">
-          <h3>{presentation.configurationHeading}</h3>
+        <details className="panel">
+          <summary className="min-h-11 cursor-pointer py-3 font-serif text-xl">
+            Advanced machine setup
+          </summary>
+          <p>{presentation.configurationHeading}</p>
           <ul className="list-plain">
             <li>
-              Backend: <code>{plan.planned_job.backend}</code>
+              Job service (backend): <code>{plan.planned_job.backend}</code>
             </li>
             <li>
-              Instance: <code>{plan.planned_job.instance_type}</code>
+              Machine type (instance): <code>{plan.planned_job.instance_type}</code>
             </li>
             <li>
-              Max runtime: {plan.planned_job.max_runtime_seconds}s
+              Time limit: {plan.planned_job.max_runtime_seconds}s
             </li>
             <li>
-              Finite job: {plan.planned_job.finite ? "yes" : "no"}
+              The job has a hard stop: {plan.planned_job.finite ? "yes" : "no"}
             </li>
             <li>
-              Current activity:{" "}
+              Current work:{" "}
               <strong data-testid="job-activity">
                 {presentation.kind === "active" ? "active" : "none"}
               </strong>
             </li>
             <li>
-              Record source:{" "}
+              Source:{" "}
               {presentation.kind === "prior_completion"
-                ? "precomputed prior run"
-                : "fixture preparation"}
+                ? "saved earlier run"
+                : "saved sample plan"}
             </li>
             <li>
-              Peak memory estimate: {plan.memory_peak_gib_estimate} GiB
+              Estimated peak memory: {plan.memory_peak_gib_estimate} GiB
             </li>
             <li>
-              Wall time estimate: {plan.wall_time_minutes_estimate.low}–
+              Time estimate: {plan.wall_time_minutes_estimate.low} to{" "}
               {plan.wall_time_minutes_estimate.high} min
             </li>
           </ul>
-        </div>
+        </details>
 
         <div className="panel">
           <h3>{presentation.costHeading}</h3>
           <div className="grid-3">
             <div className="stat">
-              <span className="label">Ceiling</span>
+              <span className="label">Maximum</span>
               <span className="value">${plan.cost.max_run_usd}</span>
             </div>
             <div className="stat">
-              <span className="label">Est. low</span>
+              <span className="label">Low estimate</span>
               <span className="value">${plan.cost.estimate_low_usd}</span>
             </div>
             <div className="stat">
-              <span className="label">Est. high</span>
+              <span className="label">High estimate</span>
               <span className="value">${plan.cost.estimate_high_usd}</span>
             </div>
           </div>
@@ -213,17 +250,16 @@ export function TrainStage({
                   const updated = await client.cancelRun(run.run_id);
                   setCancelRequested(updated.cancel_requested);
                   setCancelNote(
-                    "Cancellation was recorded by the fixture client. No live service call was made.",
+                    "The saved sample now shows a stop request. No live service was called.",
                   );
                 }}
               >
-                {cancelRequested ? "Cancellation requested" : "Request cancellation"}
+                {cancelRequested ? "Stop requested" : "Stop this job"}
               </button>
             </div>
           ) : (
             <p data-testid="cancellation-unavailable">
-              Cancellation unavailable: this view does not represent an active, started
-              run.
+              There is no running job to stop. Leaving this alone changes nothing.
             </p>
           )}
           {cancelNote ? (
@@ -234,24 +270,30 @@ export function TrainStage({
         </div>
       </div>
 
-      <div className="panel">
-        <h3>Artifact integrity</h3>
-        {artifact ? (
+      {artifact ? (
+        <details className="panel">
+          <summary className="min-h-11 cursor-pointer py-3 font-serif text-xl">
+            Advanced saved model files
+          </summary>
+          <p>
+            These file names and fingerprints identify the exact model output. They are
+            useful when you download, repeat, or audit a run.
+          </p>
           <>
             <div className="meta-row">
               <span>
-                Artifact <code>{artifact.artifact_id}</code>
+                File set <code>{artifact.artifact_id}</code>
               </span>
               {artifact.precomputed ? (
-                <StatusBadge tone="precomputed">Precomputed</StatusBadge>
+                <StatusBadge tone="precomputed">Saved run</StatusBadge>
               ) : null}
             </div>
             <ul className="list-plain">
               <li>
-                Adapter URI: <code>{artifact.adapter_uri}</code>
+                Adapter file: <code>{artifact.adapter_uri}</code>
               </li>
               <li>
-                Merged URI: <code>{artifact.merged_uri ?? "—"}</code>
+                Merged file: <code>{artifact.merged_uri ?? "Not available"}</code>
               </li>
               {Object.entries(artifact.checksums).map(([name, sha]) => (
                 <li key={name}>
@@ -261,12 +303,23 @@ export function TrainStage({
             </ul>
             <p>{artifact.load_instructions}</p>
           </>
-        ) : (
-          <p data-testid="no-artifacts-yet">
-            No artifacts yet. This fixture contains preflight data only.
-          </p>
-        )}
-      </div>
+        </details>
+      ) : (
+        <div className="panel">
+          <div className="grid gap-3" data-testid="no-artifacts-yet">
+            <p>
+              There are no model files yet. This saved sample only contains the checks
+              that happen before a run.
+            </p>
+            <Link
+              href={buildProjectHref(mode, run.run_id)}
+              className="btn btn-primary w-fit"
+            >
+              Return to the project setup
+            </Link>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

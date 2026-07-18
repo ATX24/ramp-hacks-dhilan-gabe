@@ -12,18 +12,20 @@ function stableStringify(value: unknown): string {
 
 /**
  * Exact-match joint score when gold is available.
- * Returns null when gold is missing — UI must not invent a score.
+ * Returns null when gold is missing. The UI must not invent a score.
  */
 export function scoreAgainstGold(
   structuredOutput: Record<string, unknown>,
   goldOutput: Record<string, unknown> | null,
 ): { score: number | null; detail: string | null } {
   if (goldOutput === null) {
-    return { score: null, detail: "No gold available for this example." };
+    return { score: null, detail: "This example has no known-correct answer to score." };
   }
   const match = stableStringify(structuredOutput) === stableStringify(goldOutput);
   return {
     score: match ? 1 : 0,
-    detail: match ? "Exact match to gold." : "Does not exactly match gold.",
+    detail: match
+      ? "The result exactly matches the known-correct answer."
+      : "The result does not exactly match the known-correct answer.",
   };
 }
