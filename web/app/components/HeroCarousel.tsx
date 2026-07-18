@@ -43,7 +43,7 @@ export function HeroCarousel() {
             <div className="hero-lower">
               <div className="hero-deck">
                 <p>
-                  A portable finance generalist distilled from a 1.5B teacher
+                  A portable finance generalist distilled from a large API teacher
                   into a 0.5B student.
                 </p>
                 <Button asChild variant="outline">

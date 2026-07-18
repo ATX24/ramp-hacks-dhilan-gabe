@@ -25,7 +25,7 @@ const stages = [
   {
     number: "03",
     title: "Train",
-    copy: "Resolve sequence or logit distillation openly, then run one finite sealed job.",
+    copy: "Resolve a built-in or user-defined recipe openly, then run one finite sealed job.",
   },
   {
     number: "04",
@@ -87,10 +87,12 @@ export default function DistilleryPage() {
             <h2>TinyFable is the test, not the testimonial.</h2>
           </div>
           <p>
-            One Qwen2.5 1.5B teacher, one 0.5B student, and one finance-generalist
+            One large API teacher (Amazon Nova Pro, with Claude Fable traces), one 0.5B student, and one finance-generalist
             benchmark. The same TinyFable weights must handle transaction review
-            and variance analysis. Rules, base, teacher, a cheap API, oracle SFT,
-            sequence KD, and logit KD all get a seat at the table.
+            variance analysis, and cash reconciliation. Two recipes compete through
+            the same sealed pipeline: standard sequence KD on every valid teacher
+            label, and a user-defined rejection-sampling recipe that keeps only
+            oracle-verified labels.
           </p>
           <Link href="/#tinyfable">Meet TinyFable ↗</Link>
         </section>

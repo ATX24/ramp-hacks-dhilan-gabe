@@ -49,7 +49,7 @@ export function ProductStage() {
               </div>
               <div className="flex flex-col justify-between p-2 text-[#faf9f5] md:p-5">
                 <p className="max-w-xl font-serif text-[clamp(34px,4vw,62px)] leading-[1.02] tracking-[-0.03em]">
-                  One portable finance generalist. Distilled from a 1.5B teacher into a 0.5B model.
+                  One portable finance generalist. Distilled from a large API teacher into a 0.5B model.
                 </p>
                 <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl bg-white/15">
                   {[["0.5B", "parameters"], ["2", "finance tasks"], ["1", "set of weights"]].map(([value, label]) => (

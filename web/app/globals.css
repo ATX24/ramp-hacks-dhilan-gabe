@@ -1449,3 +1449,22 @@ a {
     @apply font-sans;
   }
 }
+
+/* Experiment page */
+.prose-block { max-width: 720px; font-family: var(--serif, Georgia, serif); font-size: 16px; line-height: 1.65; }
+.prose-block p + p { margin-top: 0.95rem; }
+.demo-runbar { display: flex; gap: 0.6rem; margin: 1.4rem 0 1rem; align-items: center; }
+.demo-select { font-family: var(--mono, monospace); font-size: 12px; padding: 0.45rem 0.6rem; border: 1px solid #d9d5ca; background: #fbfaf6; max-width: 60%; }
+.demo-run { font-family: var(--mono, monospace); font-size: 12px; padding: 0.45rem 1rem; border: 1px solid #171714; background: #171714; color: #f1eee6; cursor: pointer; }
+.demo-run:hover { background: #d75a3d; border-color: #d75a3d; }
+.demo-input span { font-family: var(--mono, monospace); font-size: 11px; color: #6d6a63; }
+.demo-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 800px) { .demo-cols { grid-template-columns: 1fr; } }
+.demo-card { border: 1px solid #d9d5ca; padding: 1rem; background: #fbfaf6; }
+.demo-card h3 { margin: 0 0 0.6rem; font-family: var(--serif, Georgia, serif); font-size: 15px; }
+.demo-card pre, .demo-input pre { font-family: var(--mono, monospace); font-size: 11.5px; background: #e9e5da; padding: 0.7rem; overflow-x: auto; white-space: pre-wrap; margin: 0.6rem 0 0; max-height: 320px; overflow-y: auto; }
+.demo-badge { display: inline-block; font-family: var(--mono, monospace); font-size: 11px; padding: 0.15rem 0.5rem; margin: 0 0.35rem 0.35rem 0; border: 1px solid #d9d5ca; color: #6d6a63; }
+.demo-ok { border-color: #2f7a3a; color: #2f7a3a; }
+.demo-bad { border-color: #d75a3d; color: #d75a3d; }
+.demo-pending { color: #6d6a63; font-style: italic; }
+.demo-expected { margin-top: 1rem; }
