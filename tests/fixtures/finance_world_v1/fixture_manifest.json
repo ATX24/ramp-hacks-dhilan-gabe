@@ -35,11 +35,11 @@
   "raw_line_sha256": {
     "ex_cash_hard_exc_001": "c2329014e494b21d687b2f4592296e27cb7924fe4d1e6b9f2cb2eac8f1dc4f8c",
     "ex_cash_medium_001": "0e33f4c032a9b5f24670ec26e79f61ce11d770cf96b1bc915dbcad0ff9742f00",
-    "ex_invalid_json_001": "a6f4b8e3748f40a61150bcf6975924e85497d854221c896c5932aa5537e0ff33",
+    "ex_invalid_json_001": "79c43b3c490a9784203e6520fd42f6b51d335055c83f460aceed69cf1a1612b4",
     "ex_txn_easy_001": "979129fe52190a769e8ae2bc62f4201e663bcaa3f2304448295b99e51e252a9f",
     "ex_txn_hard_001": "0f024ffd8cedd608d1e912637ab821413840b1d0a7fdf8dbafd4a3adafed8587",
     "ex_txn_medium_001": "650724502df7511f99b8fc42ed3a9a748b0121fc967b07afb91b6d315a20d590",
-    "ex_txn_unbalanced_001": "7fbf68d45d7420e4f027d4ae2525af09bec3665e1f1f5478db59496bdf3fe2d3",
+    "ex_txn_unbalanced_001": "bd2016b91b7f8c1a37941557b3775eeb61efda5233ee85914ed9446a8f902835",
     "ex_var_easy_001": "fff96a2cfa81637b4ff1a0b1f01056ff465e1eaffdce7ff29ad8d0773a38a1bf",
     "ex_var_hard_001": "b2da8d88fa435c83cf54e11240e38aa8b1b00ee045454d83833fa3268c624d87",
     "ex_var_medium_001": "4491cd9741504c2fc95cab6de8740c659daa52b04eaa3b198fe5c8dc404c66a5",
@@ -49,11 +49,11 @@
   "semantic_example_sha256": {
     "ex_cash_hard_exc_001": "709794427c28b773d4f569aab25ccaf87feb004cb7bee82a01367c175cf51cba",
     "ex_cash_medium_001": "c916e9260492ad73f7472c94b1caa6d745001a7548b0ba61096c6a059a2b3758",
-    "ex_invalid_json_001": "02ffc52231754818046400b7dc87b89f9b8f2fbaab61f202c00e8f238d18c8e1",
+    "ex_invalid_json_001": "8d67a190bcdf65dbd4d708d95b5b72681b4359c4485bc04c6e30620b2fbcbcbc",
     "ex_txn_easy_001": "3c19883fef9b45d7541471634af50b416a8ee3c4ffdb3ecb1114685a42d1ee8c",
     "ex_txn_hard_001": "6ded5c90fba6ad95742e3105d231e1f54649257cd369eb39b0ae595e4d387c75",
     "ex_txn_medium_001": "0899aea3552e76704a84fada99c7ad165603e29799023571e5e0b1e9a135dc10",
-    "ex_txn_unbalanced_001": "7489141d9165fac36b8009aec8682506210ef86718c315b0578633b022362746",
+    "ex_txn_unbalanced_001": "f7cbcffe81d19e5eb1218631c654e4981b0f44d8b39278233513c920c6ee029e",
     "ex_var_easy_001": "aec21959969d3e7e1ad65532e0dc7cb3e3e3a2db3d5f2a3a37248afb3e83bd38",
     "ex_var_hard_001": "4315d3c536ecbef4f7d51cc0accdadab95c83c926ebe615d858b059e430189a3",
     "ex_var_medium_001": "32f436fc7489b36b5cc3e3e18191e918cc1abe0d45a97496a5c4d2d57686961d",
@@ -63,10 +63,10 @@
   "files": {
     "golden.jsonl": {
       "line_count": 12,
-      "sha256": "3a19c49eb6bd66a363b66e94a1482867cb2025844d5832dd6e46a877c904397f"
+      "sha256": "328253b50cfe33245bb03dbbf4fb9b97e3ba2de6951f5810b0500f993d4d8f45"
     },
     "oracle_expected.json": {
-      "sha256": "8ff732ef4c4a969c95bd07883ffcd29a07823597f4297c11a378ff0e24bb21e8"
+      "sha256": "e872a3657a8486a122ab0952e5ca41c20cc7fc33eeb683e089dc3d3269518fad"
     }
   },
   "fixture_set": "finance_world_v1",

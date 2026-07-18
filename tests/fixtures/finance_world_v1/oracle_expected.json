@@ -70,7 +70,7 @@
       "evidence": [
         {
           "field": "amount_minor",
-          "source_id": "txn_test",
+          "source_id": "txn_edge",
           "value": "1200"
         }
       ],
@@ -89,7 +89,7 @@
       ],
       "policy_action": "approve",
       "rule_ids": [
-        "POL-TEST-MEAL-001"
+        "POL-MEAL-EDGE-001"
       ],
       "schema_version": "transaction_review.v1",
       "task": "transaction_review"
@@ -226,7 +226,7 @@
       ],
       "policy_action": "approve",
       "rule_ids": [
-        "POL-VALIDATION-MEAL-001"
+        "POL-MEAL-NEG-001"
       ],
       "schema_version": "transaction_review.v1",
       "task": "transaction_review"
@@ -257,7 +257,7 @@
       ],
       "policy_action": "approve",
       "rule_ids": [
-        "POL-VALIDATION-MEAL-001"
+        "POL-MEAL-NEG-001"
       ],
       "schema_version": "transaction_review.v1",
       "task": "transaction_review"
