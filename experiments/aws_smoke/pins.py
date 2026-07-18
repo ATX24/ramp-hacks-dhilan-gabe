@@ -50,12 +50,24 @@ _ECR_IMAGE_RE = re.compile(
 )
 
 
+# Official AWS Hugging Face training DLC account (us-east-1 / global DLC).
+AWS_HF_DLC_ACCOUNT_ID = "763104351884"
+AWS_HF_DLC_TRAINING_REPOSITORY = "huggingface-pytorch-training"
+
+
 @dataclass(frozen=True, slots=True)
 class EcrImageIdentity:
     account_id: str
     region: str
     repository: str
     digest: str
+
+    @property
+    def is_aws_hf_training_dlc(self) -> bool:
+        return (
+            self.account_id == AWS_HF_DLC_ACCOUNT_ID
+            and self.repository == AWS_HF_DLC_TRAINING_REPOSITORY
+        )
 
 
 def parse_digest_pinned_ecr_image(uri: str) -> EcrImageIdentity:
@@ -229,8 +241,11 @@ class EmergencyEvidence(BaseModel):
             )
         if identity.region != self.aws_region:
             raise ValueError("ecr_image_uri region does not match aws_region")
-        if identity.account_id != self.aws_account_id:
-            raise ValueError("ecr_image_uri account does not match aws_account_id")
+        if identity.account_id != self.aws_account_id and not identity.is_aws_hf_training_dlc:
+            raise ValueError(
+                "ecr_image_uri account must match aws_account_id or be the "
+                "pinned AWS Hugging Face training DLC account"
+            )
         if self.student_tokenizer_sha256 != self.teacher_tokenizer_sha256:
             raise ValueError(
                 "logit KD requires identical teacher/student tokenizer sha256 evidence"

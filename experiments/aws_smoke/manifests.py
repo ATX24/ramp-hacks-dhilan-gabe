@@ -673,7 +673,8 @@ def write_arm_manifests(
         paths[arm] = path
 
     first_arm = arms[0]
-    assert_arms_comparable(manifests)
+    if len(manifests) >= 2:
+        assert_arms_comparable(manifests)
     baseline_order = plans[first_arm].order
     for arm, plan in plans.items():
         if plan.order != baseline_order:

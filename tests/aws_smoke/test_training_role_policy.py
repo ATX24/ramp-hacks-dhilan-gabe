@@ -21,6 +21,10 @@ def test_model_reads_are_separate_and_prefix_scoped() -> None:
         model_channel_prefix="models",
         model_prefix="models/Qwen",
         model_materialization_key="models/materialization.json",
+        code_prefix="artifacts/rescue/code/deadbeef-cafebabe",
+        additional_ecr_repository_arns=(
+            "arn:aws:ecr:us-east-1:763104351884:repository/huggingface-pytorch-training",
+        ),
     )
     statements = {statement["Sid"]: statement for statement in policy["Statement"]}
     assert statements["ModelBucketList"]["Condition"]["StringLike"]["s3:prefix"] == [
@@ -44,6 +48,14 @@ def test_model_reads_are_separate_and_prefix_scoped() -> None:
             "arn:aws:s3:::distillery-225989358036-us-east-1/"
             "datasets/ds_awssmoke01/*"
         ),
+        (
+            "arn:aws:s3:::distillery-225989358036-us-east-1/"
+            "artifacts/rescue/code/deadbeef-cafebabe/*"
+        ),
+    ]
+    assert statements["ECRPullRepository"]["Resource"] == [
+        "arn:aws:ecr:us-east-1:225989358036:repository/distillery-training",
+        "arn:aws:ecr:us-east-1:763104351884:repository/huggingface-pytorch-training",
     ]
     assert statements["RunOutputWrite"]["Resource"] == [
         (

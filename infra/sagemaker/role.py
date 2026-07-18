@@ -32,6 +32,8 @@ def training_role_inline_policy(
     model_channel_prefix: str,
     model_prefix: str,
     model_materialization_key: str,
+    code_prefix: str | None = None,
+    additional_ecr_repository_arns: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Build separate read/write scopes for one run, dataset, and model set."""
     for value, name in (
@@ -40,8 +42,10 @@ def training_role_inline_policy(
     ):
         if not value.startswith("arn:aws:s3:::"):
             raise ValueError(f"{name} must be an S3 bucket ARN")
-    if ":ecr:" not in ecr_repository_arn or ":repository/" not in ecr_repository_arn:
-        raise ValueError("ecr_repository_arn must be an ECR repository ARN")
+    ecr_arns = (ecr_repository_arn, *additional_ecr_repository_arns)
+    for value in ecr_arns:
+        if ":ecr:" not in value or ":repository/" not in value:
+            raise ValueError("ecr_repository_arn must be an ECR repository ARN")
     for value, name in (
         (run_artifact_prefix, "run_artifact_prefix"),
         (dataset_prefix, "dataset_prefix"),
@@ -50,6 +54,21 @@ def training_role_inline_policy(
         (model_materialization_key, "model_materialization_key"),
     ):
         _validate_prefix(value, name=name)
+    if code_prefix is not None:
+        _validate_prefix(code_prefix, name="code_prefix")
+
+    list_prefixes = [
+        f"{run_artifact_prefix}/manifest/*",
+        f"{run_artifact_prefix}/sagemaker-output/*",
+        f"{dataset_prefix}/*",
+    ]
+    read_resources = [
+        f"{artifact_bucket_arn}/{run_artifact_prefix}/manifest/*",
+        f"{artifact_bucket_arn}/{dataset_prefix}/*",
+    ]
+    if code_prefix is not None:
+        list_prefixes.append(f"{code_prefix}/*")
+        read_resources.append(f"{artifact_bucket_arn}/{code_prefix}/*")
 
     return {
         "Version": "2012-10-17",
@@ -61,11 +80,7 @@ def training_role_inline_policy(
                 "Resource": [artifact_bucket_arn],
                 "Condition": {
                     "StringLike": {
-                        "s3:prefix": [
-                            f"{run_artifact_prefix}/manifest/*",
-                            f"{run_artifact_prefix}/sagemaker-output/*",
-                            f"{dataset_prefix}/*",
-                        ]
+                        "s3:prefix": list_prefixes
                     }
                 },
             },
@@ -73,10 +88,7 @@ def training_role_inline_policy(
                 "Sid": "ManifestAndDatasetRead",
                 "Effect": "Allow",
                 "Action": ["s3:GetObject"],
-                "Resource": [
-                    f"{artifact_bucket_arn}/{run_artifact_prefix}/manifest/*",
-                    f"{artifact_bucket_arn}/{dataset_prefix}/*",
-                ],
+                "Resource": read_resources,
             },
             {
                 "Sid": "ModelBucketList",
@@ -134,7 +146,7 @@ def training_role_inline_policy(
                     "ecr:GetDownloadUrlForLayer",
                     "ecr:BatchGetImage",
                 ],
-                "Resource": [ecr_repository_arn],
+                "Resource": list(ecr_arns),
             },
             {
                 "Sid": "CloudWatchLogs",
