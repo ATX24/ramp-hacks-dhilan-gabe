@@ -196,8 +196,15 @@ def validate_mixture_distribution(
     examples: Sequence[SamplerExample],
     *,
     mixture: MixtureSpec,
+    require_difficulty_lra: bool = True,
 ) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
-    """Require exact rounded 45/45/10 and per-task 30/40/30 counts."""
+    """Require exact rounded task weights and per-task difficulty counts.
+
+    When ``require_difficulty_lra`` is false, task LRA is still enforced, but
+    per-task difficulty counts are taken from the observed examples. Emergency
+    smoke corpora use joint cell allocation that can diverge from independent
+    difficulty LRA at small per-task N.
+    """
     if not examples:
         raise ValueError("sampler requires at least one example")
     ids = [example.example_id for example in examples]
@@ -243,12 +250,15 @@ def validate_mixture_distribution(
         for example in examples:
             if example.task == task:
                 actual[example.difficulty] += 1
-        if actual != expected:
-            raise ValueError(
-                "difficulty mixture does not match deterministic largest-remainder "
-                f"allocation for task {task}: expected={expected} actual={actual}"
-            )
-        expected_difficulties[task] = expected
+        if require_difficulty_lra:
+            if actual != expected:
+                raise ValueError(
+                    "difficulty mixture does not match deterministic largest-remainder "
+                    f"allocation for task {task}: expected={expected} actual={actual}"
+                )
+            expected_difficulties[task] = expected
+        else:
+            expected_difficulties[task] = actual
     return expected_tasks, expected_difficulties
 
 
@@ -283,6 +293,7 @@ def build_mixture_aware_order(
     *,
     seed: int,
     mixture: MixtureSpec | None = None,
+    require_difficulty_lra: bool = True,
 ) -> list[str]:
     """
     Build a deterministic order that respects task mixture proportions.
@@ -292,7 +303,9 @@ def build_mixture_aware_order(
     """
     spec = mixture or DEFAULT_FINANCE_MIXTURE
     expected_tasks, expected_difficulties = validate_mixture_distribution(
-        examples, mixture=spec
+        examples,
+        mixture=spec,
+        require_difficulty_lra=require_difficulty_lra,
     )
     by_stratum: dict[tuple[str, str], list[str]] = {}
     for ex in examples:
@@ -349,13 +362,21 @@ def plan_batches(
     seed: int,
     microbatch_size: int = 1,
     mixture: MixtureSpec | None = None,
+    require_difficulty_lra: bool = True,
 ) -> BatchPlan:
     """End-to-end deterministic batch plan with sampler_order_hash."""
     spec = mixture or DEFAULT_FINANCE_MIXTURE
     expected_tasks, expected_difficulties = validate_mixture_distribution(
-        examples, mixture=spec
+        examples,
+        mixture=spec,
+        require_difficulty_lra=require_difficulty_lra,
     )
-    order = build_mixture_aware_order(examples, seed=seed, mixture=spec)
+    order = build_mixture_aware_order(
+        examples,
+        seed=seed,
+        mixture=spec,
+        require_difficulty_lra=require_difficulty_lra,
+    )
     batches = chunk_batches(order, microbatch_size=microbatch_size)
     order_hash = sampler_order_hash(
         order,

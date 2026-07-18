@@ -36,6 +36,7 @@ from distillery.contracts.manifest import (
 from distillery.training.batching import (
     DEFAULT_FINANCE_MIXTURE,
     BatchPlan,
+    MixtureSpec,
     SamplerExample,
     plan_batches,
 )
@@ -52,6 +53,16 @@ from experiments.aws_smoke.profile import (
 from experiments.aws_smoke.tokenization import (
     ArmTokenizationEvidence,
     TokenizationEvidence,
+)
+
+# Matches experiments.aws_smoke.dataset_subset emergency task mixture. Difficulty
+# LRA is not independently enforced because joint corpus cells can diverge at N=6.
+EMERGENCY_FINANCE_MIXTURE = MixtureSpec(
+    task_weights={
+        "variance_analysis": 0.8,
+        "cash_reconciliation": 0.2,
+    },
+    difficulty_weights=dict(DEFAULT_FINANCE_MIXTURE.difficulty_weights),
 )
 
 
@@ -119,7 +130,8 @@ def build_sampler_plan(
         examples,
         seed=seed,
         microbatch_size=microbatch_size,
-        mixture=DEFAULT_FINANCE_MIXTURE,
+        mixture=EMERGENCY_FINANCE_MIXTURE,
+        require_difficulty_lra=False,
     )
 
 
