@@ -1,6 +1,6 @@
 # Decision: Qwen2.5-72B expensive quality fallback
 
-Date: 2026-07-18  
+Date: 2026-07-18
 Workstream: `feat/distillery-qwen72b-fallback`
 Decision id: `decision_qwen72b_finance_world_v2_fallback_v2`
 

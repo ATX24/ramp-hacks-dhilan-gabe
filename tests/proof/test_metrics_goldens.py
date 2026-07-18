@@ -211,7 +211,7 @@ def test_journal_set_f1_hand_calc() -> None:
 
 def test_calibration_brier_hand_calc() -> None:
     gold = txn_gold()
-    # two schema-valid: conf 1.0 correct, conf 0.0 incorrect → brier = (0+0)/2? 
+    # two schema-valid: conf 1.0 correct, conf 0.0 incorrect → brier = (0+0)/2?
     # (1-1)^2=0, for incorrect use conf 0.0 and joint false → (0-0)^2=0 → brier=0
     # Better: conf 0.8 correct and conf 0.8 incorrect
     # brier = ((0.8-1)^2 + (0.8-0)^2) / 2 = (0.04 + 0.64) / 2 = 0.34

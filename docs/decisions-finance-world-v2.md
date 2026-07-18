@@ -1,6 +1,6 @@
 # Decision: finance_world.v1 vs finance_world.v2 (Merchant Tagging)
 
-Date: 2026-07-18  
+Date: 2026-07-18
 Status: locked for next campaign; does not alter active v1 smoke
 
 ## Context
