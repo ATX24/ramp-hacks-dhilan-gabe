@@ -1,4 +1,4 @@
-"""Serial launcher / dry-run planner for three emergency arms (quota=1)."""
+"""Serial launcher plan with canonical manifest channels and isolated networking."""
 
 from __future__ import annotations
 
@@ -7,24 +7,32 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+from urllib.parse import urlparse
 
-from distillery.backends.safety import parse_digest_pinned_ecr_image
 from distillery.contracts.manifest import SealedRunManifest
-from experiments.aws_smoke.manifests import job_name_for_arm
-from experiments.aws_smoke.pins import EmergencyEvidence
+from experiments.aws_smoke.channels import (
+    CANONICAL_MANIFEST_FILENAME,
+    load_manifest,
+)
+from experiments.aws_smoke.manifests import (
+    job_name_for_arm,
+    manifest_arm,
+    manifest_objective,
+)
+from experiments.aws_smoke.pins import EmergencyEvidence, parse_digest_pinned_ecr_image
 from experiments.aws_smoke.profile import (
     DEFAULT_EMERGENCY_PROFILE,
-    REQUIRED_ARMS,
     EmergencyTrainingProfile,
     RunArm,
+    default_launch_order,
 )
-from experiments.aws_smoke.safety import (
-    CallerIdentity,
-    enforce_safety_gates,
-)
+from experiments.aws_smoke.safety import CallerIdentity, enforce_safety_gates
 
 ENTRYPOINT = ["python", "-m", "experiments.aws_smoke.train"]
+CONTAINER_MANIFEST_PATH = (
+    f"/opt/ml/input/data/manifest/{CANONICAL_MANIFEST_FILENAME}"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +45,11 @@ class PlannedJob:
     max_runtime_seconds: int
     max_run_usd: float
     hourly_usd: float
+    scientific_role: str
+    distinct_training_signal: bool
+    equivalent_to: str | None
+    local_manifest_path: Path
+    manifest_object_uri: str
     create_training_job_request: dict[str, Any]
 
 
@@ -49,13 +62,86 @@ class SerialLaunchPlan:
     quota_instance_count: int
     jobs: tuple[PlannedJob, ...]
     total_ceiling_usd: float
+    distinct_signal_count: int
     identity: CallerIdentity | None
 
 
-def load_manifest(path: Path) -> SealedRunManifest:
-    return SealedRunManifest.model_validate(
-        json.loads(path.read_text(encoding="utf-8"))
+class S3UploadClient(Protocol):
+    def upload_file(
+        self,
+        filename: str,
+        bucket: str,
+        key: str,
+        ExtraArgs: dict[str, str] | None = None,
+    ) -> Any: ...
+
+
+def discover_generated_manifest_paths(
+    manifests_dir: Path,
+) -> dict[RunArm, Path]:
+    """Read canonical paths from the generated campaign index."""
+    index_path = manifests_dir / "campaign_index.json"
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    raw_arms = payload.get("arms")
+    if not isinstance(raw_arms, dict):
+        raise ValueError("campaign index missing arms map")
+    result: dict[RunArm, Path] = {}
+    for arm, metadata in raw_arms.items():
+        if arm not in {"oracle_sft", "ce_ablation", "logit_kd", "sequence_kd"}:
+            raise ValueError(f"campaign index contains unknown arm {arm!r}")
+        if not isinstance(metadata, dict):
+            raise ValueError(f"campaign index arm {arm} metadata must be an object")
+        relative = metadata.get("manifest")
+        if not isinstance(relative, str):
+            raise ValueError(f"campaign index arm {arm} lacks manifest path")
+        path = manifests_dir / relative
+        if not path.resolve().is_relative_to(manifests_dir.resolve()):
+            raise ValueError(f"campaign index arm {arm} manifest escapes campaign dir")
+        if path.name != CANONICAL_MANIFEST_FILENAME:
+            raise ValueError(f"campaign index arm {arm} uses noncanonical manifest name")
+        if not path.is_file():
+            raise FileNotFoundError(f"campaign index manifest missing: {path}")
+        result[arm] = path  # type: ignore[index]
+    return result
+
+
+def manifest_object_uri(request: Mapping[str, Any]) -> str:
+    channels = {
+        str(channel["ChannelName"]): channel
+        for channel in request["InputDataConfig"]
+    }
+    prefix = channels["manifest"]["DataSource"]["S3DataSource"]["S3Uri"]
+    return str(prefix).rstrip("/") + f"/{CANONICAL_MANIFEST_FILENAME}"
+
+
+def stage_manifest_for_job(
+    client: S3UploadClient,
+    *,
+    local_manifest_path: Path,
+    request: Mapping[str, Any],
+) -> str:
+    """Upload exactly canonical manifest.json to the request's channel prefix."""
+    manifest = load_manifest(local_manifest_path)
+    expected_sha256 = str(request["HyperParameters"]["manifest_sha256"])
+    if manifest.seal_sha256() != expected_sha256:
+        raise ValueError("local manifest seal differs from CreateTrainingJob request")
+    target = manifest_object_uri(request)
+    expected_target = (
+        manifest.output.prefix.rstrip("/")
+        + f"/manifest/{CANONICAL_MANIFEST_FILENAME}"
     )
+    if target != expected_target:
+        raise ValueError("manifest staging target differs from sealed output prefix")
+    parsed = urlparse(target)
+    if parsed.scheme != "s3" or not parsed.netloc or not parsed.path.lstrip("/"):
+        raise ValueError(f"invalid manifest staging S3 URI: {target}")
+    client.upload_file(
+        str(local_manifest_path),
+        parsed.netloc,
+        parsed.path.lstrip("/"),
+        ExtraArgs={"ContentType": "application/json"},
+    )
+    return target
 
 
 def build_create_training_job_request(
@@ -65,7 +151,7 @@ def build_create_training_job_request(
     arm: RunArm,
     profile: EmergencyTrainingProfile | None = None,
 ) -> dict[str, Any]:
-    """Pure request builder. Does not call AWS."""
+    """Build one finite, network-isolated request without calling AWS."""
     p = profile or DEFAULT_EMERGENCY_PROFILE
     if manifest.runtime.instance_type != p.instance_type:
         raise ValueError(
@@ -75,10 +161,17 @@ def build_create_training_job_request(
         raise ValueError("emergency path requires quota_instance_count == 1")
     if p.max_runtime_seconds > 15 * 60:
         raise ValueError("MaxRuntime must be <= 15 minutes for emergency path")
+    if manifest.tags.get("EnableNetworkIsolation") != "true":
+        raise ValueError("manifest must seal EnableNetworkIsolation=true")
     identity = parse_digest_pinned_ecr_image(evidence.ecr_image_uri)
     if identity.digest != manifest.runtime.image_digest:
-        raise ValueError("manifest image_digest does not match evidence ecr image")
+        raise ValueError("manifest image_digest does not match evidence ECR image")
+    if manifest.dataset.sha256 != evidence.data_content_sha256:
+        raise ValueError("manifest dataset hash does not match operator evidence")
+    if manifest_arm(manifest) != arm:
+        raise ValueError("request arm does not match sealed manifest arm")
 
+    objective = manifest_objective(manifest)
     job_name = job_name_for_arm(arm, manifest_sha256=manifest.seal_sha256())
     output_prefix = manifest.output.prefix.rstrip("/") + "/"
     hyperparams = {
@@ -88,6 +181,9 @@ def build_create_training_job_request(
         "max_run_usd": str(manifest.cost.max_run_usd),
         "hourly_usd": str(p.hourly_usd),
         "emergency_profile": p.name,
+        "initialization_fingerprint": str(
+            manifest.tags["InitializationFingerprint"]
+        ),
     }
     return {
         "TrainingJobName": job_name,
@@ -97,7 +193,7 @@ def build_create_training_job_request(
             "ContainerEntrypoint": list(ENTRYPOINT),
             "ContainerArguments": [
                 "--manifest",
-                "/opt/ml/input/data/manifest/manifest.json",
+                CONTAINER_MANIFEST_PATH,
                 "--arm",
                 arm,
             ],
@@ -151,7 +247,7 @@ def build_create_training_job_request(
             "MaxRuntimeInSeconds": p.max_runtime_seconds,
         },
         "HyperParameters": hyperparams,
-        "EnableNetworkIsolation": False,
+        "EnableNetworkIsolation": True,
         "EnableManagedSpotTraining": False,
         "Tags": [
             {"Key": "Project", "Value": "RampHackathon"},
@@ -163,6 +259,11 @@ def build_create_training_job_request(
             {"Key": "ManifestSha256", "Value": manifest.seal_sha256()},
             {"Key": "Backend", "Value": "sagemaker"},
             {"Key": "EmergencyProfile", "Value": p.name},
+            {"Key": "ScientificRole", "Value": str(objective["scientific_role"])},
+            {
+                "Key": "DistinctTrainingSignal",
+                "Value": str(objective["distinct_training_signal"]).lower(),
+            },
         ],
     }
 
@@ -176,14 +277,19 @@ def plan_serial_launch(
     dry_run: bool = True,
     identity_provider: Any | None = None,
     training_profile: EmergencyTrainingProfile | None = None,
-    arms: Sequence[RunArm] = REQUIRED_ARMS,
+    arms: Sequence[RunArm] | None = None,
+    require_three_distinct: bool = True,
 ) -> SerialLaunchPlan:
-    """
-    Build a serial (quota=1) launch plan for the three required arms.
-
-    Default is dry-run. Mutation requires safety gates + confirmation phrase.
-    """
+    """Plan one-at-a-time jobs; default order requires three distinct signals."""
     p = training_profile or DEFAULT_EMERGENCY_PROFILE
+    launch_arms = (
+        tuple(arms)
+        if arms is not None
+        else default_launch_order(
+            set(manifest_paths),
+            require_three_distinct=require_three_distinct,
+        )
+    )
     identity = enforce_safety_gates(
         profile=profile_name,
         confirm=confirm,
@@ -193,8 +299,11 @@ def plan_serial_launch(
     )
     jobs: list[PlannedJob] = []
     seen_names: set[str] = set()
-    for arm in arms:
-        path = manifest_paths[arm]
+    for arm in launch_arms:
+        try:
+            path = manifest_paths[arm]
+        except KeyError:
+            raise ValueError(f"launch arm {arm} lacks a generated manifest") from None
         manifest = load_manifest(path)
         request = build_create_training_job_request(
             manifest=manifest,
@@ -206,6 +315,7 @@ def plan_serial_launch(
         if job_name in seen_names:
             raise ValueError(f"duplicate TrainingJobName across arms: {job_name}")
         seen_names.add(job_name)
+        objective = manifest_objective(manifest)
         jobs.append(
             PlannedJob(
                 arm=arm,
@@ -216,8 +326,19 @@ def plan_serial_launch(
                 max_runtime_seconds=p.max_runtime_seconds,
                 max_run_usd=manifest.cost.max_run_usd,
                 hourly_usd=p.hourly_usd,
+                scientific_role=str(objective["scientific_role"]),
+                distinct_training_signal=bool(objective["distinct_training_signal"]),
+                equivalent_to=objective["equivalent_to"],
+                local_manifest_path=path,
+                manifest_object_uri=manifest_object_uri(request),
                 create_training_job_request=request,
             )
+        )
+    distinct_count = sum(job.distinct_training_signal for job in jobs)
+    if require_three_distinct and distinct_count < 3:
+        raise ValueError(
+            f"default launch requires 3 distinct signals, planned only {distinct_count}; "
+            "ce_ablation is an oracle_sft-equivalent control"
         )
     return SerialLaunchPlan(
         dry_run=dry_run,
@@ -227,6 +348,7 @@ def plan_serial_launch(
         quota_instance_count=p.quota_instance_count,
         jobs=tuple(jobs),
         total_ceiling_usd=sum(job.max_run_usd for job in jobs),
+        distinct_signal_count=distinct_count,
         identity=identity,
     )
 
@@ -239,6 +361,7 @@ def plan_to_dict(plan: SerialLaunchPlan) -> dict[str, Any]:
         "instance_type": plan.instance_type,
         "quota_instance_count": plan.quota_instance_count,
         "total_ceiling_usd": plan.total_ceiling_usd,
+        "distinct_signal_count": plan.distinct_signal_count,
         "planned_at": datetime.now(tz=UTC).isoformat(),
         "identity_arn": plan.identity.arn if plan.identity is not None else None,
         "jobs": [
@@ -251,12 +374,21 @@ def plan_to_dict(plan: SerialLaunchPlan) -> dict[str, Any]:
                 "max_runtime_seconds": job.max_runtime_seconds,
                 "max_run_usd": job.max_run_usd,
                 "hourly_usd": job.hourly_usd,
+                "scientific_role": job.scientific_role,
+                "distinct_training_signal": job.distinct_training_signal,
+                "equivalent_to": job.equivalent_to,
+                "local_manifest_path": str(job.local_manifest_path),
+                "manifest_object_uri": job.manifest_object_uri,
                 "create_training_job_request": job.create_training_job_request,
             }
             for job in plan.jobs
         ],
         "serial_note": (
-            "Submit jobs one at a time; wait for terminal state before the next "
-            "(quota InstanceCount=1 on ml.g5.xlarge)."
+            "Submit one job at a time and wait for terminal state because quota is "
+            "one ml.g5.xlarge instance."
+        ),
+        "control_disclosure": (
+            "ce_ablation is identical to oracle_sft when both use oracle hard "
+            "targets; it is a replication/control, not a third distinct method."
         ),
     }

@@ -25,11 +25,15 @@ if str(_REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from experiments.aws_smoke.launch_plan import (  # noqa: E402
+    discover_generated_manifest_paths,
     plan_serial_launch,
     plan_to_dict,
+    stage_manifest_for_job,
 )
 from experiments.aws_smoke.pins import load_evidence  # noqa: E402
-from experiments.aws_smoke.profile import REQUIRED_ARMS, RunArm  # noqa: E402
+from experiments.aws_smoke.profile import (  # noqa: E402
+    DEFAULT_UNIQUE_LAUNCH_ORDER,
+)
 from experiments.aws_smoke.safety import CONFIRM_PHRASE, CallerIdentity  # noqa: E402
 
 
@@ -62,28 +66,36 @@ def main() -> int:
         help="Attempt CreateTrainingJob (also requires DISTILLERY_AWS_SMOKE_EXECUTE=1)",
     )
     parser.add_argument("--plan-out", type=Path, default=None)
+    parser.add_argument(
+        "--allow-control-as-third",
+        action="store_true",
+        help=(
+            "Allow oracle_sft-equivalent ce_ablation as a third job when "
+            "sequence_kd evidence is absent; output remains only two distinct signals"
+        ),
+    )
+    parser.add_argument(
+        "--include-control",
+        action="store_true",
+        help="Append ce_ablation after the three distinct default signals",
+    )
     args = parser.parse_args()
 
     evidence = load_evidence(args.evidence)
-    manifest_paths: dict[RunArm, Path] = {}
-    for arm in REQUIRED_ARMS:
-        path = args.manifests_dir / f"manifest_{arm}.json"
-        if not path.is_file():
-            raise SystemExit(f"missing manifest for arm {arm}: {path}")
-        manifest_paths[arm] = path
+    manifest_paths = discover_generated_manifest_paths(args.manifests_dir)
 
     dry_run = bool(args.dry_run) and not bool(args.execute)
+
     def identity_provider() -> CallerIdentity:
         return _sts_identity(args.profile, evidence.aws_region)
 
-    # Planning always builds requests; identity resolution is optional for pure dry-run
-    # without network. When --execute is set, safety gates require STS.
-    provider = None
-    if dry_run and os.environ.get("DISTILLERY_AWS_SMOKE_SKIP_STS", "") == "1":
-        provider = None
-    elif args.profile:
-        provider = identity_provider
+    # Dry-run is strictly local. Execution resolves STS for the non-root gate.
+    provider = None if dry_run else identity_provider
 
+    explicit_arms = None
+    require_three_distinct = not args.allow_control_as_third
+    if args.include_control and "sequence_kd" in manifest_paths:
+        explicit_arms = DEFAULT_UNIQUE_LAUNCH_ORDER + ("ce_ablation",)
     plan = plan_serial_launch(
         manifest_paths=manifest_paths,
         evidence=evidence,
@@ -91,6 +103,8 @@ def main() -> int:
         confirm=args.confirm,
         dry_run=dry_run,
         identity_provider=provider,
+        arms=explicit_arms,
+        require_three_distinct=require_three_distinct,
     )
     payload = plan_to_dict(plan)
     if args.plan_out is not None:
@@ -114,13 +128,25 @@ def main() -> int:
     # Intentionally left as an explicit opt-in mutation path for operators.
     session = boto3.Session(profile_name=args.profile, region_name=evidence.aws_region)
     sm = session.client("sagemaker")
+    s3 = session.client("s3")
     submitted: list[dict[str, Any]] = []
     for job in plan.jobs:
         # Serial: submit first only; operator resumes remaining via jobctl.
         if submitted:
             break
+        staged_uri = stage_manifest_for_job(
+            s3,
+            local_manifest_path=job.local_manifest_path,
+            request=job.create_training_job_request,
+        )
         sm.create_training_job(**job.create_training_job_request)
-        submitted.append({"arm": job.arm, "job_name": job.job_name})
+        submitted.append(
+            {
+                "arm": job.arm,
+                "job_name": job.job_name,
+                "manifest_object_uri": staged_uri,
+            }
+        )
     print(
         json.dumps(
             {

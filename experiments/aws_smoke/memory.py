@@ -1,4 +1,4 @@
-"""A10G memory gates for QLoRA vs BF16-LoRA emergency student loads."""
+"""A10G/A100 memory gates for QLoRA vs BF16-LoRA emergency student loads."""
 
 from __future__ import annotations
 
@@ -6,14 +6,73 @@ import math
 from dataclasses import dataclass
 from typing import Literal
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 PrecisionMode = Literal["qlora_nf4", "bf16_lora"]
 
 # Public parameter counts from Qwen2.5 model cards (approx; used only for gating).
 QWEN25_05B_PARAMS = 494_000_000
 QWEN25_15B_PARAMS = 1_540_000_000
 A10G_VRAM_BYTES = 24 * 1024**3
+A100_80GB_VRAM_BYTES = 80 * 1024**3
+MAX_SUPPORTED_VRAM_BYTES = A100_80GB_VRAM_BYTES
 # Leave headroom for CUDA context, activations, optimizer state on LoRA params.
 A10G_USABLE_FRACTION = 0.82
+
+
+class EmergencyMemoryProbeEvidence(BaseModel):
+    """Measured GPU probe evidence bound to exact model/runtime settings."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: Literal["distillery.aws_smoke.memory_probe.v2"] = (
+        "distillery.aws_smoke.memory_probe.v2"
+    )
+    passed: bool
+    precision_mode: PrecisionMode
+    device_type: Literal["NVIDIA A10G", "NVIDIA A100-SXM4-80GB"]
+    peak_memory_bytes: int = Field(ge=1, le=MAX_SUPPORTED_VRAM_BYTES)
+    capacity_memory_bytes: int = Field(ge=1, le=MAX_SUPPORTED_VRAM_BYTES)
+    headroom_bytes: int = Field(ge=1, le=MAX_SUPPORTED_VRAM_BYTES)
+    probe_id: str = Field(min_length=1)
+    student_model_id: str = Field(min_length=1)
+    student_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    teacher_model_id: str = Field(min_length=1)
+    teacher_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    max_length: int = Field(ge=1)
+    max_completion: int = Field(ge=1)
+    vocab_chunk_size: int = Field(ge=1)
+    microbatch: int = Field(ge=1)
+    grad_accumulation: int = Field(ge=1)
+    runtime_image_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    instance_type: Literal[
+        "ml.g5.xlarge",
+        "ml.g5.12xlarge",
+        "ml.g5.48xlarge",
+        "ml.p4de.24xlarge",
+    ]
+
+    @model_validator(mode="after")
+    def _validate_measurement(self) -> EmergencyMemoryProbeEvidence:
+        if self.headroom_bytes != self.capacity_memory_bytes - self.peak_memory_bytes:
+            raise ValueError("headroom_bytes must equal capacity_memory_bytes - peak")
+        if self.peak_memory_bytes >= self.capacity_memory_bytes:
+            raise ValueError("memory probe must retain positive measured headroom")
+        if self.instance_type == "ml.p4de.24xlarge":
+            if self.device_type != "NVIDIA A100-SXM4-80GB":
+                raise ValueError("p4de memory evidence requires NVIDIA A100-SXM4-80GB")
+        elif self.device_type != "NVIDIA A10G":
+            raise ValueError("g5 memory evidence requires NVIDIA A10G")
+        if (
+            self.device_type == "NVIDIA A10G"
+            and self.capacity_memory_bytes > A10G_VRAM_BYTES
+        ):
+            raise ValueError("A10G capacity evidence cannot exceed 24 GiB")
+        return self
+
+
+# Compatibility name for the first emergency-path draft.
+Bf16MemoryEvidence = EmergencyMemoryProbeEvidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,15 +146,21 @@ def estimate_emergency_memory(
 
 def select_precision_mode(
     *,
-    bitsandbytes_available: bool,
-    bitsandbytes_reliable: bool,
+    sealed_mode: PrecisionMode,
+    nf4_kernel_probe_passed: bool,
+    bf16_memory_evidence: EmergencyMemoryProbeEvidence | None,
     max_length: int,
     microbatch: int,
     lora_rank: int,
     load_teacher: bool,
 ) -> MemoryEstimate:
-    """Prefer QLoRA; fall back to BF16 LoRA only when A10G estimate fits."""
-    if bitsandbytes_available and bitsandbytes_reliable:
+    """Enforce the sealed mode; never silently change protocol after a failed probe."""
+    if sealed_mode == "qlora_nf4":
+        if not nf4_kernel_probe_passed:
+            raise RuntimeError(
+                "sealed QLoRA mode requires a successful live bitsandbytes NF4 "
+                "kernel probe; silent BF16 fallback is forbidden"
+            )
         estimate = estimate_emergency_memory(
             mode="qlora_nf4",
             max_length=max_length,
@@ -110,17 +175,53 @@ def select_precision_mode(
             f"total_bytes={estimate.total_bytes} "
             f"budget={int(A10G_VRAM_BYTES * A10G_USABLE_FRACTION)}"
         )
-
+    if sealed_mode != "bf16_lora":
+        raise ValueError(f"unknown sealed precision mode: {sealed_mode}")
+    if bf16_memory_evidence is None:
+        raise RuntimeError(
+            "sealed BF16 LoRA deviation requires configuration-bound memory evidence"
+        )
+    if not bf16_memory_evidence.passed:
+        raise RuntimeError("sealed BF16 LoRA memory evidence did not pass")
+    if bf16_memory_evidence.precision_mode != "bf16_lora":
+        raise RuntimeError("BF16 LoRA requires BF16-specific measured memory evidence")
+    usable_budget = int(
+        bf16_memory_evidence.capacity_memory_bytes * A10G_USABLE_FRACTION
+    )
+    if bf16_memory_evidence.peak_memory_bytes > usable_budget:
+        raise RuntimeError(
+            "sealed BF16 LoRA measured peak exceeds the GPU emergency budget: "
+            f"peak={bf16_memory_evidence.peak_memory_bytes} budget={usable_budget}"
+        )
     bf16 = estimate_emergency_memory(
         mode="bf16_lora",
         max_length=max_length,
         microbatch=microbatch,
         lora_rank=lora_rank,
         load_teacher=load_teacher,
+        device_bytes=bf16_memory_evidence.capacity_memory_bytes,
     )
     if not bf16.fits:
         raise RuntimeError(
-            "bitsandbytes/QLoRA unavailable or unreliable, and BF16 LoRA memory "
-            f"estimate does not fit A10G (total_bytes={bf16.total_bytes}). Failing loud."
+            "sealed BF16 LoRA static estimate does not fit the sealed GPU "
+            f"(total_bytes={bf16.total_bytes}); measured evidence cannot override it"
         )
     return bf16
+
+
+def validate_runtime_gpu_binding(
+    evidence: EmergencyMemoryProbeEvidence,
+    *,
+    device_type: str,
+    capacity_memory_bytes: int,
+) -> None:
+    if device_type != evidence.device_type:
+        raise ValueError(
+            "runtime GPU type differs from sealed memory evidence: "
+            f"expected={evidence.device_type!r} actual={device_type!r}"
+        )
+    if capacity_memory_bytes != evidence.capacity_memory_bytes:
+        raise ValueError(
+            "runtime GPU capacity differs from sealed memory evidence: "
+            f"expected={evidence.capacity_memory_bytes} actual={capacity_memory_bytes}"
+        )

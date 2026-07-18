@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator, model_validator
 
-from distillery.backends.safety import parse_digest_pinned_ecr_image
 from distillery.recipes.base import require_pinned_revision
+from experiments.aws_smoke.memory import EmergencyMemoryProbeEvidence
 
 UNSET_SENTINELS: frozenset[str] = frozenset(
     {
@@ -40,6 +41,35 @@ _ROLE_ARN_RE = re.compile(
 )
 _S3_URI_RE = re.compile(r"^s3://[a-z0-9][a-z0-9.\-]{1,61}[a-z0-9](?:/.*)?$")
 _ACCOUNT_RE = re.compile(r"^[0-9]{12}$")
+_ECR_IMAGE_RE = re.compile(
+    r"^(?P<account>[0-9]{12})\.dkr\.ecr\."
+    r"(?P<region>[a-z0-9-]+)\.amazonaws\.com/"
+    r"(?P<repository>[a-z0-9]+(?:[._/-][a-z0-9]+)*)@"
+    r"(?P<digest>sha256:[0-9a-f]{64})$"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class EcrImageIdentity:
+    account_id: str
+    region: str
+    repository: str
+    digest: str
+
+
+def parse_digest_pinned_ecr_image(uri: str) -> EcrImageIdentity:
+    match = _ECR_IMAGE_RE.fullmatch(uri)
+    if match is None:
+        raise ValueError(
+            "ECR image must be a concrete account/region repository URI pinned "
+            "by sha256 digest"
+        )
+    return EcrImageIdentity(
+        account_id=match.group("account"),
+        region=match.group("region"),
+        repository=match.group("repository"),
+        digest=match.group("digest"),
+    )
 
 
 def _reject_unset(value: str, *, field_name: str) -> str:
@@ -68,23 +98,28 @@ class EmergencyEvidence(BaseModel):
     image_digest: StrictStr
     student_model_id: StrictStr = Field(min_length=1)
     student_revision: StrictStr
+    student_model_config_sha256: StrictStr
     teacher_model_id: StrictStr = Field(min_length=1)
     teacher_revision: StrictStr
+    teacher_model_config_sha256: StrictStr
     student_tokenizer_sha256: StrictStr
     teacher_tokenizer_sha256: StrictStr
     student_chat_template_sha256: StrictStr
     teacher_chat_template_sha256: StrictStr
+    student_special_token_map: dict[str, int]
+    teacher_special_token_map: dict[str, int]
     package_lock_hash: StrictStr
     source_revision: StrictStr
     proof_protocol_id: StrictStr = Field(min_length=1)
     proof_protocol_sha256: StrictStr
     license_disposition: StrictStr = Field(min_length=1)
     output_use_disposition: StrictStr = Field(min_length=1)
-    data_content_sha256: StrictStr | None = None
+    data_content_sha256: StrictStr
     price_source: StrictStr = Field(min_length=1)
     hourly_usd: float = Field(gt=0.0)
     evidence_attested_by: StrictStr = Field(min_length=1)
     evidence_notes: StrictStr = ""
+    memory_probe_evidence: EmergencyMemoryProbeEvidence | None
 
     @field_validator(
         "aws_account_id",
@@ -97,8 +132,10 @@ class EmergencyEvidence(BaseModel):
         "image_digest",
         "student_model_id",
         "student_revision",
+        "student_model_config_sha256",
         "teacher_model_id",
         "teacher_revision",
+        "teacher_model_config_sha256",
         "student_tokenizer_sha256",
         "teacher_tokenizer_sha256",
         "student_chat_template_sha256",
@@ -109,6 +146,7 @@ class EmergencyEvidence(BaseModel):
         "proof_protocol_sha256",
         "license_disposition",
         "output_use_disposition",
+        "data_content_sha256",
         "price_source",
         "evidence_attested_by",
         mode="before",
@@ -140,6 +178,10 @@ class EmergencyEvidence(BaseModel):
         require_pinned_revision(self.teacher_revision, role="teacher")
         if not _SHA256_RE.fullmatch(self.student_tokenizer_sha256):
             raise ValueError("student_tokenizer_sha256 must be 64 lowercase hex")
+        if not _SHA256_RE.fullmatch(self.student_model_config_sha256):
+            raise ValueError("student_model_config_sha256 must be 64 lowercase hex")
+        if not _SHA256_RE.fullmatch(self.teacher_model_config_sha256):
+            raise ValueError("teacher_model_config_sha256 must be 64 lowercase hex")
         if not _SHA256_RE.fullmatch(self.teacher_tokenizer_sha256):
             raise ValueError("teacher_tokenizer_sha256 must be 64 lowercase hex")
         if not _SHA256_RE.fullmatch(self.student_chat_template_sha256):
@@ -150,9 +192,8 @@ class EmergencyEvidence(BaseModel):
             raise ValueError("package_lock_hash must be 64 lowercase hex")
         if not _SHA256_RE.fullmatch(self.proof_protocol_sha256):
             raise ValueError("proof_protocol_sha256 must be 64 lowercase hex")
-        if self.data_content_sha256 is not None:
-            if not _SHA256_RE.fullmatch(self.data_content_sha256):
-                raise ValueError("data_content_sha256 must be 64 lowercase hex")
+        if not _SHA256_RE.fullmatch(self.data_content_sha256):
+            raise ValueError("data_content_sha256 must be 64 lowercase hex")
         if not self.image_digest.startswith("sha256:"):
             raise ValueError("image_digest must be sha256:<64-hex>")
         digest_hex = self.image_digest.removeprefix("sha256:")
@@ -174,6 +215,12 @@ class EmergencyEvidence(BaseModel):
         if self.student_chat_template_sha256 != self.teacher_chat_template_sha256:
             raise ValueError(
                 "logit KD requires identical teacher/student chat_template sha256 evidence"
+            )
+        if not self.student_special_token_map or not self.teacher_special_token_map:
+            raise ValueError("teacher/student special-token maps must be nonempty")
+        if self.student_special_token_map != self.teacher_special_token_map:
+            raise ValueError(
+                "logit KD requires identical teacher/student special-token map evidence"
             )
         license_ok = self.license_disposition.lower()
         if "blocked" in license_ok or "unknown" in license_ok or "pending" in license_ok:
@@ -216,21 +263,46 @@ def evidence_schema_template() -> dict[str, Any]:
         "image_digest": "UNSET",
         "student_model_id": "Qwen/Qwen2.5-0.5B-Instruct",
         "student_revision": "UNSET",
+        "student_model_config_sha256": "UNSET",
         "teacher_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
         "teacher_revision": "UNSET",
+        "teacher_model_config_sha256": "UNSET",
         "student_tokenizer_sha256": "UNSET",
         "teacher_tokenizer_sha256": "UNSET",
         "student_chat_template_sha256": "UNSET",
         "teacher_chat_template_sha256": "UNSET",
+        "student_special_token_map": {},
+        "teacher_special_token_map": {},
         "package_lock_hash": "UNSET",
         "source_revision": "UNSET",
         "proof_protocol_id": "finance-proof.v1",
         "proof_protocol_sha256": "UNSET",
         "license_disposition": "UNSET",
         "output_use_disposition": "UNSET",
-        "data_content_sha256": None,
+        "data_content_sha256": "UNSET",
         "price_source": "UNSET",
         "hourly_usd": 1.408,
         "evidence_attested_by": "UNSET",
         "evidence_notes": "Fill every UNSET field from measured evidence before launch.",
+        "memory_probe_evidence": {
+            "schema_version": "distillery.aws_smoke.memory_probe.v2",
+            "passed": False,
+            "precision_mode": "qlora_nf4",
+            "device_type": "NVIDIA A10G",
+            "peak_memory_bytes": 0,
+            "capacity_memory_bytes": 0,
+            "headroom_bytes": 0,
+            "probe_id": "UNSET",
+            "student_model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "student_revision": "UNSET",
+            "teacher_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+            "teacher_revision": "UNSET",
+            "max_length": 512,
+            "max_completion": 128,
+            "vocab_chunk_size": 4096,
+            "microbatch": 1,
+            "grad_accumulation": 1,
+            "runtime_image_digest": "UNSET",
+            "instance_type": "ml.g5.xlarge",
+        },
     }

@@ -1,4 +1,4 @@
-"""Manifest comparability and separate job/output prefixes."""
+"""Canonical channels, sampler seals, and scientific arm comparability."""
 
 from __future__ import annotations
 
@@ -7,132 +7,160 @@ from pathlib import Path
 
 import pytest
 
-from experiments.aws_smoke.dataset_subset import materialize_emergency_subset
+from experiments.aws_smoke.channels import discover_and_load_manifest, discover_manifest
 from experiments.aws_smoke.manifests import (
     assert_arms_comparable,
-    build_emergency_manifest,
-    job_name_for_arm,
-    shared_sampler_order_hash,
-    write_arm_manifests,
+    assert_kd_ablation_matched,
+    build_sampler_plan,
+    manifest_arm,
+    manifest_emergency_config,
+    manifest_objective,
 )
 from experiments.aws_smoke.pins import EmergencyEvidence
-from experiments.aws_smoke.profile import DEFAULT_EMERGENCY_PROFILE, REQUIRED_ARMS
+from tests.aws_smoke.support import build_campaign, build_tokenization_evidence
 
 
-def _subset_inputs(tmp_path: Path) -> tuple[list[str], list[str], list[str], dict[str, str], str]:
-    subset = materialize_emergency_subset(tmp_path / "subset")
-    rows = [
-        json.loads(line)
-        for line in subset.train_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    return (
-        [str(r["example_id"]) for r in rows],
-        [str(r["task"]) for r in rows],
-        [str(r["difficulty"]) for r in rows],
-        subset.split_sha256,
-        subset.content_sha256,
-    )
-
-
-def test_three_arms_share_student_pin_and_order(
+def test_generated_manifest_channel_round_trip(
     valid_evidence: EmergencyEvidence,
     tmp_path: Path,
 ) -> None:
-    example_ids, tasks, difficulties, split_sha256, content_sha256 = _subset_inputs(tmp_path)
-    order = shared_sampler_order_hash(
-        example_ids=example_ids,
-        tasks=tasks,
-        difficulties=difficulties,
-        seed=DEFAULT_EMERGENCY_PROFILE.seed,
-        tokenizer_sha256=valid_evidence.student_tokenizer_sha256,
-    )
+    paths, _, _ = build_campaign(tmp_path, valid_evidence)
+    for arm, generated_path in paths.items():
+        assert generated_path.name == "manifest.json"
+        assert generated_path.parent.name == "manifest"
+        parsed = discover_and_load_manifest(generated_path.parent)
+        assert manifest_arm(parsed) == arm
+        assert parsed.seal_sha256() == (
+            generated_path.parent.parent / "manifest.sha256"
+        ).read_text(encoding="utf-8").strip()
+
+
+def test_manifest_channel_rejects_missing_and_ambiguous(tmp_path: Path) -> None:
+    channel = tmp_path / "manifest"
+    channel.mkdir()
+    with pytest.raises(FileNotFoundError, match="exactly one"):
+        discover_manifest(channel)
+    (channel / "manifest.json").write_text("{}\n", encoding="utf-8")
+    (channel / "manifest_backup.json").write_text("{}\n", encoding="utf-8")
+    with pytest.raises(FileNotFoundError, match="exactly one"):
+        discover_manifest(channel)
+
+
+def test_three_required_arms_share_initialization_and_order(
+    valid_evidence: EmergencyEvidence,
+    tmp_path: Path,
+) -> None:
+    paths, _, _ = build_campaign(tmp_path, valid_evidence)
     manifests = {
-        arm: build_emergency_manifest(
-            arm=arm,
-            evidence=valid_evidence,
-            dataset_id="ds_awssmoke01",
-            dataset_uri=valid_evidence.dataset_s3_uri,
-            dataset_sha256=content_sha256,
-            split_sha256=split_sha256,
-            sampler_order_hash=order,
-        )
-        for arm in REQUIRED_ARMS
+        arm: discover_and_load_manifest(path.parent) for arm, path in paths.items()
     }
     assert_arms_comparable(manifests)
-    revisions = {m.models.student.revision for m in manifests.values()}
-    assert revisions == {valid_evidence.student_revision}
-    orders = {m.sampler_order_hash for m in manifests.values()}
-    assert orders == {order}
+    fingerprints = {
+        manifest.tags["InitializationFingerprint"]
+        for manifest in manifests.values()
+    }
+    order_hashes = {manifest.sampler_order_hash for manifest in manifests.values()}
+    assert len(fingerprints) == 1
+    assert len(order_hashes) == 1
 
 
-def test_arms_have_separate_job_names_and_output_prefixes(
+def test_ce_ablation_discloses_oracle_equivalence_and_matches_kd(
     valid_evidence: EmergencyEvidence,
     tmp_path: Path,
 ) -> None:
-    example_ids, tasks, difficulties, split_sha256, content_sha256 = _subset_inputs(tmp_path)
-    paths = write_arm_manifests(
-        output_dir=tmp_path / "manifests",
-        evidence=valid_evidence,
-        dataset_id="ds_awssmoke01",
-        dataset_uri=valid_evidence.dataset_s3_uri,
-        dataset_sha256=content_sha256,
-        split_sha256=split_sha256,
-        example_ids=example_ids,
-        tasks=tasks,
-        difficulties=difficulties,
+    paths, _, _ = build_campaign(tmp_path, valid_evidence)
+    ce = discover_and_load_manifest(paths["ce_ablation"].parent)
+    kd = discover_and_load_manifest(paths["logit_kd"].parent)
+    assert_kd_ablation_matched(ce, kd)
+    objective = manifest_objective(ce)
+    assert objective["distinct_training_signal"] is False
+    assert objective["equivalent_to"] == "oracle_sft"
+    assert objective["signal"] == "oracle_hard_ce"
+    assert manifest_objective(kd)["teacher_runtime"].startswith("online_")
+
+
+def test_sequence_kd_is_third_distinct_signal_only_with_response_evidence(
+    valid_evidence: EmergencyEvidence,
+    tmp_path: Path,
+) -> None:
+    paths, _, _ = build_campaign(
+        tmp_path,
+        valid_evidence,
+        include_sequence_kd=True,
     )
-    names: set[str] = set()
-    prefixes: set[str] = set()
-    for arm, path in paths.items():
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        seal = path.with_suffix(".sha256").read_text(encoding="utf-8").strip()
-        name = job_name_for_arm(arm, manifest_sha256=seal)
-        names.add(name)
-        prefixes.add(payload["output"]["prefix"])
-        assert arm.replace("_", "-") in name
-    assert len(names) == 3
-    assert len(prefixes) == 3
+    sequence = discover_and_load_manifest(paths["sequence_kd"].parent)
+    objective = manifest_objective(sequence)
+    assert objective["distinct_training_signal"] is True
+    assert objective["hard_target_source"] == "pre_materialized_teacher"
+    assert manifest_emergency_config(sequence)["teacher_responses_sha256"] == "9" * 64
 
 
-def test_sequence_kd_requires_teacher_responses(
+def test_sampler_plan_uses_sealed_tokenizer_counts(
     valid_evidence: EmergencyEvidence,
     tmp_path: Path,
 ) -> None:
-    example_ids, tasks, difficulties, split_sha256, content_sha256 = _subset_inputs(tmp_path)
-    order = shared_sampler_order_hash(
-        example_ids=example_ids,
-        tasks=tasks,
-        difficulties=difficulties,
-        seed=17,
+    paths, _, rows = build_campaign(tmp_path, valid_evidence)
+    manifest = discover_and_load_manifest(paths["oracle_sft"].parent)
+    tokenization = build_tokenization_evidence(rows, valid_evidence).arm("oracle_sft")
+    counts = {
+        str(key): int(value)
+        for key, value in manifest.training.completion_evidence.completion_token_counts.items()
+    }
+    prompt_counts = tokenization.prompt_token_counts
+    total_counts = tokenization.total_token_counts
+    record_hashes = tokenization.record_sha256
+    plan = build_sampler_plan(
+        example_ids=[str(row["example_id"]) for row in rows],
+        tasks=[str(row["task"]) for row in rows],
+        difficulties=[str(row["difficulty"]) for row in rows],
+        completion_token_counts=counts,
+        prompt_token_counts=prompt_counts,
+        total_token_counts=total_counts,
+        record_sha256=record_hashes,
+        seed=manifest.training.seed,
         tokenizer_sha256=valid_evidence.student_tokenizer_sha256,
+        microbatch_size=1,
     )
-    with pytest.raises(ValueError, match="pre-materialized teacher responses"):
-        build_emergency_manifest(
-            arm="sequence_kd",
-            evidence=valid_evidence,
-            dataset_id="ds_awssmoke01",
-            dataset_uri=valid_evidence.dataset_s3_uri,
-            dataset_sha256=content_sha256,
-            split_sha256=split_sha256,
-            sampler_order_hash=order,
-            include_sequence_kd_gate=True,
-            teacher_responses_present=False,
+    assert plan.sampler_order_hash == manifest.sampler_order_hash
+    index = json.loads(
+        (tmp_path / "manifests/campaign_index.json").read_text(encoding="utf-8")
+    )
+    assert list(plan.order) == index["shared_sampler_order"]
+    bad_counts = dict(counts)
+    bad_counts[str(rows[0]["example_id"])] = 0
+    with pytest.raises(ValueError):
+        build_sampler_plan(
+            example_ids=[str(row["example_id"]) for row in rows],
+            tasks=[str(row["task"]) for row in rows],
+            difficulties=[str(row["difficulty"]) for row in rows],
+            completion_token_counts=bad_counts,
+            prompt_token_counts=prompt_counts,
+            total_token_counts=total_counts,
+            record_sha256=record_hashes,
+            seed=manifest.training.seed,
+            tokenizer_sha256=valid_evidence.student_tokenizer_sha256,
+            microbatch_size=1,
         )
 
 
-def test_subset_has_no_train_val_id_overlap(tmp_path: Path) -> None:
-    subset = materialize_emergency_subset(tmp_path / "subset")
-    train_ids = {
-        json.loads(line)["example_id"]
-        for line in subset.train_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    }
-    val_ids = {
-        json.loads(line)["example_id"]
-        for line in subset.validation_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    }
-    assert not (train_ids & val_ids)
-    assert 32 <= len(train_ids) <= 64
-    assert len(val_ids) == 16
+def test_campaign_index_marks_only_distinct_signals(
+    valid_evidence: EmergencyEvidence,
+    tmp_path: Path,
+) -> None:
+    build_campaign(tmp_path, valid_evidence)
+    index = json.loads(
+        (tmp_path / "manifests/campaign_index.json").read_text(encoding="utf-8")
+    )
+    assert index["distinct_signal_count"] == 2
+    assert index["arms"]["ce_ablation"]["equivalent_to"] == "oracle_sft"
+
+
+def test_logit_manifest_requires_real_memory_probe_evidence(
+    valid_evidence: EmergencyEvidence,
+    tmp_path: Path,
+) -> None:
+    payload = valid_evidence.model_dump(mode="json")
+    payload["memory_probe_evidence"] = None
+    without_probe = EmergencyEvidence.model_validate(payload)
+    with pytest.raises(ValueError, match="measured A10G memory probe"):
+        build_campaign(tmp_path, without_probe)

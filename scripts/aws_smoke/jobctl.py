@@ -26,20 +26,48 @@ from experiments.aws_smoke.job_control import (  # noqa: E402
 )
 from experiments.aws_smoke.launch_plan import (  # noqa: E402
     build_create_training_job_request,
+    discover_generated_manifest_paths,
     load_manifest,
+    stage_manifest_for_job,
 )
 from experiments.aws_smoke.pins import load_evidence  # noqa: E402
-from experiments.aws_smoke.profile import REQUIRED_ARMS, RunArm  # noqa: E402
+from experiments.aws_smoke.profile import (  # noqa: E402
+    DEFAULT_UNIQUE_LAUNCH_ORDER,
+    RunArm,
+    default_launch_order,
+)
+from experiments.aws_smoke.safety import (  # noqa: E402
+    CONFIRM_PHRASE,
+    CallerIdentity,
+    enforce_safety_gates,
+)
 
 
 def _client(profile: str, region: str):
     return boto3.Session(profile_name=profile, region_name=region).client("sagemaker")
 
 
-def _load_job_map(manifests_dir: Path) -> dict[RunArm, str]:
+def _s3_client(profile: str, region: str):
+    return boto3.Session(profile_name=profile, region_name=region).client("s3")
+
+
+def _identity(profile: str, region: str) -> CallerIdentity:
+    raw = boto3.Session(profile_name=profile, region_name=region).client(
+        "sts"
+    ).get_caller_identity()
+    return CallerIdentity(
+        account=str(raw["Account"]),
+        arn=str(raw["Arn"]),
+        user_id=str(raw["UserId"]),
+    )
+
+
+def _load_job_map(
+    manifest_paths: dict[RunArm, Path],
+) -> dict[RunArm, str]:
     jobs: dict[RunArm, str] = {}
-    for arm in REQUIRED_ARMS:
-        meta_path = manifests_dir / f"jobmeta_{arm}.json"
+    for arm, manifest_path in manifest_paths.items():
+        meta_path = manifest_path.parent.parent / "jobmeta.json"
         if not meta_path.is_file():
             raise SystemExit(f"missing job meta for {arm}: {meta_path}")
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -54,6 +82,8 @@ def main() -> int:
     parser.add_argument("--evidence", type=Path, default=None)
     parser.add_argument("--profile", type=str, default="gabriel-cli")
     parser.add_argument("--arm", type=str, default=None)
+    parser.add_argument("--confirm", type=str, default=None)
+    parser.add_argument("--include-control", action="store_true")
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -71,7 +101,14 @@ def main() -> int:
         print(json.dumps({"jobs": names}, sort_keys=True))
         return 0
 
-    jobs = _load_job_map(args.manifests_dir)
+    manifest_paths = discover_generated_manifest_paths(args.manifests_dir)
+    jobs = _load_job_map(manifest_paths)
+    ordered_arms = default_launch_order(
+        set(manifest_paths),
+        require_three_distinct=False,
+    )
+    if args.include_control and "sequence_kd" in manifest_paths:
+        ordered_arms = DEFAULT_UNIQUE_LAUNCH_ORDER + ("ce_ablation",)
     if args.evidence is None:
         raise SystemExit("--evidence required")
     evidence = load_evidence(args.evidence)
@@ -119,8 +156,17 @@ def main() -> int:
     if args.action == "resume":
         if not args.execute:
             raise SystemExit("refusing resume without --execute")
+        enforce_safety_gates(
+            profile=args.profile,
+            confirm=args.confirm,
+            evidence=evidence,
+            identity_provider=lambda: _identity(args.profile, evidence.aws_region),
+            dry_run=False,
+        )
+        if args.confirm != CONFIRM_PHRASE:
+            raise SystemExit(f"missing confirmation phrase {CONFIRM_PHRASE}")
         views = status_campaign(client, jobs)
-        arm = next_resumable_arm(views, ordered_arms=REQUIRED_ARMS)
+        arm = next_resumable_arm(views, ordered_arms=ordered_arms)
         if arm is None:
             print(json.dumps({"ok": True, "action": "wait", "reason": "active_or_done"}))
             return 0
@@ -139,11 +185,16 @@ def main() -> int:
                 )
             )
             return 0
-        manifest = load_manifest(args.manifests_dir / f"manifest_{arm}.json")
+        manifest = load_manifest(manifest_paths[arm])
         request = build_create_training_job_request(
             manifest=manifest,
             evidence=evidence,
             arm=arm,
+        )
+        staged_uri = stage_manifest_for_job(
+            _s3_client(args.profile, evidence.aws_region),
+            local_manifest_path=manifest_paths[arm],
+            request=request,
         )
         try:
             client.create_training_job(**request)
@@ -156,6 +207,7 @@ def main() -> int:
                     "action": "submitted",
                     "arm": arm,
                     "job_name": request["TrainingJobName"],
+                    "manifest_object_uri": staged_uri,
                 },
                 sort_keys=True,
             )

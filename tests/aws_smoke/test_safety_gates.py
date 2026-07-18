@@ -79,3 +79,12 @@ def test_tokenizer_mismatch_rejected_in_evidence(valid_evidence: EmergencyEviden
     payload["teacher_tokenizer_sha256"] = "9" * 64
     with pytest.raises(ValidationError):
         EmergencyEvidence.model_validate(payload)
+
+
+def test_special_token_map_mismatch_rejected(
+    valid_evidence: EmergencyEvidence,
+) -> None:
+    payload = valid_evidence.model_dump(mode="json")
+    payload["teacher_special_token_map"] = {"eos_token": 1}
+    with pytest.raises(ValidationError, match="special-token"):
+        EmergencyEvidence.model_validate(payload)

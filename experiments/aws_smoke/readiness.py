@@ -21,8 +21,14 @@ REQUIRED_SYMBOLS: frozenset[str] = frozenset(
         "compute_torch_loss",
         "load_student",
         "load_teacher",
+        "probe_bitsandbytes_nf4",
+        "reload_adapter_for_test",
+        "verify_and_order_training_examples",
+        "write_failure_output",
         "forward_kl_chunked_torch",
         "hard_cross_entropy_torch",
+        "require_local_model_weights",
+        "validate_runtime_gpu_binding",
     }
 )
 
@@ -64,6 +70,17 @@ def imported_names(tree: ast.Module) -> set[str]:
     return names
 
 
+def inline_import_locations(tree: ast.Module) -> list[int]:
+    locations: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Import, ast.ImportFrom)):
+            continue
+        if node in tree.body:
+            continue
+        locations.append(node.lineno)
+    return sorted(locations)
+
+
 def assert_trainer_source_ready(path: Path | None = None) -> dict[str, object]:
     """
     Fail loud if the emergency trainer source lacks real ML imports/symbols.
@@ -85,6 +102,22 @@ def assert_trainer_source_ready(path: Path | None = None) -> dict[str, object]:
     if missing_symbols:
         raise RuntimeError(
             "train.py missing required trainer symbols: " + ", ".join(missing_symbols)
+        )
+    inline_imports = inline_import_locations(tree)
+    if inline_imports:
+        raise RuntimeError(f"train.py contains inline imports at lines {inline_imports}")
+    source = (path or TRAIN_MODULE).read_text(encoding="utf-8")
+    required_runtime_guards = (
+        "local_files_only=True",
+        "torch.inference_mode()",
+        "gradient_checkpointing_enable",
+        "write_emergency_integrity",
+        "adapter_model.safetensors",
+    )
+    missing_guards = [guard for guard in required_runtime_guards if guard not in source]
+    if missing_guards:
+        raise RuntimeError(
+            "train.py missing runtime safety guards: " + ", ".join(missing_guards)
         )
     return {
         "ok": True,
