@@ -12,7 +12,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
 from distillery_inference.errors import InferenceError, InferenceErrorCode
-from distillery_inference.schemas import ArtifactKind, DemoModelArmId, FinanceTaskId
+from distillery_inference.schemas import (
+    ArtifactKind,
+    ArtifactSourceProvenance,
+    DemoModelArmId,
+    FinanceTaskId,
+)
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -39,9 +44,7 @@ class BundleChecksums(BaseModel):
 class ArtifactManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["distillery.serving_artifact.v1"] = (
-        "distillery.serving_artifact.v1"
-    )
+    schema_version: Literal["distillery.serving_artifact.v1"] = "distillery.serving_artifact.v1"
     artifact_id: StrictStr = Field(min_length=1)
     model_id: StrictStr = Field(min_length=1)
     arm_id: DemoModelArmId
@@ -60,6 +63,7 @@ class ArtifactManifest(BaseModel):
     excluded: bool = False
     exclusion_reason: StrictStr | None = None
     stats: dict[str, Any] = Field(default_factory=dict)
+    source_provenance: ArtifactSourceProvenance | None = None
 
     @field_validator("base_revision", "tokenizer_revision")
     @classmethod
@@ -87,9 +91,7 @@ class ArtifactManifest(BaseModel):
 class ServingRegistryDocument(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["distillery.serving_registry.v1"] = (
-        "distillery.serving_registry.v1"
-    )
+    schema_version: Literal["distillery.serving_registry.v1"] = "distillery.serving_registry.v1"
     run_id: StrictStr = Field(min_length=1)
     dataset_id: StrictStr | None = None
     endpoint_id: StrictStr = Field(min_length=1)
@@ -159,8 +161,7 @@ class LoadedBundle:
         if artifact.excluded:
             raise InferenceError(
                 InferenceErrorCode.ARTIFACT_NOT_SERVABLE,
-                artifact.exclusion_reason
-                or f"Artifact {artifact_id} is excluded from serving.",
+                artifact.exclusion_reason or f"Artifact {artifact_id} is excluded from serving.",
                 http_status=409,
             )
         return artifact

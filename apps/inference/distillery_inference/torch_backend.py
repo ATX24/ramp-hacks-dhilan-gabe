@@ -8,13 +8,34 @@ from typing import Any
 
 import torch
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    StoppingCriteria,
+    StoppingCriteriaList,
+)
 
 from distillery_inference.bundle import ArtifactManifest, LoadedBundle
 from distillery_inference.errors import InferenceError, InferenceErrorCode
 from distillery_inference.prompts import build_messages, render_chat_prompt
 from distillery_inference.runtime import GenerationResult
 from distillery_inference.schemas import FinanceTaskId
+
+
+class DeadlineStoppingCriteria(StoppingCriteria):
+    """Stop generation at the request deadline; service maps it to TIMEOUT."""
+
+    def __init__(self, deadline: float) -> None:
+        self.deadline = deadline
+
+    def __call__(
+        self,
+        input_ids: torch.LongTensor,
+        scores: torch.FloatTensor,
+        **kwargs: Any,
+    ) -> bool:
+        del input_ids, scores, kwargs
+        return time.monotonic() >= self.deadline
 
 
 class TorchBackend:
@@ -27,6 +48,9 @@ class TorchBackend:
         self._model: Any = None
         self._tokenizer: Any = None
         self._base_model: Any = None
+        self._peft_model: Any = None
+        self._adapter_names: set[str] = set()
+        self._device, self._dtype = self._select_device()
         self._load_base()
 
     def ready(self) -> bool:
@@ -92,10 +116,7 @@ class TorchBackend:
             if prompt_tokens > max_prompt_tokens:
                 raise InferenceError(
                     InferenceErrorCode.TOKEN_LIMIT_EXCEEDED,
-                    (
-                        f"Prompt tokens {prompt_tokens} exceed limit "
-                        f"{max_prompt_tokens}"
-                    ),
+                    (f"Prompt tokens {prompt_tokens} exceed limit {max_prompt_tokens}"),
                     http_status=413,
                     details={
                         "prompt_tokens": prompt_tokens,
@@ -109,24 +130,39 @@ class TorchBackend:
                     http_status=504,
                     retryable=True,
                 )
-            input_ids = encoded["input_ids"].to(self._model.device)
+            input_ids = encoded["input_ids"].to(self._device)
             attention_mask = encoded.get("attention_mask")
             if attention_mask is not None:
-                attention_mask = attention_mask.to(self._model.device)
+                attention_mask = attention_mask.to(self._device)
             torch.manual_seed(seed)
+            if self._device.type == "cuda":
+                torch.cuda.manual_seed_all(seed)
             generate_kwargs: dict[str, Any] = {
                 "input_ids": input_ids,
                 "max_new_tokens": max_completion_tokens,
                 "do_sample": temperature > 0,
-                "temperature": max(temperature, 1e-5),
-                "top_p": top_p,
-                "pad_token_id": self._tokenizer.pad_token_id
-                or self._tokenizer.eos_token_id,
+                "pad_token_id": self._tokenizer.pad_token_id or self._tokenizer.eos_token_id,
+                "stopping_criteria": StoppingCriteriaList(
+                    [DeadlineStoppingCriteria(started + timeout_s)]
+                ),
             }
+            if temperature > 0:
+                generate_kwargs["temperature"] = temperature
+                generate_kwargs["top_p"] = top_p
+            else:
+                generate_kwargs["temperature"] = None
+                generate_kwargs["top_p"] = None
+                generate_kwargs["top_k"] = None
             if attention_mask is not None:
                 generate_kwargs["attention_mask"] = attention_mask
+            self._synchronize()
             with torch.inference_mode():
-                output_ids = self._model.generate(**generate_kwargs)
+                if artifact.kind == "base" and self._peft_model is not None:
+                    with self._peft_model.disable_adapter():
+                        output_ids = self._peft_model.generate(**generate_kwargs)
+                else:
+                    output_ids = self._model.generate(**generate_kwargs)
+            self._synchronize()
             if time.monotonic() - started > timeout_s:
                 raise InferenceError(
                     InferenceErrorCode.TIMEOUT,
@@ -139,10 +175,7 @@ class TorchBackend:
             if completion_tokens > max_completion_tokens:
                 raise InferenceError(
                     InferenceErrorCode.TOKEN_LIMIT_EXCEEDED,
-                    (
-                        f"Completion tokens {completion_tokens} exceed limit "
-                        f"{max_completion_tokens}"
-                    ),
+                    (f"Completion tokens {completion_tokens} exceed limit {max_completion_tokens}"),
                     http_status=413,
                 )
             raw_output = self._tokenizer.decode(new_tokens, skip_special_tokens=True)
@@ -166,8 +199,11 @@ class TorchBackend:
                 str(base_path),
                 local_files_only=True,
                 revision=self._bundle.registry.base_revision,
-                torch_dtype=torch.float32,
+                trust_remote_code=False,
+                torch_dtype=self._dtype,
+                low_cpu_mem_usage=True,
             )
+            self._base_model.to(self._device)
             self._base_model.eval()
             self._model = self._base_model
         except Exception as exc:
@@ -186,26 +222,42 @@ class TorchBackend:
             )
         artifact_path = self._bundle.artifact_path(artifact)
         if artifact.kind == "base":
-            self._model = self._base_model
+            self._model = self._peft_model or self._base_model
             self._loaded_model_id = artifact.model_id
             return
         if artifact.kind == "merged":
             self._model = AutoModelForCausalLM.from_pretrained(
                 str(artifact_path),
                 local_files_only=True,
-                torch_dtype=torch.float32,
+                trust_remote_code=False,
+                torch_dtype=self._dtype,
+                low_cpu_mem_usage=True,
             )
+            self._model.to(self._device)
             self._model.eval()
             self._loaded_model_id = artifact.model_id
             return
         if artifact.kind == "peft_adapter":
-            # Always re-wrap from the immutable base; never chain adapters.
-            self._model = PeftModel.from_pretrained(
-                self._base_model,
-                str(artifact_path),
-                local_files_only=True,
-            )
-            self._model.eval()
+            adapter_name = artifact.artifact_id
+            if self._peft_model is None:
+                self._peft_model = PeftModel.from_pretrained(
+                    self._base_model,
+                    str(artifact_path),
+                    adapter_name=adapter_name,
+                    local_files_only=True,
+                )
+                self._adapter_names.add(adapter_name)
+            elif adapter_name not in self._adapter_names:
+                self._peft_model.load_adapter(
+                    str(artifact_path),
+                    adapter_name=adapter_name,
+                    local_files_only=True,
+                )
+                self._adapter_names.add(adapter_name)
+            self._peft_model.set_adapter(adapter_name)
+            self._peft_model.to(self._device)
+            self._peft_model.eval()
+            self._model = self._peft_model
             self._loaded_model_id = artifact.model_id
             return
         raise InferenceError(
@@ -213,3 +265,17 @@ class TorchBackend:
             f"Unsupported artifact kind: {artifact.kind}",
             http_status=409,
         )
+
+    @staticmethod
+    def _select_device() -> tuple[torch.device, torch.dtype]:
+        if torch.cuda.is_available():
+            return torch.device("cuda"), torch.float16
+        if torch.backends.mps.is_available():
+            return torch.device("mps"), torch.float16
+        return torch.device("cpu"), torch.float32
+
+    def _synchronize(self) -> None:
+        if self._device.type == "cuda":
+            torch.cuda.synchronize()
+        elif self._device.type == "mps":
+            torch.mps.synchronize()

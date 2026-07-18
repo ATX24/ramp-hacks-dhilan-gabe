@@ -7,7 +7,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DOCKERFILE="${ROOT_DIR}/containers/inference/Dockerfile"
 COMPATIBILITY="${ROOT_DIR}/containers/training/ml-compatibility.json"
 IMAGE_NAME="distillery-inference"
-BASE_DIGEST="sha256:0a3b9fedefe1f61ac4d5a9de9015c0863db27ca0fde2d4e37e6268147980b726"
+BASE_IMAGE="${DISTILLERY_INFERENCE_BASE_IMAGE:-225989358036.dkr.ecr.us-east-1.amazonaws.com/distillery-training@sha256:fce8fe86d50f994ad7b38e443f55d0a675abb3793f23f5423c073bdb910f1976}"
 
 if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
   PYTHON="${DISTILLERY_PACKAGING_PYTHON:-${ROOT_DIR}/.venv/bin/python}"
@@ -49,6 +49,8 @@ sha256_file() {
 
 [[ -f "${DOCKERFILE}" ]] || die "missing Dockerfile: ${DOCKERFILE}"
 [[ -f "${COMPATIBILITY}" ]] || die "missing ML compatibility pin: ${COMPATIBILITY}"
+[[ "${BASE_IMAGE}" =~ @sha256:[0-9a-f]{64}$ ]] \
+  || die "DISTILLERY_INFERENCE_BASE_IMAGE must be digest-pinned"
 
 SOURCE_SHA="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
 LOCK_SHA="$(sha256_file "${ROOT_DIR}/uv.lock")"
@@ -88,7 +90,7 @@ PY
 log "== Distillery inference image ${MODE} =="
 log "image=${IMAGE_NAME}"
 log "dockerfile=${DOCKERFILE}"
-log "base_digest=${BASE_DIGEST}"
+log "base_image=${BASE_IMAGE}"
 log "source_sha=${SOURCE_SHA}"
 log "source_tree_sha256=${TREE_SHA}"
 log "package_lock_sha256=${LOCK_SHA}"
@@ -120,9 +122,10 @@ fi
 
 require_cmd docker
 docker build \
+  --platform linux/amd64 \
   -f "${DOCKERFILE}" \
   -t "${IMAGE_NAME}:local" \
-  --build-arg "BASE_IMAGE=pytorch/pytorch@${BASE_DIGEST}" \
+  --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
   --build-arg "DISTILLERY_SOURCE_SHA=${SOURCE_SHA}" \
   --build-arg "DISTILLERY_SOURCE_TREE_SHA256=${TREE_SHA}" \
   --build-arg "DISTILLERY_LOCK_SHA256=${LOCK_SHA}" \

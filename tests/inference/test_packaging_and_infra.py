@@ -24,14 +24,14 @@ APP_DIR = ROOT / "apps" / "inference" / "distillery_inference"
 def test_dockerfile_is_digest_pinned_non_root_offline() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
     assert (
-        "pytorch/pytorch@sha256:0a3b9fedefe1f61ac4d5a9de9015c0863db27ca0fde2d4e37e6268147980b726"
-        in text
+        "distillery-training@sha256:fce8fe86d50f994ad7b38e443f55d0a"
+        "675abb3793f23f5423c073bdb910f1976" in text
     )
     assert 'distillery.runtime.uid="1000"' in text
     assert "HF_HUB_OFFLINE=1" in text
     assert "TRANSFORMERS_OFFLINE=1" in text
-    assert "useradd --uid 1000" in text
-    assert "containers/training/ml-compatibility.json" in text
+    assert "--require-bitsandbytes" in text
+    assert "inference_entrypoint.py" in text
     assert "apps/inference" in text
     assert "EXPOSE 8080" in text
     assert "AKIA" not in text
@@ -109,6 +109,7 @@ def test_cloudformation_template_static_shape() -> None:
         "AWS::SageMaker::Model",
         "AWS::SageMaker::EndpointConfig",
         "AWS::SageMaker::Endpoint",
+        "AWS::Scheduler::Schedule",
         "EnableNetworkIsolation: true",
         "AWS::IAM::Role",
         "AWS::Logs::LogGroup",
@@ -117,6 +118,9 @@ def test_cloudformation_template_static_shape() -> None:
         "ImageUri",
         "ModelDataUrl",
         "InstanceType",
+        "KmsKeyId",
+        "AutoDeleteAtUtc",
+        "MaxEndpointCostUsd",
         "CreateTrainingJob",
     ):
         assert marker in text
@@ -140,9 +144,9 @@ def test_server_module_import_smoke() -> None:
 
 
 def test_requirements_serve_pins_uvicorn() -> None:
-    requirements = (
-        ROOT / "containers" / "inference" / "requirements-serve.txt"
-    ).read_text(encoding="utf-8")
+    requirements = (ROOT / "containers" / "inference" / "requirements-serve.txt").read_text(
+        encoding="utf-8"
+    )
     assert "uvicorn==0.32.1" in requirements
 
 
@@ -176,11 +180,9 @@ def test_ml_compatibility_json_is_reused_not_forked() -> None:
     inference_dir = ROOT / "containers" / "inference"
     assert not (inference_dir / "ml-compatibility.json").exists()
     training = json.loads(
-        (ROOT / "containers" / "training" / "ml-compatibility.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "containers" / "training" / "ml-compatibility.json").read_text(encoding="utf-8")
     )
     assert training["torch_version"] == "2.4.1"
-    assert "0a3b9fedefe1f61ac4d5a9de9015c0863db27ca0fde2d4e37e6268147980b726" in training[
-        "base_image"
-    ]
+    assert (
+        "0a3b9fedefe1f61ac4d5a9de9015c0863db27ca0fde2d4e37e6268147980b726" in training["base_image"]
+    )

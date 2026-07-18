@@ -102,10 +102,7 @@ class InferenceService:
         if request.task not in artifact.supported_tasks:
             raise InferenceError(
                 InferenceErrorCode.UNSUPPORTED_TASK,
-                (
-                    f"Task {request.task} is not supported by artifact "
-                    f"{artifact.artifact_id}"
-                ),
+                (f"Task {request.task} is not supported by artifact {artifact.artifact_id}"),
                 http_status=400,
                 details={"supported_tasks": list(artifact.supported_tasks)},
             )

@@ -6,11 +6,30 @@ import json
 
 import pytest
 from distillery_inference.errors import InferenceError, InferenceErrorCode
+from distillery_inference.prompts import build_messages
 from distillery_inference.schemas import InferRequest
 from distillery_inference.server import create_app
 from distillery_inference.validation import validate_structured_output
 from fastapi.testclient import TestClient
 from support import make_service, sample_input
+
+
+def test_cash_prompt_includes_verified_arithmetic() -> None:
+    messages = build_messages(
+        task="cash_reconciliation",
+        example_input={
+            "book_balance_minor": 250000,
+            "bank_balance_minor": 250000,
+            "book_entries": [{"id": "book_match", "amount_minor": 250000}],
+            "bank_events": [{"id": "bank_match", "amount_minor": 250000}],
+        },
+    )
+    prompt = messages[-1]["content"]
+    assert "250000 - 250000 = 0" in prompt
+    assert "adjusted_book_balance_minor=250000" in prompt
+    assert 'status="balanced"' in prompt
+    assert '"book_match"' in prompt
+    assert '"bank_match"' in prompt
 
 
 @pytest.mark.parametrize(

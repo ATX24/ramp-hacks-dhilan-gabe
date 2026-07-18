@@ -80,6 +80,14 @@ def stats_from_artifact(artifact: ArtifactManifest) -> ModelStats:
         ood_retention=_optional_number(raw.get("ood_retention")),
         ood_ci_low=_optional_number(raw.get("ood_ci_low")),
         ood_ci_high=_optional_number(raw.get("ood_ci_high")),
+        evaluation_scope=_optional_str(raw.get("evaluation_scope")),
+        validation_examples=_optional_int(raw.get("validation_examples")),
+        validation_primary_index=_optional_number(raw.get("validation_primary_index")),
+        base_validation_primary_index=_optional_number(raw.get("base_validation_primary_index")),
+        primary_index_delta=_optional_number(raw.get("primary_index_delta")),
+        mean_latency_ms=_optional_number(raw.get("mean_latency_ms")),
+        p50_latency_ms=_optional_number(raw.get("p50_latency_ms")),
+        p95_latency_ms=_optional_number(raw.get("p95_latency_ms")),
         proof_status=_optional_str(artifact.proof_status or raw.get("proof_status")),
         promotion_status=promotion,
     )
@@ -112,6 +120,7 @@ def build_model_registry_response(
                     reason=reason,
                 ),
                 stats=stats_from_artifact(artifact),
+                provenance=artifact.source_provenance,
             )
         )
     return ModelRegistryResponse(

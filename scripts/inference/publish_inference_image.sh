@@ -54,9 +54,44 @@ arn="$(printf '%s' "${identity}" | python3 -c 'import json,sys; print(json.load(
 [[ "${arn}" != *":root" ]] || die "refusing to publish with account root identity (${arn})"
 account="$(printf '%s' "${identity}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["Account"])')"
 registry="${account}.dkr.ecr.${REGION}.amazonaws.com"
+repository_uri="${registry}/${REPOSITORY_NAME}"
+source_sha="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
+tree_sha="$(git -C "${ROOT_DIR}" rev-parse HEAD:apps/inference)"
+image_tag="inference-${source_sha:0:12}-${tree_sha:0:12}"
+remote_ref="${repository_uri}:${image_tag}"
+
+if ! aws ecr describe-repositories \
+  --profile "${AWS_PROFILE}" \
+  --region "${REGION}" \
+  --repository-names "${REPOSITORY_NAME}" >/dev/null 2>&1; then
+  aws ecr create-repository \
+    --profile "${AWS_PROFILE}" \
+    --region "${REGION}" \
+    --repository-name "${REPOSITORY_NAME}" \
+    --image-tag-mutability IMMUTABLE \
+    --image-scanning-configuration scanOnPush=true \
+    --encryption-configuration encryptionType=AES256 \
+    --tags Key=Project,Value=RampHackathon \
+      Key=Owner,Value=Gabriel \
+      Key=TTL,Value=2026-07-20 \
+      Key=Component,Value=distillery-inference >/dev/null
+  log "repository_created=true"
+fi
+
 aws ecr get-login-password --profile "${AWS_PROFILE}" --region "${REGION}" \
   | docker login --username AWS --password-stdin "${registry}"
-digest_uri="$(docker image inspect --format '{{index .RepoDigests 0}}' "${LOCAL_IMAGE_REF}" 2>/dev/null || true)"
-[[ -n "${digest_uri}" ]] || die "local image missing RepoDigests; tag/push once then re-inspect"
-log "publish path requires an existing ECR repository under ${ROOT_DIR} and prior local build"
-die "publish not completed: wire ECR repository + digest tag explicitly before re-running"
+docker image inspect "${LOCAL_IMAGE_REF}" >/dev/null 2>&1 \
+  || die "local image missing: ${LOCAL_IMAGE_REF}"
+docker tag "${LOCAL_IMAGE_REF}" "${remote_ref}"
+docker push "${remote_ref}"
+digest="$(aws ecr describe-images \
+  --profile "${AWS_PROFILE}" \
+  --region "${REGION}" \
+  --repository-name "${REPOSITORY_NAME}" \
+  --image-ids "imageTag=${image_tag}" \
+  --query 'imageDetails[0].imageDigest' \
+  --output text)"
+[[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || die "ECR returned invalid digest: ${digest}"
+log "image_tag=${image_tag}"
+log "digest_uri=${repository_uri}@${digest}"
+log "publish_complete=true"

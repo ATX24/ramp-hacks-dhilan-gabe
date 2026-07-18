@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from pydantic import ValidationError
+
 from distillery_inference.schemas import (
-    TASK_REQUIRED_FIELDS,
-    TASK_SCHEMA_VERSIONS,
+    TASK_OUTPUT_TYPES,
     FinanceTaskId,
     ValidationState,
 )
@@ -17,19 +18,14 @@ def validate_structured_output(
     task: FinanceTaskId,
     output: dict[str, Any],
 ) -> tuple[ValidationState, str | None]:
-    required = TASK_REQUIRED_FIELDS[task]
-    missing = [field for field in required if field not in output]
-    if missing:
-        return "invalid", f"Missing required fields: {', '.join(missing)}"
-    if output.get("task") != task:
-        return "invalid", f"Output task {output.get('task')!r} does not match {task!r}"
-    expected_version = TASK_SCHEMA_VERSIONS[task]
-    if output.get("schema_version") != expected_version:
-        return (
-            "invalid",
-            f"Unexpected schema_version {output.get('schema_version')!r}; "
-            f"expected {expected_version!r}",
-        )
+    output_type = TASK_OUTPUT_TYPES[task]
+    try:
+        output_type.model_validate(output)
+    except ValidationError as exc:
+        errors = exc.errors(include_url=False)
+        first = errors[0] if errors else {"msg": "unknown schema violation", "loc": ()}
+        location = ".".join(str(part) for part in first.get("loc", ())) or "<root>"
+        return "invalid", f"{location}: {first.get('msg', 'schema violation')}"
     return "valid", None
 
 

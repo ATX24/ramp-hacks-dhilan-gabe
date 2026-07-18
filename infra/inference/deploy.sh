@@ -88,7 +88,7 @@ PY
     log "AWS_PROFILE unset; skipped live CloudFormation validate-template"
   fi
 
-  log "remaining_inputs=ImageUri,ModelDataUrl,ArtifactBucketName,ModelDataPrefix,EcrRepositoryArn"
+  log "remaining_inputs=ImageUri,ModelDataUrl,ArtifactBucketName,ModelDataPrefix,EcrRepositoryArn,KmsKeyArn,AutoDeleteAtUtc"
   log "plan_complete=no_resources_changed"
 }
 
@@ -101,13 +101,15 @@ apply() {
     DISTILLERY_INFERENCE_MODEL_DATA_URL \
     DISTILLERY_ARTIFACT_BUCKET \
     DISTILLERY_INFERENCE_MODEL_PREFIX \
-    DISTILLERY_INFERENCE_ECR_REPO_ARN
+    DISTILLERY_INFERENCE_ECR_REPO_ARN \
+    DISTILLERY_INFERENCE_KMS_KEY_ARN \
+    DISTILLERY_INFERENCE_AUTO_DELETE_AT_UTC
   do
     [[ -n "${!required:-}" ]] || die "missing required env for apply: ${required}"
   done
   plan
   require_cmd aws
-  log "== apply disabled in this commit by design unless explicitly confirmed =="
+  log "apply_confirmed=true"
   aws cloudformation deploy \
     --profile "${AWS_PROFILE}" \
     --region "${REGION}" \
@@ -121,7 +123,17 @@ apply() {
       ArtifactBucketName="${DISTILLERY_ARTIFACT_BUCKET}" \
       ModelDataPrefix="${DISTILLERY_INFERENCE_MODEL_PREFIX}" \
       EcrRepositoryArn="${DISTILLERY_INFERENCE_ECR_REPO_ARN}" \
+      KmsKeyArn="${DISTILLERY_INFERENCE_KMS_KEY_ARN}" \
+      AutoDeleteAtUtc="${DISTILLERY_INFERENCE_AUTO_DELETE_AT_UTC}" \
+      MaxEndpointCostUsd="${DISTILLERY_INFERENCE_MAX_COST_USD:-4.224}" \
+      EndpointName="${DISTILLERY_INFERENCE_ENDPOINT_NAME:-distillery-demo-inference}" \
       InstanceType="${DISTILLERY_INFERENCE_INSTANCE_TYPE:-ml.g5.xlarge}"
+  aws cloudformation describe-stacks \
+    --profile "${AWS_PROFILE}" \
+    --region "${REGION}" \
+    --stack-name "${STACK_NAME}" \
+    --query 'Stacks[0].Outputs' \
+    --output json
 }
 
 case "${MODE}" in

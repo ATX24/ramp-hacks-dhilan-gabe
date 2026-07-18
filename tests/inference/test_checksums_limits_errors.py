@@ -61,6 +61,37 @@ def test_structured_output_schema_failure(tmp_path) -> None:
     assert exc_info.value.code == InferenceErrorCode.STRUCTURED_OUTPUT_INVALID
 
 
+def test_structured_output_accounting_invariant_failure(tmp_path) -> None:
+    service, bundle, runtime = make_service(tmp_path)
+    runtime.outputs_by_model["model_sequence_kd"] = json.dumps(
+        {
+            "task": "transaction_review",
+            "schema_version": "transaction_review.v1",
+            "gl_account": "6400",
+            "journal_entry": [
+                {"account": "6400", "amount_minor": 100, "side": "debit"},
+                {"account": "2100", "amount_minor": 99, "side": "credit"},
+            ],
+            "policy_action": "review",
+            "rule_ids": [],
+            "evidence": [],
+            "confidence": 0.5,
+        }
+    )
+    with pytest.raises(InferenceError) as exc_info:
+        service.infer(
+            InferRequest(
+                model_id="model_sequence_kd",
+                artifact_id=bundle.artifacts_by_model["model_sequence_kd"].artifact_id,
+                task="transaction_review",
+                example_id=None,
+                input=sample_input(),
+            )
+        )
+    assert exc_info.value.code == InferenceErrorCode.STRUCTURED_OUTPUT_INVALID
+    assert "balance" in exc_info.value.message
+
+
 def test_token_limit_exceeded(tmp_path) -> None:
     service, bundle, runtime = make_service(
         tmp_path,

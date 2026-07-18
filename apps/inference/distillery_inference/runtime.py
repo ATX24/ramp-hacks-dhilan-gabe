@@ -117,20 +117,12 @@ class FakeRuntime:
                 )
             if self.delay_s > 0:
                 time.sleep(self.delay_s)
-            prompt = render_chat_prompt(
-                build_messages(task=task, example_input=example_input)
-            )
+            prompt = render_chat_prompt(build_messages(task=task, example_input=example_input))
             prompt_tokens = max(1, len(prompt.split()))
-            if (
-                artifact.model_id in self.token_overflow_models
-                or prompt_tokens > max_prompt_tokens
-            ):
+            if artifact.model_id in self.token_overflow_models or prompt_tokens > max_prompt_tokens:
                 raise InferenceError(
                     InferenceErrorCode.TOKEN_LIMIT_EXCEEDED,
-                    (
-                        f"Prompt tokens {prompt_tokens} exceed limit "
-                        f"{max_prompt_tokens}"
-                    ),
+                    (f"Prompt tokens {prompt_tokens} exceed limit {max_prompt_tokens}"),
                     http_status=413,
                     details={
                         "prompt_tokens": prompt_tokens,
@@ -147,10 +139,7 @@ class FakeRuntime:
             if completion_tokens > max_completion_tokens:
                 raise InferenceError(
                     InferenceErrorCode.TOKEN_LIMIT_EXCEEDED,
-                    (
-                        f"Completion tokens {completion_tokens} exceed limit "
-                        f"{max_completion_tokens}"
-                    ),
+                    (f"Completion tokens {completion_tokens} exceed limit {max_completion_tokens}"),
                     http_status=413,
                     details={
                         "completion_tokens": completion_tokens,
@@ -173,7 +162,7 @@ def _default_structured(
 ) -> dict[str, Any]:
     schema_version = TASK_SCHEMA_VERSIONS[task]
     if task == "transaction_review":
-        amount = int(example_input.get("amount_minor", 0))
+        amount = max(1, abs(int(example_input.get("amount_minor", 1))))
         account = "6400"
         candidates = example_input.get("gl_candidates")
         if isinstance(candidates, list) and candidates:
@@ -188,18 +177,16 @@ def _default_structured(
             ],
             "policy_action": "review",
             "rule_ids": ["POL-FAKE-001"],
-            "evidence": [
-                {"field": "amount_minor", "source_id": "txn", "value": str(amount)}
-            ],
+            "evidence": [{"field": "amount_minor", "source_id": "txn", "value": str(amount)}],
             "confidence": 0.5,
         }
     if task == "variance_analysis":
         return {
             "task": task,
             "schema_version": schema_version,
-            "profit_impact_minor": 0,
+            "profit_impact_minor": 1,
             "direction": "favorable",
-            "top_drivers": [],
+            "top_drivers": [{"driver_id": "fake_driver", "impact_minor": 1, "rank": 1}],
             "other_impact_minor": 0,
             "rule_ids": ["VAR-FAKE-001"],
             "evidence_ids": [],

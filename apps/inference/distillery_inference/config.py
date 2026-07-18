@@ -101,7 +101,7 @@ class InferenceSettings:
             max_completion_tokens=_env_int(
                 env,
                 "DISTILLERY_INFERENCE_MAX_COMPLETION_TOKENS",
-                512,
+                192,
                 minimum=16,
                 maximum=2048,
             ),
