@@ -28,7 +28,8 @@ AWS_REGION = "us-east-1"
 AWS_ACCOUNT = "225989358036"
 ROLE_ARN = f"arn:aws:iam::{AWS_ACCOUNT}:role/distillery-sagemaker-training"
 BUCKET = f"distillery-{AWS_ACCOUNT}-{AWS_REGION}"
-MODELS_PREFIX = f"s3://{BUCKET}/models/"
+MODELS_PREFIX = f"s3://{BUCKET}/models/Qwen/"
+CODE_PREFIX = f"s3://{BUCKET}/benchmarks/code/overlay-89eab5e/"
 STUDENT_PREFIX = (
     f"s3://{BUCKET}/models/Qwen/Qwen2.5-0.5B-Instruct/"
     "7ae557604adf67be50417f59c2c2f167def9a775/"
@@ -40,11 +41,13 @@ TEACHER_PREFIX = (
 HARD_CAP_USD = 100.0
 HOURLY_USD = {
     "ml.g5.xlarge": 1.408,
+    "ml.g5.2xlarge": 1.515,
     "ml.p4de.24xlarge": 31.5641075,
 }
 HARDWARE_LABEL = {
     "ml.g5.xlarge": "NVIDIA-A10G-24GB",
-    "ml.p4de.24xlarge": "NVIDIA-A100-80GB-x8-use-gpu0",
+    "ml.g5.2xlarge": "NVIDIA-A10G-24GB",
+    "ml.p4de.24xlarge": "NVIDIA-A100-80GB-gpu0-of-8",
 }
 
 
@@ -97,28 +100,8 @@ def build_create_training_job_request(cfg: LaunchConfig, *, job_name: str) -> di
             "TrainingImage": cfg.image_uri,
             "TrainingInputMode": "File",
             "ContainerEntrypoint": [
-                "python",
-                "/opt/distillery/experiments/benchmark/run.py",
-            ],
-            "ContainerArguments": [
-                "--models-root",
-                "/opt/ml/input/data/models",
-                "--output-dir",
-                "/opt/ml/output/data",
-                "--dtype",
-                cfg.dtype,
-                "--max-new-tokens",
-                str(cfg.max_new_tokens),
-                "--warmups",
-                str(cfg.warmups),
-                "--timed",
-                str(cfg.timed),
-                "--batch-sizes",
-                cfg.batch_sizes,
-                "--hardware",
-                HARDWARE_LABEL[cfg.instance_type],
-                "--instance-type",
-                cfg.instance_type,
+                "bash",
+                "/opt/ml/input/data/code/sm_entrypoint.sh",
             ],
         },
         "HyperParameters": {
@@ -137,7 +120,18 @@ def build_create_training_job_request(cfg: LaunchConfig, *, job_name: str) -> di
                     }
                 },
                 "InputMode": "File",
-            }
+            },
+            {
+                "ChannelName": "code",
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": CODE_PREFIX,
+                        "S3DataDistributionType": "FullyReplicated",
+                    }
+                },
+                "InputMode": "File",
+            },
         ],
         "OutputDataConfig": {
             "S3OutputPath": output_prefix,
@@ -157,6 +151,11 @@ def build_create_training_job_request(cfg: LaunchConfig, *, job_name: str) -> di
             "TRANSFORMERS_OFFLINE": "1",
             "DISTILLERY_BENCHMARK_INSTANCE_TYPE": cfg.instance_type,
             "DISTILLERY_BENCHMARK_HARDWARE": HARDWARE_LABEL[cfg.instance_type],
+            "DISTILLERY_BENCHMARK_DTYPE": cfg.dtype,
+            "DISTILLERY_BENCHMARK_MAX_NEW_TOKENS": str(cfg.max_new_tokens),
+            "DISTILLERY_BENCHMARK_WARMUPS": str(cfg.warmups),
+            "DISTILLERY_BENCHMARK_TIMED": str(cfg.timed),
+            "DISTILLERY_BENCHMARK_BATCH_SIZES": cfg.batch_sizes,
             "CUDA_VISIBLE_DEVICES": "0",
         },
         "Tags": [

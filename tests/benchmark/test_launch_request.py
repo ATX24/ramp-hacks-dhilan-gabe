@@ -49,9 +49,11 @@ def test_request_is_tagged_finite_and_isolated() -> None:
     assert tags["CostCapUSD"] == "100"
     assert tags["AutoCleanup"] == "true"
     assert "@sha256:" in request["AlgorithmSpecification"]["TrainingImage"]
-    assert request["AlgorithmSpecification"]["ContainerEntrypoint"][-1].endswith(
-        "experiments/benchmark/run.py"
-    )
+    assert request["AlgorithmSpecification"]["ContainerEntrypoint"] == [
+        "bash",
+        "/opt/ml/input/data/code/sm_entrypoint.sh",
+    ]
+    assert any(ch["ChannelName"] == "code" for ch in request["InputDataConfig"])
 
 
 def test_unpinned_image_rejected() -> None:

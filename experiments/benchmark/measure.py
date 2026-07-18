@@ -191,10 +191,12 @@ def _generate_batch(
     if device.type == "cuda":
         torch.cuda.synchronize()
     elapsed = time.perf_counter() - started
-    per_row_completion = [
-        max(0, int(row.shape[-1]) - prompt_len)
-        for row, prompt_len in zip(output, prompt_lens, strict=True)
-    ]
+    # With left-padding, output length is padded_prompt_len + new_tokens for every
+    # row. Subtract the shared padded input length, not the unpadded prompt_len,
+    # or left-pad tokens are miscounted as completions.
+    padded_prompt_len = int(input_ids.shape[-1])
+    new_tokens_per_row = max(0, int(output.shape[-1]) - padded_prompt_len)
+    per_row_completion = [new_tokens_per_row for _ in prompts]
     return {
         "elapsed_s": elapsed,
         "prompt_tokens": int(sum(prompt_lens)),

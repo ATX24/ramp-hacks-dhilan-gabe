@@ -1,0 +1,1215 @@
+{
+  "artifact_label": "base_model_proxy_until_trained_adapters",
+  "batch_sizes": [
+    1,
+    8
+  ],
+  "dtype": "bf16",
+  "gpu_snapshot_start": {
+    "available": true,
+    "gpus": [
+      {
+        "memory_total_mib": 23028.0,
+        "memory_used_mib": 334.0,
+        "name": "NVIDIA A10G",
+        "utilization_gpu_pct": 94.0,
+        "utilization_memory_pct": 64.0
+      }
+    ]
+  },
+  "hardware": "NVIDIA-A10G-24GB",
+  "instance_type": "ml.g5.2xlarge",
+  "max_new_tokens": 128,
+  "models": [
+    {
+      "artifact_label": "base_model_proxy_until_trained_adapters",
+      "cold_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_seconds": 5.009260855999997,
+        "first_request_generate_seconds": 3.1347689600000024,
+        "first_request_prompt_tokens": 3464,
+        "model_load_seconds": 1.874491895999995
+      },
+      "dtype": "bf16",
+      "hardware": "NVIDIA-A10G-24GB",
+      "instance_type": "ml.g5.2xlarge",
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "profiles": [
+        {
+          "artifact_label": "base_model_proxy_until_trained_adapters",
+          "batch_size": 1,
+          "completion_tokens_total": 25028,
+          "dtype": "bf16",
+          "failure_rate": 0.0,
+          "failures": 0,
+          "gpu_snapshots": [
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1524.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 28.0,
+                  "utilization_memory_pct": 12.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1524.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 35.0,
+                  "utilization_memory_pct": 20.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1558.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 28.0,
+                  "utilization_memory_pct": 12.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1558.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 28.0,
+                  "utilization_memory_pct": 13.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1558.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 34.0,
+                  "utilization_memory_pct": 20.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3110.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 95.0,
+                  "utilization_memory_pct": 78.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3890.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 95.0,
+                  "utilization_memory_pct": 78.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 4676.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 96.0,
+                  "utilization_memory_pct": 79.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 4676.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 93.0,
+                  "utilization_memory_pct": 76.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 4676.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 94.0,
+                  "utilization_memory_pct": 77.0
+                }
+              ]
+            }
+          ],
+          "hardware": "NVIDIA-A10G-24GB",
+          "instance_type": "ml.g5.2xlarge",
+          "latency_p50_ms": 2621.1772885000073,
+          "latency_p95_ms": 2701.3320005500036,
+          "latency_samples_ms": [
+            2640.65650500001,
+            2716.304629999996,
+            2646.289300999996,
+            2641.727388000021,
+            2695.175919999997,
+            2636.14523199999,
+            2629.2265030000126,
+            2691.834462999992,
+            1979.137819999977,
+            2643.969658000003,
+            2697.4359559999925,
+            2635.818493000016,
+            2637.2222910000005,
+            2694.3470159999947,
+            2571.8905239999967,
+            2579.1866659999982,
+            2677.4323070000037,
+            1568.792376999994,
+            2637.412415999989,
+            2704.841823999999,
+            2635.965035999988,
+            2609.8147659999995,
+            2698.840278999967,
+            2635.0560210000253,
+            2593.2818050000037,
+            2643.888591999996,
+            2581.6262099999676,
+            2582.6267269999903,
+            2651.8196590000116,
+            2597.6837479999517,
+            2594.4303819999845,
+            2669.9871580000263,
+            2608.932632999995,
+            2600.4510570000434,
+            2679.054942999983,
+            2616.537648000019,
+            2620.371554999963,
+            2680.418916000008,
+            2618.426530000022,
+            2621.318405000011,
+            2680.150762999972,
+            2628.32126699999,
+            2644.3843400000446,
+            2665.3282970000305,
+            2559.6675790000063,
+            2581.0582990000057,
+            2699.5984609999937,
+            2657.017513000028,
+            2598.540431999993,
+            2653.7070640000024,
+            2586.1057430000187,
+            2582.4674940000136,
+            2664.7743149999883,
+            2582.4307419999855,
+            2575.7745399999976,
+            2642.820717999996,
+            2551.80876899999,
+            2556.3360979999743,
+            2628.3419890000346,
+            1522.7944179999895,
+            2555.6425940000054,
+            2632.685271000014,
+            2611.136285999976,
+            2592.5804610000114,
+            2662.208683000017,
+            1519.7660160000055,
+            2580.543655999975,
+            2620.0806489999877,
+            2575.1990090000163,
+            2586.8308619999993,
+            2652.789240000004,
+            2616.7807200000084,
+            2706.6666509999777,
+            2705.5085270000063,
+            2323.771253000018,
+            2655.2429340000003,
+            2680.4006209999898,
+            2573.7861759999987,
+            2562.8093259999787,
+            2639.3623289999937,
+            1954.536644999962,
+            2585.033127000031,
+            2667.938092999975,
+            2596.959142000003,
+            2610.4532140000174,
+            2667.117083999983,
+            2678.6388820000298,
+            2629.394738999963,
+            2699.8178110000026,
+            2640.4999270000076,
+            2613.218217999986,
+            2677.474829999994,
+            2587.2172699999965,
+            2552.9655560000037,
+            2628.5021510000206,
+            2587.1374050000213,
+            2655.5327430000375,
+            2701.1472730000037,
+            2426.7773109999666,
+            2581.42610699997,
+            2671.865528000012,
+            2593.707633000008,
+            2606.0662990000196,
+            2651.8376550000085,
+            2600.767531000031,
+            2602.049161000025,
+            2671.025630000031,
+            2605.290193999963,
+            2614.7117500000263,
+            2672.0668899999964,
+            2602.4730650000265,
+            2610.3047670000024,
+            2659.331930999997,
+            2580.3416189999666,
+            2574.9136420000127,
+            2652.8465499999925,
+            1925.4753870000059,
+            2586.143027999981,
+            2664.213552000035,
+            2596.0167039999646,
+            2625.355703000082,
+            2771.6214229999423,
+            2650.600098000041,
+            2666.7681290000473,
+            2715.0921829999106,
+            1455.400047000012,
+            2652.6139200000216,
+            2719.0842119999843,
+            2654.2055339999706,
+            2659.7671050000145,
+            2668.615446999979,
+            2134.4604049999134,
+            2565.2582599999505,
+            2644.8067680000804,
+            2574.394758999915,
+            2576.866156000051,
+            2636.4146570000457,
+            2611.7279329999974,
+            2635.889943000052,
+            2645.41442999996,
+            2553.042803999915,
+            2586.6708339999605,
+            2632.157125000049,
+            2563.4108429999287,
+            2586.13599399996,
+            2705.151143999956,
+            1987.1330600000192,
+            2584.970306999935,
+            2653.1194659999073,
+            2600.7708829999956,
+            2607.9543689999127,
+            2673.8224069999887,
+            2624.123332999943,
+            2597.6627600000484,
+            2674.4425220000494,
+            2605.419890999997,
+            2619.900136999945,
+            2645.1707919999308,
+            2573.5764680000557,
+            2590.2026960000057,
+            2664.089009999998,
+            2603.385532000061,
+            2607.8176990000657,
+            2145.070824999948,
+            2581.709407999938,
+            2558.5176920000094,
+            2633.3728829999927,
+            1931.4801010000338,
+            2573.164575000078,
+            2635.7552019999275,
+            2644.083888999944,
+            2685.323820999997,
+            2162.8158749999784,
+            2650.823558999946,
+            2668.132552999964,
+            2658.0327990000114,
+            1939.4593509999822,
+            2575.3969749999897,
+            2621.0361720000037,
+            1897.1606640000118,
+            2560.8748470000364,
+            2619.132345999901,
+            2580.026363999991,
+            2605.7479680000597,
+            2647.764463000044,
+            2601.8126499999426,
+            2628.8450280000006,
+            2672.2968729999366,
+            2611.965899999973,
+            2612.405996000007,
+            2676.182492999942,
+            1998.8435039999786,
+            2662.044853999987,
+            2721.184368999957,
+            2656.11284900001,
+            2691.9354469999917,
+            2731.065107999939,
+            2632.8979800000525,
+            2611.4053869999907,
+            2679.279281000049
+          ],
+          "max_new_tokens": 128,
+          "mean_completion_tokens": 125.14,
+          "mean_prompt_tokens": 1354.255,
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "notes": [
+            "base_model_proxy_until_trained_adapters",
+            "transformers_runtime_only",
+            "train_validation_prompts_only_no_test_split"
+          ],
+          "output_tokens_per_second": 48.58853708158645,
+          "peak_vram_allocated_gb": 1.0960545539855957,
+          "peak_vram_reserved_gb": 1.216796875,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 0.3882734304106317,
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "role": "student",
+          "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+          "runtime_family": "transformers",
+          "single_request_decode_tokens_per_second": 48.68904253504629,
+          "timed_examples": 200,
+          "timed_examples_by_task": {
+            "cash_reconciliation": 67,
+            "transaction_review": 67,
+            "variance_analysis": 66
+          },
+          "vllm_tested": false,
+          "wall_time_seconds": 515.100916868,
+          "warmup_requests": 20,
+          "warmup_requests_by_task": {
+            "cash_reconciliation": 6,
+            "transaction_review": 7,
+            "variance_analysis": 7
+          }
+        },
+        {
+          "artifact_label": "base_model_proxy_until_trained_adapters",
+          "batch_size": 8,
+          "completion_tokens_total": 25600,
+          "dtype": "bf16",
+          "failure_rate": 0.0,
+          "failures": 0,
+          "gpu_snapshots": [
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1524.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 28.0,
+                  "utilization_memory_pct": 12.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1524.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 35.0,
+                  "utilization_memory_pct": 20.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1558.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 28.0,
+                  "utilization_memory_pct": 12.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1558.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 28.0,
+                  "utilization_memory_pct": 13.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 1558.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 34.0,
+                  "utilization_memory_pct": 20.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3110.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 95.0,
+                  "utilization_memory_pct": 78.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3890.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 95.0,
+                  "utilization_memory_pct": 78.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 4676.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 96.0,
+                  "utilization_memory_pct": 79.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 4676.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 93.0,
+                  "utilization_memory_pct": 76.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 4676.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 94.0,
+                  "utilization_memory_pct": 77.0
+                }
+              ]
+            }
+          ],
+          "hardware": "NVIDIA-A10G-24GB",
+          "instance_type": "ml.g5.2xlarge",
+          "latency_p50_ms": 3653.739599000005,
+          "latency_p95_ms": 3725.812409600053,
+          "latency_samples_ms": [
+            3507.5855070000443,
+            3635.2353119999634,
+            3676.814658000012,
+            3676.65398500003,
+            3531.037842000046,
+            3681.155786999966,
+            3536.9603200000483,
+            3650.2492430000757,
+            3618.8369000000193,
+            3502.521062000028,
+            3508.509707999906,
+            3504.286415000024,
+            3659.834327999988,
+            3659.9952749999147,
+            3566.2254829999256,
+            3707.566236000048,
+            3713.4132270000464,
+            3728.7170340000557,
+            3735.5518029999075,
+            3696.012591999988,
+            3714.1939120000416,
+            3672.0483369999783,
+            3653.739599000005,
+            3622.906335000039,
+            3645.713867999916
+          ],
+          "max_new_tokens": 128,
+          "mean_completion_tokens": 128.0,
+          "mean_prompt_tokens": 1354.255,
+          "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+          "notes": [
+            "base_model_proxy_until_trained_adapters",
+            "transformers_runtime_only",
+            "train_validation_prompts_only_no_test_split"
+          ],
+          "output_tokens_per_second": 279.31748438730995,
+          "peak_vram_allocated_gb": 2.4013447761535645,
+          "peak_vram_reserved_gb": 4.259765625,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 2.182167846775859,
+          "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+          "role": "student",
+          "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+          "runtime_family": "transformers",
+          "single_request_decode_tokens_per_second": 279.31748438730995,
+          "timed_examples": 200,
+          "timed_examples_by_task": {
+            "cash_reconciliation": 67,
+            "transaction_review": 67,
+            "variance_analysis": 66
+          },
+          "vllm_tested": false,
+          "wall_time_seconds": 91.65197823599999,
+          "warmup_requests": 20,
+          "warmup_requests_by_task": {
+            "cash_reconciliation": 6,
+            "transaction_review": 7,
+            "variance_analysis": 7
+          }
+        }
+      ],
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "role": "student",
+      "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+      "runtime_family": "transformers",
+      "schema_version": "distillery.benchmark.systems.v1",
+      "vllm_tested": false,
+      "warm_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_latency_ms": 2652.6748550000148,
+        "first_request_generate_seconds": 2.652674855000015,
+        "first_request_prompt_tokens": 324
+      }
+    },
+    {
+      "artifact_label": "base_model_proxy_until_trained_adapters",
+      "cold_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_seconds": 4.229850449999844,
+        "first_request_generate_seconds": 3.3356075879999025,
+        "first_request_prompt_tokens": 3464,
+        "model_load_seconds": 0.8942428619999419
+      },
+      "dtype": "bf16",
+      "hardware": "NVIDIA-A10G-24GB",
+      "instance_type": "ml.g5.2xlarge",
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "profiles": [
+        {
+          "artifact_label": "base_model_proxy_until_trained_adapters",
+          "batch_size": 1,
+          "completion_tokens_total": 24770,
+          "dtype": "bf16",
+          "failure_rate": 0.0,
+          "failures": 0,
+          "gpu_snapshots": [
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3726.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 45.0,
+                  "utilization_memory_pct": 32.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3726.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 58.0,
+                  "utilization_memory_pct": 47.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3912.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 44.0,
+                  "utilization_memory_pct": 31.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3916.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 46.0,
+                  "utilization_memory_pct": 33.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3916.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 58.0,
+                  "utilization_memory_pct": 47.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 6686.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 86.0,
+                  "utilization_memory_pct": 77.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 8126.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 97.0,
+                  "utilization_memory_pct": 86.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 9572.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 92.0,
+                  "utilization_memory_pct": 82.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 9572.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 97.0,
+                  "utilization_memory_pct": 86.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 9572.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 97.0,
+                  "utilization_memory_pct": 85.0
+                }
+              ]
+            }
+          ],
+          "hardware": "NVIDIA-A10G-24GB",
+          "instance_type": "ml.g5.2xlarge",
+          "latency_p50_ms": 3170.622620500012,
+          "latency_p95_ms": 3413.481804449941,
+          "latency_samples_ms": [
+            3099.7720919999665,
+            3352.9191000000083,
+            3148.00983300006,
+            2972.293671999978,
+            3461.5976599999385,
+            3200.9704160000183,
+            3187.049485999978,
+            3413.4302269999353,
+            2194.5412110000007,
+            3161.1816579999186,
+            3335.2885460000152,
+            2623.1504900000573,
+            3123.7881639999614,
+            3339.001406999955,
+            3094.713441999943,
+            2368.1874039999684,
+            3340.2940910000325,
+            3147.6512330000332,
+            3118.159531999936,
+            3327.7564130000883,
+            1826.095175999967,
+            2360.0332190000017,
+            3313.8559889999897,
+            3096.355874999972,
+            3129.459415000042,
+            3459.932440999978,
+            2587.2957869999027,
+            3204.124691000061,
+            3411.3980549999496,
+            3197.483336000005,
+            3099.4248890000335,
+            3307.5017800000523,
+            3090.475493999975,
+            3075.3481159999865,
+            3281.042303999925,
+            3081.822753000097,
+            3085.833442999956,
+            3290.6192060000876,
+            3069.380604999992,
+            3071.4462229999526,
+            3300.3720529999327,
+            3065.467290000015,
+            3062.7537609999536,
+            3286.71315400004,
+            3079.973622000125,
+            3198.7892080001075,
+            3439.386689999992,
+            3184.7874519999095,
+            3186.711422000144,
+            3333.0030929998884,
+            2195.6480599999395,
+            3102.2158260000197,
+            3337.610453000025,
+            3121.19577999988,
+            3132.876038999939,
+            3366.343354000037,
+            2656.2108830000852,
+            3100.62197000002,
+            3314.127494000104,
+            3116.3726219999717,
+            3122.873878999826,
+            3322.23153599989,
+            2792.1950990000823,
+            2401.16289599996,
+            3340.8599839999624,
+            3149.0621840000586,
+            3239.385177000031,
+            3390.1770659999784,
+            2674.1610779999974,
+            3177.6859940000577,
+            3383.626578000076,
+            2137.1516130000145,
+            2418.8868569999613,
+            3412.4313099998744,
+            2636.2578889998076,
+            3181.850532999988,
+            3380.9504750001906,
+            3163.509791000024,
+            3166.183302000036,
+            3397.3015970000233,
+            3195.154751000018,
+            3166.1969970000428,
+            3414.461776000053,
+            3209.0202719998615,
+            3159.4993990001967,
+            3390.1486820000173,
+            3270.1739569999972,
+            3212.6355190000595,
+            3404.4361409999055,
+            2580.46223700012,
+            3198.861647000058,
+            3414.8356079999758,
+            3195.219855000005,
+            3201.123409000047,
+            3405.742401999987,
+            3204.6407939999426,
+            3195.4669700000977,
+            3407.342706999998,
+            3187.976017999972,
+            3132.072083999901,
+            3412.4260969999796,
+            2296.13594500006,
+            3188.8520759998755,
+            3411.438730999862,
+            3191.6819289999694,
+            3191.0968229999526,
+            3485.3511750000052,
+            3118.149244000051,
+            3187.412100999836,
+            3390.9598180000557,
+            1836.7262509998454,
+            3079.0256749999116,
+            3280.7975180000994,
+            2743.1376850001925,
+            3077.0788410000023,
+            3286.988731000065,
+            3067.037073999927,
+            3130.1099279999107,
+            3347.7679669999816,
+            3142.5655730001836,
+            3086.1002669998925,
+            3346.403379000094,
+            3133.780178000052,
+            2984.048161999908,
+            3367.5052559999585,
+            3138.195838999991,
+            3191.127384999845,
+            3451.130957000032,
+            3105.3664159999244,
+            3101.71989100013,
+            3321.1724129998856,
+            2496.677016999911,
+            3126.255852999975,
+            3355.3254570001627,
+            3143.031181999959,
+            2385.0256040000204,
+            3358.1961630000023,
+            2912.34523099979,
+            3098.6914640000123,
+            3332.3535490001177,
+            3140.2909350001664,
+            2337.2809959998904,
+            3312.257473000045,
+            3089.9540370000977,
+            3152.766534999955,
+            3402.607314000079,
+            3126.8837990000975,
+            3282.006689999889,
+            3430.165721000094,
+            3186.351241000011,
+            3180.199123999955,
+            3407.525372000009,
+            3175.0482439999814,
+            3189.4868659999247,
+            3394.103266000002,
+            3077.3942840000927,
+            3129.6150030000263,
+            3337.406572999953,
+            3150.1756360000854,
+            3079.4336459998704,
+            3285.8875819999867,
+            3099.1971109999668,
+            3078.852895999944,
+            3310.6974600000285,
+            3083.7129609999465,
+            3077.704068999992,
+            3326.423223999882,
+            1690.5089900001258,
+            3234.2694640001355,
+            3415.1518940000187,
+            1987.1108190000086,
+            3079.1914169999473,
+            3329.492324000057,
+            3098.116167999933,
+            3125.988879000033,
+            3369.555524999896,
+            3136.294944999918,
+            3137.6673950001077,
+            3347.449175000065,
+            3102.3719190000065,
+            3109.3571339999926,
+            3368.864998000163,
+            3158.7644379999347,
+            2389.303747999975,
+            3345.938540999896,
+            3142.4492659998577,
+            3137.6588130001437,
+            3423.439462000033,
+            3215.9331069999553,
+            3129.721355999891,
+            3382.747977000008,
+            3156.8211730000257,
+            2394.9724669998886,
+            3386.3386560001345,
+            3161.983034999821,
+            3177.898398000025,
+            3291.221286999871,
+            3095.2545009999994,
+            3096.276090999936,
+            3325.634996999952
+          ],
+          "max_new_tokens": 128,
+          "mean_completion_tokens": 123.85,
+          "mean_prompt_tokens": 1354.255,
+          "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+          "notes": [
+            "base_model_proxy_until_trained_adapters",
+            "transformers_runtime_only",
+            "train_validation_prompts_only_no_test_split"
+          ],
+          "output_tokens_per_second": 39.66643471338424,
+          "peak_vram_allocated_gb": 3.198607921600342,
+          "peak_vram_reserved_gb": 4.259765625,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 0.32027803563491514,
+          "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+          "role": "teacher",
+          "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+          "runtime_family": "transformers",
+          "single_request_decode_tokens_per_second": 39.824267169109916,
+          "timed_examples": 200,
+          "timed_examples_by_task": {
+            "cash_reconciliation": 67,
+            "transaction_review": 67,
+            "variance_analysis": 66
+          },
+          "vllm_tested": false,
+          "wall_time_seconds": 624.457433066,
+          "warmup_requests": 20,
+          "warmup_requests_by_task": {
+            "cash_reconciliation": 6,
+            "transaction_review": 7,
+            "variance_analysis": 7
+          }
+        },
+        {
+          "artifact_label": "base_model_proxy_until_trained_adapters",
+          "batch_size": 8,
+          "completion_tokens_total": 25600,
+          "dtype": "bf16",
+          "failure_rate": 0.0,
+          "failures": 0,
+          "gpu_snapshots": [
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3726.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 45.0,
+                  "utilization_memory_pct": 32.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3726.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 58.0,
+                  "utilization_memory_pct": 47.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3912.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 44.0,
+                  "utilization_memory_pct": 31.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3916.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 46.0,
+                  "utilization_memory_pct": 33.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 3916.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 58.0,
+                  "utilization_memory_pct": 47.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 6686.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 86.0,
+                  "utilization_memory_pct": 77.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 8126.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 97.0,
+                  "utilization_memory_pct": 86.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 9572.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 92.0,
+                  "utilization_memory_pct": 82.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 9572.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 97.0,
+                  "utilization_memory_pct": 86.0
+                }
+              ]
+            },
+            {
+              "available": true,
+              "gpus": [
+                {
+                  "memory_total_mib": 23028.0,
+                  "memory_used_mib": 9572.0,
+                  "name": "NVIDIA A10G",
+                  "utilization_gpu_pct": 97.0,
+                  "utilization_memory_pct": 85.0
+                }
+              ]
+            }
+          ],
+          "hardware": "NVIDIA-A10G-24GB",
+          "instance_type": "ml.g5.2xlarge",
+          "latency_p50_ms": 7505.115895000017,
+          "latency_p95_ms": 7614.532883599986,
+          "latency_samples_ms": [
+            7505.115895000017,
+            7409.161331000178,
+            7497.29226799991,
+            7625.694204999945,
+            7507.823083999938,
+            7473.366955000074,
+            7620.014867000009,
+            7504.785747999904,
+            7460.059594999848,
+            7507.423625000001,
+            7507.497970000031,
+            7531.29125800001,
+            7537.014378000094,
+            7486.606031000065,
+            7512.825733,
+            7411.389614999962,
+            7469.08851000012,
+            7532.258910999872,
+            7592.604949999895,
+            7402.3528129998795,
+            7564.668046999941,
+            7513.797221999994,
+            7483.463192000045,
+            7440.565842000069,
+            7496.394335000105
+          ],
+          "max_new_tokens": 128,
+          "mean_completion_tokens": 128.0,
+          "mean_prompt_tokens": 1354.255,
+          "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+          "notes": [
+            "base_model_proxy_until_trained_adapters",
+            "transformers_runtime_only",
+            "train_validation_prompts_only_no_test_split"
+          ],
+          "output_tokens_per_second": 135.7855650581398,
+          "peak_vram_allocated_gb": 5.563180446624756,
+          "peak_vram_reserved_gb": 9.041015625,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 1.0608247270167173,
+          "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+          "role": "teacher",
+          "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+          "runtime_family": "transformers",
+          "single_request_decode_tokens_per_second": 135.7855650581398,
+          "timed_examples": 200,
+          "timed_examples_by_task": {
+            "cash_reconciliation": 67,
+            "transaction_review": 67,
+            "variance_analysis": 66
+          },
+          "vllm_tested": false,
+          "wall_time_seconds": 188.53255859,
+          "warmup_requests": 20,
+          "warmup_requests_by_task": {
+            "cash_reconciliation": 6,
+            "transaction_review": 7,
+            "variance_analysis": 7
+          }
+        }
+      ],
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "role": "teacher",
+      "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+      "runtime_family": "transformers",
+      "schema_version": "distillery.benchmark.systems.v1",
+      "vllm_tested": false,
+      "warm_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_latency_ms": 3075.747674000013,
+        "first_request_generate_seconds": 3.075747674000013,
+        "first_request_prompt_tokens": 324
+      }
+    }
+  ],
+  "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+  "runtime_family": "transformers",
+  "schema_version": "distillery.benchmark.systems.v1",
+  "seed": 17,
+  "timed": 200,
+  "vllm_tested": false,
+  "wall_time_seconds": 1557.9487933310002,
+  "warmups": 20
+}

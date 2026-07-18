@@ -1,0 +1,87 @@
+{
+  "dtype": "bf16",
+  "hardware": "NVIDIA-A10G-24GB",
+  "instance_type": "ml.g5.2xlarge",
+  "models": [
+    {
+      "cold_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_seconds": 5.009260855999997,
+        "first_request_generate_seconds": 3.1347689600000024,
+        "first_request_prompt_tokens": 3464,
+        "model_load_seconds": 1.874491895999995
+      },
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "profiles": [
+        {
+          "batch_size": 1,
+          "completion_tokens_total": 25028,
+          "latency_p50_ms": 2621.1772885000073,
+          "latency_p95_ms": 2701.3320005500036,
+          "output_tokens_per_second": 48.58853708158645,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 0.3882734304106317,
+          "single_request_decode_tokens_per_second": 48.68904253504629
+        },
+        {
+          "batch_size": 8,
+          "completion_tokens_total": 25600,
+          "latency_p50_ms": 3653.739599000005,
+          "latency_p95_ms": 3725.812409600053,
+          "output_tokens_per_second": 279.31748438730995,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 2.182167846775859,
+          "single_request_decode_tokens_per_second": 279.31748438730995
+        }
+      ],
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "warm_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_latency_ms": 2652.6748550000148,
+        "first_request_generate_seconds": 2.652674855000015,
+        "first_request_prompt_tokens": 324
+      }
+    },
+    {
+      "cold_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_seconds": 4.229850449999844,
+        "first_request_generate_seconds": 3.3356075879999025,
+        "first_request_prompt_tokens": 3464,
+        "model_load_seconds": 0.8942428619999419
+      },
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "profiles": [
+        {
+          "batch_size": 1,
+          "completion_tokens_total": 24770,
+          "latency_p50_ms": 3170.622620500012,
+          "latency_p95_ms": 3413.481804449941,
+          "output_tokens_per_second": 39.66643471338424,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 0.32027803563491514,
+          "single_request_decode_tokens_per_second": 39.824267169109916
+        },
+        {
+          "batch_size": 8,
+          "completion_tokens_total": 25600,
+          "latency_p50_ms": 7505.115895000017,
+          "latency_p95_ms": 7614.532883599986,
+          "output_tokens_per_second": 135.7855650581398,
+          "prompt_tokens_total": 270851,
+          "requests_per_second": 1.0608247270167173,
+          "single_request_decode_tokens_per_second": 135.7855650581398
+        }
+      ],
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "warm_startup": {
+        "first_request_completion_tokens": 128,
+        "first_request_e2e_latency_ms": 3075.747674000013,
+        "first_request_generate_seconds": 3.075747674000013,
+        "first_request_prompt_tokens": 324
+      }
+    }
+  ],
+  "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+  "status": "succeeded"
+}
