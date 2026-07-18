@@ -338,7 +338,7 @@ def evidence_schema_template() -> dict[str, Any]:
             "student_revision": "UNSET",
             "teacher_model_id": "Qwen/Qwen2.5-1.5B-Instruct",
             "teacher_revision": "UNSET",
-            "max_length": 512,
+            "max_length": 640,
             "max_completion": 128,
             "vocab_chunk_size": 4096,
             "microbatch": 1,

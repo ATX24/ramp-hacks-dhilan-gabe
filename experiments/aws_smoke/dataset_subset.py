@@ -15,7 +15,7 @@ from distillery.data.split import SplitSpec
 from experiments.aws_smoke.profile import DEFAULT_EMERGENCY_PROFILE, EmergencyTrainingProfile
 
 # transaction_review prompts currently embed full policy/COA payloads and exceed
-# the sealed 512-token emergency max_length. Keep the smoke corpus on short tasks.
+# the sealed 640-token emergency max_length. Keep the smoke corpus on short tasks.
 _EMERGENCY_TASK_MIXTURE: dict[TaskId, float] = {
     TaskId.VARIANCE_ANALYSIS: 0.8,
     TaskId.CASH_RECONCILIATION: 0.2,

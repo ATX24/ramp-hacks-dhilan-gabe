@@ -42,7 +42,7 @@ class EmergencyTrainingProfile(BaseModel):
     train_examples: StrictInt = Field(default=32, ge=32, le=64)
     validation_examples: StrictInt = Field(default=16, ge=16, le=16)
     max_steps: StrictInt = Field(default=8, ge=5, le=10)
-    max_length: StrictInt = 512
+    max_length: StrictInt = 640
     max_completion: StrictInt = 128
     microbatch: StrictInt = 1
     grad_accumulation: StrictInt = 1

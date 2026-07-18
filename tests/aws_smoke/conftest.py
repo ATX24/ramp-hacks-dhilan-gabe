@@ -81,7 +81,7 @@ def valid_evidence() -> EmergencyEvidence:
             student_revision=STUDENT_REV,
             teacher_model_id="Qwen/Qwen2.5-1.5B-Instruct",
             teacher_revision=TEACHER_REV,
-            max_length=512,
+            max_length=640,
             max_completion=128,
             vocab_chunk_size=4096,
             microbatch=1,

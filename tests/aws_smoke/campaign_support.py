@@ -110,7 +110,7 @@ def write_test_manifests(
                 seed=17 + ordinal,
                 max_steps=8,
                 token_budget=0,
-                max_length=512,
+                max_length=640,
                 qlora=ManifestQLoRAConfig(),
                 completion_evidence=ManifestCompletionEvidence(
                     source_file_sha256="4" * 64,

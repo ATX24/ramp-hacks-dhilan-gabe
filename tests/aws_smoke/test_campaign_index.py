@@ -114,7 +114,7 @@ def test_p4de_memory_evidence_uses_a100_capacity(
         sealed_mode="bf16_lora",
         nf4_kernel_probe_passed=False,
         bf16_memory_evidence=evidence,
-        max_length=512,
+        max_length=640,
         microbatch=1,
         lora_rank=16,
         load_teacher=True,

@@ -112,7 +112,7 @@ def build_tokenization_evidence(
         student_tokenizer_sha256=evidence.student_tokenizer_sha256,
         student_chat_template_sha256=evidence.student_chat_template_sha256,
         student_special_token_map=evidence.student_special_token_map,
-        max_length=512,
+        max_length=640,
         max_completion=128,
         arms=arms,
     )
