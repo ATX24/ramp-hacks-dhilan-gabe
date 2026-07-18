@@ -33,7 +33,8 @@ export function Brand({ inverse = false }: { inverse?: boolean }) {
 const links = [
   ["Research", "/research"],
   ["Papers", "/papers"],
-  ["Company", "/company"],
+  ["Docs", "/docs"],
+  ["Experiment", "/experiment"],
   ["TinyFable", "/tinyfable"],
 ] as const;
 
