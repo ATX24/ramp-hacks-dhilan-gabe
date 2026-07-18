@@ -99,12 +99,15 @@ describe("mode × stage rendered matrix", () => {
   )("renders $mode on $stage without a blank screen", ({ mode, stage, name }) => {
     const bundle = buildStageBundle(mode);
     render(<StageRouteContent stage={stage} bundle={bundle} />);
-    expect(screen.getByRole("heading", { name })).toBeInTheDocument();
 
     if (mode === "loading") {
       expect(screen.getByTestId("stage-loading")).toBeInTheDocument();
     } else if (mode === "fetch_failure") {
       expect(screen.getByTestId("stage-fetch-failure")).toHaveAttribute("role", "alert");
+    } else if (stage === "train" || stage === "demo") {
+      expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    } else {
+      expect(screen.getByRole("heading", { name })).toBeInTheDocument();
     }
   });
 });

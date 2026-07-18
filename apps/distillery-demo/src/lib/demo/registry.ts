@@ -128,19 +128,6 @@ function servingForArm(
   const artifactId = bundle.artifact?.artifact_id ?? null;
   const hasPriorArtifact = artifactId !== null;
 
-  const liveBase =
-    typeof process !== "undefined"
-      ? process.env.NEXT_PUBLIC_DISTILLERY_INFERENCE_URL?.trim()
-      : undefined;
-  if (liveBase && (armId === "student_base" || armId === "sequence_kd")) {
-    return {
-      availability: "live",
-      endpoint_id: "local-mps",
-      artifact_id: artifactId ?? "local-adapter",
-      reason: null,
-    };
-  }
-
   if (armId === "student_base") {
     return {
       availability: "fixture_preview" satisfies DemoServingAvailability,

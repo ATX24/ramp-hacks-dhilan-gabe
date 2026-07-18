@@ -61,9 +61,9 @@ describe("demo navigation", () => {
   it("renders Demo inside the stage route matrix", () => {
     const bundle = buildStageBundle("proved");
     render(<StageRouteContent stage="demo" bundle={bundle} />);
-    expect(screen.getByRole("heading", { name: "Demo" })).toBeInTheDocument();
-    expect(screen.getByText("Playground")).toBeInTheDocument();
-    expect(screen.getByTestId("demo-walkthrough")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getByTestId("demo-hero")).toBeInTheDocument();
+    expect(screen.getByText("Not live inference")).toBeInTheDocument();
   });
 });
 
@@ -81,102 +81,101 @@ describe("demo model registry", () => {
     ]);
   });
 
-  it("omits sequence_kd when the proof payload does not include it", () => {
+  it("keeps the two honest saved-data arms available by default", () => {
     const bundle = buildStageBundle("default");
     const registry = buildDemoModelRegistry(bundle);
-    expect(registry.models.map((model) => model.arm_id)).toEqual(["student_base"]);
+    expect(registry.models.map((model) => model.arm_id)).toEqual([
+      "student_base",
+      "sequence_kd",
+    ]);
   });
 
-  it("renders unknown for missing OOD CI evidence", () => {
+  it("keeps detailed proof statistics out of the primary demo flow", () => {
     const bundle = buildStageBundle("proved");
     render(<DemoStage bundle={bundle} />);
-    const panel = screen.getByTestId("demo-stats-panel");
-    expect(within(panel).getAllByText("unknown").length).toBeGreaterThan(0);
-    const oodCiRow = within(panel)
-      .getByText("OOD 95% CI")
-      .closest("tr");
-    expect(oodCiRow).toHaveTextContent("unknown");
+    expect(screen.queryByTestId("demo-stats-panel")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "saved demo data",
+    );
   });
 });
 
 describe("demo playground interactions", () => {
-  it("switches tasks and loads prepopulated examples", async () => {
+  it("selects an example and prefills the plain-language input without running", async () => {
     const user = userEvent.setup();
     render(<DemoStage bundle={buildStageBundle("proved")} />);
 
-    expect(screen.getByTestId("demo-expected-schema")).toHaveTextContent(
-      "transaction_review.v1",
-    );
-    await user.selectOptions(screen.getByTestId("demo-task-select"), "variance_analysis");
-    expect(screen.getByTestId("demo-expected-schema")).toHaveTextContent(
-      "variance_analysis.v1",
-    );
-    expect((screen.getByTestId("demo-input") as HTMLTextAreaElement).value).toContain(
-      "period",
-    );
-  });
-
-  it("supports compare mode across registry models", async () => {
-    const user = userEvent.setup();
-    render(<DemoStage bundle={buildStageBundle("proved")} />);
-
-    await user.click(screen.getByTestId("demo-run-mode-compare"));
-    // Walkthrough already selects student_base + sequence_kd; add oracle_sft.
-    await user.click(screen.getByTestId("demo-model-oracle_sft"));
-    await user.click(screen.getByTestId("demo-run"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("demo-result-model_student_base")).toBeInTheDocument();
-      expect(screen.getByTestId("demo-result-model_sequence_kd")).toBeInTheDocument();
-      expect(screen.getByTestId("demo-result-model_oracle_sft")).toBeInTheDocument();
-    });
-    expect(screen.getByTestId("demo-result-model_student_base")).toHaveAttribute(
-      "data-provenance",
-      "fixture_preview",
-    );
-  });
-
-  it("never fabricates live inference when no serving endpoint exists", async () => {
-    const user = userEvent.setup();
-    render(<DemoStage bundle={buildStageBundle("proved")} />);
-
-    await user.click(screen.getByTestId("demo-infer-live"));
-    await user.click(screen.getByTestId("demo-run"));
-
-    await waitFor(() => {
-      const card = screen.getByTestId("demo-result-model_student_base");
-      expect(card).toHaveAttribute("data-status", "unavailable");
-      expect(card).toHaveTextContent("SERVING_ENDPOINT_MISSING");
-    });
+    const preset = screen.getByTestId("example-preset-budget-miss");
+    await user.click(preset);
+    expect(preset).toHaveAttribute("aria-pressed", "true");
     expect(
-      screen.queryByText("Live model inference"),
-    ).not.toBeInTheDocument();
+      (screen.getByTestId("demo-plain-input") as HTMLTextAreaElement).value,
+    ).toMatch(/budget/i);
+    expect(within(screen.getByTestId("demo-results")).queryAllByRole("article")).toHaveLength(
+      0,
+    );
   });
 
-  it("labels fixture-preview output explicitly", async () => {
+  it("compares the original and taught saved-data arms", async () => {
     const user = userEvent.setup();
     render(<DemoStage bundle={buildStageBundle("proved")} />);
-    await user.click(screen.getByTestId("demo-run-mode-single"));
+
+    await user.click(screen.getByTestId("demo-run"));
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByTestId("demo-results")).getAllByRole("article"),
+      ).toHaveLength(2);
+    });
+    for (const card of within(screen.getByTestId("demo-results")).getAllByRole(
+      "article",
+    )) {
+      expect(card).toHaveAttribute("data-provenance", "fixture_preview");
+    }
+  });
+
+  it("does not expose or imply live inference controls", async () => {
+    const user = userEvent.setup();
+    render(<DemoStage bundle={buildStageBundle("proved")} />);
+
+    expect(screen.queryByText("Live model inference")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("demo-run"));
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByTestId("demo-results")).getAllByText(
+          "Saved demo data. Not live inference.",
+        ),
+      ).toHaveLength(2);
+    });
+  });
+
+  it("labels every comparison result as saved demo data", async () => {
+    const user = userEvent.setup();
+    render(<DemoStage bundle={buildStageBundle("proved")} />);
     await user.click(screen.getByTestId("demo-run"));
     await waitFor(() => {
       expect(
-        screen.getByText(/Fixture preview — not live model inference/i),
-      ).toBeInTheDocument();
+        within(screen.getByTestId("demo-results")).getAllByText(
+          "Saved demo data",
+        ),
+      ).toHaveLength(2);
     });
   });
 
-  it("cycles prepopulated examples with random/reset controls", async () => {
+  it("keeps manual edits and hides raw JSON behind disclosure", async () => {
     const user = userEvent.setup();
     render(<DemoStage bundle={buildStageBundle("proved")} />);
-    const input = screen.getByTestId("demo-input") as HTMLTextAreaElement;
-    const original = input.value;
+    const input = screen.getByTestId("demo-plain-input");
     await user.clear(input);
-    await user.click(input);
-    await user.paste('{"patched":true}');
-    await user.click(screen.getByTestId("demo-reset-example"));
-    expect(screen.getByTestId("demo-input")).toHaveValue(original);
-    await user.click(screen.getByTestId("demo-random-example"));
-    expect(screen.getByTestId("demo-example-select")).not.toHaveValue("ex_txn_hard_001");
+    await user.type(input, "Keep this manual edit.");
+    expect(input).toHaveValue("Keep this manual edit.");
+    expect(screen.getByText("Edit raw example").closest("details")).not.toHaveAttribute(
+      "open",
+    );
+    expect(within(screen.getByTestId("demo-results")).queryAllByRole("article")).toHaveLength(
+      0,
+    );
   });
 });
 

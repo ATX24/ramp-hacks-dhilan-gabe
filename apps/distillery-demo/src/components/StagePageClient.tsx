@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import {
+  CentralDistillery,
+  type CentralStage,
+} from "@/components/CentralDistillery";
 import type { RunReferenceStatus } from "@/components/RunReferenceBar";
 import { StageRouteContent } from "@/components/StageRouteContent";
 import { createApiClient } from "@/lib/api";
@@ -17,10 +21,12 @@ import type { StageBundle, StageId } from "@/lib/types";
 
 export function StagePageClient({
   stage,
+  initialStage = "train",
   initialBundle,
   runSelection,
 }: {
-  stage: StageId;
+  stage: StageId | "central";
+  initialStage?: CentralStage;
   initialBundle: StageBundle;
   runSelection: RunSelection;
 }) {
@@ -105,7 +111,11 @@ export function StagePageClient({
       datasetId={visibleBundle.dataset.dataset_id}
       runReferenceStatus={referenceStatus}
     >
-      <StageRouteContent stage={stage} bundle={visibleBundle} />
+      {stage === "central" ? (
+        <CentralDistillery bundle={visibleBundle} initialStage={initialStage} />
+      ) : (
+        <StageRouteContent stage={stage} bundle={visibleBundle} />
+      )}
     </AppShell>
   );
 }

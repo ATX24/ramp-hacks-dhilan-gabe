@@ -73,7 +73,10 @@ export function TrainStage({
 
   return (
     <section aria-labelledby="train-heading" className="grid gap-4">
-      <Card className="border-border/80 bg-card/90 shadow-none" data-testid="train-demo">
+      <Card
+        className="rounded-[20px] border-0 bg-card shadow-none ring-1 ring-black/10"
+        data-testid="train-demo"
+      >
         <CardContent className="grid gap-3 pt-4">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="precomputed">Saved demo plan</StatusBadge>

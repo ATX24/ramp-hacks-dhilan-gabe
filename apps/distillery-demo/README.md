@@ -1,26 +1,29 @@
 # Distillery demo UI
 
-Stable saved-data Distillery demo (`98ed4a6`). Self-contained Next.js app. Root redirects to `/demo`.
+Password-protected Distillery demo from `1351e09`. Responses use saved demo data, not live inference.
 
-Responses are deterministic saved demo data, not live inference.
+## Required environment
 
-## Install / build
+- `DISTILLERY_DEMO_PASSWORD`
+- `DISTILLERY_AUTH_SECRET`
+
+Set a password without recording it in shell history, then generate a signing secret:
+
+```zsh
+read -rs "DISTILLERY_DEMO_PASSWORD?Demo password (12+ characters): "
+printf "\n"
+export DISTILLERY_DEMO_PASSWORD
+export DISTILLERY_AUTH_SECRET="$(openssl rand -hex 32)"
+```
+
+## Run
+
+From the repository root:
 
 ```bash
 pnpm --dir apps/distillery-demo install
-pnpm --dir apps/distillery-demo typecheck
-pnpm --dir apps/distillery-demo lint
-pnpm --dir apps/distillery-demo build
-```
-
-## Run (Portless)
-
-```bash
 cd apps/distillery-demo
 portless distillery-demo --force pnpm exec next dev
 ```
 
-Open:
-
-- `https://distillery-demo.localhost:1355/demo?mode=precomputed`
-- `https://distillery-demo.localhost:1355/train`
+Open `https://distillery-demo.localhost:1355/login`, then continue to `/demo?mode=precomputed`.

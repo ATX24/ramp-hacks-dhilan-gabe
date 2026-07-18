@@ -111,7 +111,10 @@ export function DemoStage({ bundle }: { bundle: StageBundle }) {
 
   return (
     <section aria-labelledby="demo-heading" className="grid gap-4">
-      <Card className="border-border/80 bg-card/90 shadow-none" data-testid="demo-hero">
+      <Card
+        className="rounded-[20px] border-0 bg-card shadow-none ring-1 ring-black/10"
+        data-testid="demo-hero"
+      >
         <CardContent className="grid gap-3 pt-4">
           <div className="flex items-center gap-2">
             <StatusBadge tone="precomputed">Saved demo data</StatusBadge>
@@ -169,7 +172,7 @@ export function DemoStage({ bundle }: { bundle: StageBundle }) {
             {running ? "Running..." : "Run comparison"}
           </Button>
 
-          <details className="rounded-lg border border-border px-3 py-2">
+          <details className="rounded-xl border border-black/15 px-3 py-2">
             <summary className="cursor-pointer text-sm font-medium">
               Edit raw example
             </summary>
@@ -205,7 +208,7 @@ export function DemoStage({ bundle }: { bundle: StageBundle }) {
         </p>
       ) : null}
 
-      <Card className="border-border/80 bg-card/90 shadow-none">
+      <Card className="rounded-[20px] border-0 bg-card shadow-none ring-1 ring-black/10">
         <CardHeader>
           <CardTitle className="font-serif text-xl">Results</CardTitle>
         </CardHeader>
