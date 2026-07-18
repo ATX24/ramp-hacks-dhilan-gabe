@@ -70,7 +70,6 @@ def test_dataset_roundtrip_and_hash() -> None:
                 TaskId.TRANSACTION_REVIEW: 5,
                 TaskId.VARIANCE_ANALYSIS: 5,
                 TaskId.CASH_RECONCILIATION: 2,
-                TaskId.MERCHANT_TAGGING: 0,
             },
             by_difficulty={
                 Difficulty.EASY: 3,

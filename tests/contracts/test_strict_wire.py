@@ -28,7 +28,6 @@ def _counts() -> TaskDifficultyCounts:
             TaskId.TRANSACTION_REVIEW: 1,
             TaskId.VARIANCE_ANALYSIS: 0,
             TaskId.CASH_RECONCILIATION: 0,
-            TaskId.MERCHANT_TAGGING: 0,
         },
         by_difficulty={
             Difficulty.EASY: 1,
@@ -147,7 +146,7 @@ def test_all_contract_integer_paths_reject_unsafe_json_integers() -> None:
 
 
 def test_dataset_count_breakdowns_are_complete_and_consistent() -> None:
-    with pytest.raises(ValidationError, match="every executable TaskId"):
+    with pytest.raises(ValidationError, match="complete supported task set"):
         TaskDifficultyCounts(
             by_task={TaskId.TRANSACTION_REVIEW: 1},
             by_difficulty={

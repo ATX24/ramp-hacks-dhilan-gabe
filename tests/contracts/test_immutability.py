@@ -53,7 +53,6 @@ def _dataset() -> Dataset:
                 TaskId.TRANSACTION_REVIEW: 1,
                 TaskId.VARIANCE_ANALYSIS: 0,
                 TaskId.CASH_RECONCILIATION: 0,
-                TaskId.MERCHANT_TAGGING: 0,
             },
             by_difficulty={
                 Difficulty.EASY: 1,
@@ -181,7 +180,6 @@ def test_ids_reject_bad_prefixes() -> None:
                     TaskId.TRANSACTION_REVIEW: 1,
                     TaskId.VARIANCE_ANALYSIS: 0,
                     TaskId.CASH_RECONCILIATION: 0,
-                    TaskId.MERCHANT_TAGGING: 0,
                 },
                 by_difficulty={
                     Difficulty.EASY: 1,

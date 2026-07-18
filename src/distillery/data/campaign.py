@@ -8,7 +8,12 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from distillery.contracts.dataset import (
+    FinanceWorldVersion,
+    TaskDifficultyCounts,
+)
 from distillery.contracts.hashing import content_sha256
+from distillery.contracts.tasks import Difficulty
 from distillery.data.generate import (
     CORPUS_FULL,
     CORPUS_FULL_V2,
@@ -27,8 +32,33 @@ from distillery.proof.protocol_v2 import (
 )
 from distillery.training.batching import DEFAULT_FINANCE_MIXTURE, FINANCE_MIXTURE_V2
 
-CampaignWorld = Literal["finance_world.v1", "finance_world.v2"]
+CampaignWorld = FinanceWorldVersion
 CampaignCorpus = Literal["smoke", "full"]
+
+
+def _validate_campaign_corpus(
+    world: CampaignWorld,
+    corpus: GeneratedCorpus,
+) -> None:
+    if corpus.spec.schema_version != world:
+        raise ValueError(
+            "generated corpus envelope schema version "
+            f"{corpus.spec.schema_version!r} does not match campaign world {world!r}"
+        )
+    if corpus.manifest.get("envelope_schema_version") != world:
+        raise ValueError("generated corpus manifest does not match campaign world")
+
+    by_task = {task: 0 for task in corpus.spec.task_order}
+    by_difficulty = {difficulty: 0 for difficulty in Difficulty}
+    for example in corpus.examples:
+        if example.schema_version != world:
+            raise ValueError("generated corpus contains an envelope from another finance world")
+        by_task[example.task] = by_task.get(example.task, 0) + 1
+        by_difficulty[example.difficulty] += 1
+    TaskDifficultyCounts(
+        by_task=by_task,
+        by_difficulty=by_difficulty,
+    ).require_finance_world(world)
 
 
 def campaign_corpus_spec(
@@ -57,6 +87,7 @@ def build_campaign_manifest(
         spec,
         check_near_duplicates=check_near_duplicates,
     )
+    _validate_campaign_corpus(world, corpus_obj)
     if world == "finance_world.v1":
         protocol_id = PROOF_PROTOCOL_ID_V1
         protocol_doc = {
@@ -75,6 +106,9 @@ def build_campaign_manifest(
         protocol_doc = finance_proof_v2_document()
         protocol_sha = finance_proof_v2_sha256()
         sampler_mixture = dict(FINANCE_MIXTURE_V2.task_weights)
+
+    if protocol_doc["finance_world"] != world:
+        raise ValueError("proof protocol finance world does not match campaign world")
 
     merchant_count = sum(
         1 for example in corpus_obj.examples if example.task.value == "merchant_tagging"
