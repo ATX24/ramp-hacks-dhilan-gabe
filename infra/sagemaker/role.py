@@ -22,6 +22,10 @@ def _validate_prefix(prefix: str, *, name: str) -> None:
         raise ValueError(f"{name} must be an unambiguous S3 key prefix")
 
 
+def _list_prefix_patterns(prefix: str) -> list[str]:
+    return [prefix, f"{prefix}/", f"{prefix}/*"]
+
+
 def training_role_inline_policy(
     *,
     artifact_bucket_arn: str,
@@ -58,16 +62,16 @@ def training_role_inline_policy(
         _validate_prefix(code_prefix, name="code_prefix")
 
     list_prefixes = [
-        f"{run_artifact_prefix}/manifest/*",
-        f"{run_artifact_prefix}/sagemaker-output/*",
-        f"{dataset_prefix}/*",
+        *_list_prefix_patterns(f"{run_artifact_prefix}/manifest"),
+        *_list_prefix_patterns(f"{run_artifact_prefix}/sagemaker-output"),
+        *_list_prefix_patterns(dataset_prefix),
     ]
     read_resources = [
         f"{artifact_bucket_arn}/{run_artifact_prefix}/manifest/*",
         f"{artifact_bucket_arn}/{dataset_prefix}/*",
     ]
     if code_prefix is not None:
-        list_prefixes.append(f"{code_prefix}/*")
+        list_prefixes.extend(_list_prefix_patterns(code_prefix))
         read_resources.append(f"{artifact_bucket_arn}/{code_prefix}/*")
 
     return {
