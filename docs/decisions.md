@@ -35,3 +35,8 @@ records Workstream 8 interpretations only; product locks stay in the plan.
 - Measured runtimes, VRAM, gross cost, teacher-gap, final `proof_status`
 
 When those land, update pitch scripts to cite the report—not this file.
+
+## Related isolated workstream
+
+- [decisions-qwen72b-fallback.md](./decisions-qwen72b-fallback.md) — Qwen2.5-72B
+  expensive quality fallback + TinyFable teacher roles (not a distilled student).
