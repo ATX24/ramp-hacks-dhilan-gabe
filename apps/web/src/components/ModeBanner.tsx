@@ -3,8 +3,8 @@ import type { UiMode } from "@/lib/types";
 
 const COPY: Record<UiMode, { title: string; body: string; tone: "info" | "warn" }> = {
   default: {
-    title: "Fixture-driven rehearsal",
-    body: "Static fixture responses only. No live API or active run.",
+    title: "Demo data rehearsal",
+    body: "Saved demo responses only. No live API or active run.",
     tone: "info",
   },
   no_training_yet: {
