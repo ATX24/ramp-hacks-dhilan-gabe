@@ -342,6 +342,40 @@ def _hourly_price_microusd(manifest: SealedRunManifest) -> int:
 
 def matched_protocol_inputs_sha256(manifest: SealedRunManifest) -> str:
     """Hash protocol inputs that must match while arm and seed may differ."""
+    if manifest.tags.get("PortfolioProtocolVersion") == "distillery.portfolio.training_protocol.v2":
+        qlora = manifest.training.qlora.model_dump(mode="json")
+        qlora.pop("kd_weight")
+        qlora.pop("hard_ce_weight")
+        qlora.pop("capability_evidence")
+        return content_sha256(
+            {
+                "schema_version": "distillery.portfolio.campaign_inputs.v1",
+                "dataset_bundle": manifest.dataset.model_dump(mode="json"),
+                "models": manifest.models.model_dump(mode="json"),
+                "training": {
+                    "seed": manifest.training.seed,
+                    "max_steps": manifest.training.max_steps,
+                    "token_budget": manifest.training.token_budget,
+                    "max_length": manifest.training.max_length,
+                    "qlora_without_declared_treatment": qlora,
+                },
+                "proof_protocol": manifest.proof_protocol.model_dump(mode="json"),
+                "runtime": manifest.runtime.model_dump(mode="json"),
+                "package_lock_hash": manifest.package_lock_hash,
+                "source_revision": manifest.source_revision,
+                "license_dispositions": manifest.license_dispositions,
+                "portfolio_protocol_version": manifest.tags.get("PortfolioProtocolVersion"),
+                "portfolio_training_protocol_sha256": manifest.tags.get(
+                    "PortfolioTrainingProtocolSha256"
+                ),
+                "portfolio_shared_protocol_sha256": manifest.tags.get(
+                    "PortfolioSharedProtocolSha256"
+                ),
+                "portfolio_gate_sha256": manifest.tags.get("PortfolioGateSha256"),
+                "max_runtime_seconds": manifest.tags.get("MaxRuntimeInSeconds"),
+                "network_isolation": manifest.tags.get("EnableNetworkIsolation"),
+            }
+        )
     return content_sha256(
         {
             "dataset": manifest.dataset.model_dump(mode="json"),

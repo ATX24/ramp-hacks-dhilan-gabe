@@ -1,8 +1,12 @@
 # Decision 0002: Tiered TinyFable portfolio
 
-Status: accepted, plan-only
+Status: superseded by Decision 0003
 Date: 2026-07-18
 Contract: `distillery.portfolio.plan.v2`
+
+Decision 0003 replaces the unsafe pre-promotion registry, unmatched
+sequence-specialist layout, and non-executable seed-23 language below. This
+document remains only as the historical review input.
 
 ## Scope change
 

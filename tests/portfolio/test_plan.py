@@ -1,80 +1,310 @@
-"""Tiered portfolio determinism, safety, gates, and accounting."""
+"""Portfolio wave design, readiness, determinism, and cost regressions."""
 
 from __future__ import annotations
+
+from datetime import timedelta
 
 import pytest
 from pydantic import ValidationError
 
+from distillery.contracts.budgets import ProofGates, TrainingBudget
 from experiments.portfolio.plan import (
-    A10G_BYTES,
-    A100_BYTES,
-    REQUIRED_PROBES,
-    ArtifactPlan,
-    MemoryProbe,
-    Pricing,
-    ReadinessEvidence,
-    SpecialistEvidence,
+    ACCOUNT_CEILING_MICROUSD,
+    BOOTSTRAP_RESAMPLES,
+    REPLICATION_SEED,
+    SCREEN_SEED,
+    CostCeilings,
+    FinalistPair,
+    NotStartedSlot,
+    PlannedRunSlot,
+    PortfolioArm,
+    Surface,
     Task,
     Tier,
-    TierEvidence,
-    build_plan,
-    model_pair,
-    role_evidence,
-    specialist_eligible,
-    tier_eligible,
+    build_replication_wave,
+    cost,
+    memory_probe,
+    pricing_evidence,
+    readiness_evidence,
+    replication_selection_lock,
     validate_readiness,
 )
+from tests.portfolio.support import NOW, H, make_plan, make_readiness
 
-H = {key: key * 64 for key in "123456789"}
+
+def test_protocol_uses_proof_and_training_constants_not_smoke(plan) -> None:
+    protocol = plan.protocol
+    proof = ProofGates()
+    budget = TrainingBudget()
+    assert protocol.screen_seed == proof.required_seed_screen == SCREEN_SEED
+    assert protocol.replication_seed == proof.required_seed_replication == REPLICATION_SEED
+    assert (
+        protocol.bootstrap_resamples == proof.bootstrap_resamples == BOOTSTRAP_RESAMPLES == 10_000
+    )
+    assert (
+        protocol.max_length,
+        protocol.max_completion,
+        protocol.max_steps,
+        protocol.grad_accumulation,
+        protocol.lora_rank,
+    ) == (
+        budget.max_length,
+        budget.max_completion,
+        budget.max_steps,
+        budget.grad_accumulation,
+        budget.lora_rank,
+    )
+    assert protocol.max_completion != 160
+    assert protocol.grad_accumulation != 8
 
 
-def _role(role: str, model: str, revision: str):
-    return role_evidence(
-        role=role,  # type: ignore[arg-type]
-        model_id=model,
-        revision=revision,
-        model_config_sha256=H["1"],
-        tokenizer_sha256=H["2"],
-        chat_template_sha256=H["3"],
-        special_tokens_sha256=H["4"],
-        license_sha256=H["5"],
-        output_use_sha256=H["6"],
+def test_exact_nano_logit_screen_and_preserved_idle_slots(plan) -> None:
+    wave = plan.screen_waves[0]
+    assert (wave.tier, wave.surface, wave.seed) == (Tier.NANO, Surface.LOGIT, 17)
+    assert [(slot.slot, slot.node, slot.gpu) for slot in wave.slots] == [
+        (index, index % 2, index // 2) for index in range(16)
+    ]
+    active = wave.active_slots
+    assert [
+        (slot.role, slot.arm, tuple(task.value for task in slot.tasks)) for slot in active[:4]
+    ] == [
+        ("generalist", PortfolioArm.ORACLE_SFT, tuple(task.value for task in Task)),
+        ("generalist", PortfolioArm.SEQUENCE_KD, tuple(task.value for task in Task)),
+        ("generalist", PortfolioArm.LOGIT_KD, tuple(task.value for task in Task)),
+        ("generalist", PortfolioArm.CE_ABLATION, tuple(task.value for task in Task)),
+    ]
+    assert [(slot.arm, slot.tasks[0]) for slot in active[4:]] == [
+        pair
+        for task in Task
+        for pair in (
+            (PortfolioArm.LOGIT_KD, task),
+            (PortfolioArm.CE_ABLATION, task),
+        )
+    ]
+    assert all(isinstance(slot, NotStartedSlot) for slot in wave.slots[12:])
+    assert all(slot.cost_included for slot in wave.slots[12:])
+
+
+def test_every_specialist_treatment_has_same_recipe_control(plan) -> None:
+    assert [(wave.tier, wave.surface) for wave in plan.screen_waves] == [
+        (tier, surface) for tier in Tier for surface in (Surface.LOGIT, Surface.SEQUENCE)
+    ]
+    for wave in plan.screen_waves:
+        groups: dict[str, list[PlannedRunSlot]] = {}
+        for slot in wave.active_slots:
+            groups.setdefault(slot.comparison_id, []).append(slot)
+            if slot.role == "generalist":
+                assert slot.tasks == tuple(Task)
+            else:
+                assert len(slot.tasks) == 1
+        for pair in groups.values():
+            treatment = next(slot for slot in pair if slot.comparison_position == "treatment")
+            control = next(slot for slot in pair if slot.comparison_position == "control")
+            assert (
+                treatment.recipe,
+                treatment.seed,
+                treatment.tasks,
+                treatment.dataset_view_sha256,
+                treatment.comparison_sha256,
+            ) == (
+                control.recipe,
+                control.seed,
+                control.tasks,
+                control.dataset_view_sha256,
+                control.comparison_sha256,
+            )
+            assert treatment.arm in {
+                PortfolioArm.SEQUENCE_KD,
+                PortfolioArm.LOGIT_KD,
+            }
+            if treatment.arm is PortfolioArm.SEQUENCE_KD:
+                assert control.arm in {
+                    PortfolioArm.ORACLE_SFT,
+                    PortfolioArm.SEQUENCE_CE_CONTROL,
+                }
+            else:
+                assert control.arm is PortfolioArm.CE_ABLATION
+
+
+def test_generalist_and_specialist_dataset_views_are_sealed(plan) -> None:
+    generalist = plan.dataset.view_for(tuple(Task))
+    assert generalist.task_filter == tuple(Task)
+    for task in Task:
+        specialist = plan.dataset.view_for((task,))
+        assert specialist.task_filter == (task,)
+        assert specialist.parent_bundle_sha256 == plan.dataset.content_sha256
+        assert specialist.view_sha256 != generalist.view_sha256
+    generalist_slot = plan.screen_waves[0].active_slots[0]
+    with pytest.raises(ValidationError, match="all four"):
+        generalist_slot.model_copy(update={"tasks": (Task.MERCHANT_TAGGING,)})
+
+
+def test_specialists_start_planned_without_registry_uris_or_statuses(plan) -> None:
+    assert plan.registry.publishable is False
+    assert not hasattr(plan.registry, "adapter_uris")
+    assert not hasattr(plan.registry, "merged_uris")
+    assert not hasattr(plan.registry, "routing_statuses")
+    specialists = [entry for entry in plan.registry.entries if entry.role == "specialist"]
+    assert specialists
+    assert {entry.state for entry in specialists} == {"planned"}
+    assert all(not hasattr(entry, "status") for entry in specialists)
+    assert all(not hasattr(entry, "adapter_uri") for entry in specialists)
+
+
+def _replication_lock(plan):
+    source = plan.screen_waves[0]
+    specialist = [
+        slot
+        for slot in source.active_slots
+        if slot.role == "specialist" and slot.tasks == (Task.TRANSACTION_REVIEW,)
+    ]
+    generalist_logit = [
+        slot
+        for slot in source.active_slots
+        if slot.role == "generalist" and slot.comparison_id == "cmp_generalist_logit"
+    ]
+    pairs = (
+        FinalistPair(
+            treatment_model_id=next(
+                slot.model_id for slot in specialist if slot.comparison_position == "treatment"
+            ),
+            control_model_id=next(
+                slot.model_id for slot in specialist if slot.comparison_position == "control"
+            ),
+        ),
+        FinalistPair(
+            treatment_model_id=next(
+                slot.model_id
+                for slot in generalist_logit
+                if slot.comparison_position == "treatment"
+            ),
+            control_model_id=next(
+                slot.model_id for slot in generalist_logit if slot.comparison_position == "control"
+            ),
+        ),
+    )
+    return replication_selection_lock(
+        tier=Tier.NANO,
+        source_wave_sha256=(source.matrix_sha256,),
+        validation_split_sha256=plan.dataset.split_sha256["validation"],
+        selection_protocol_sha256=H["1"],
+        selected_pairs=pairs,
+        locked_at=NOW,
     )
 
 
-@pytest.fixture
-def plan():
-    # Same 1.5B revision, separately attested as Nano teacher and Core student.
-    nano_teacher = _role("teacher", "Qwen/Qwen2.5-1.5B-Instruct", "b" * 40)
-    core_student = _role("student", "Qwen/Qwen2.5-1.5B-Instruct", "b" * 40)
-    return build_plan(
-        nano_pair=model_pair(
-            nano_teacher,
-            _role("student", "Qwen/Qwen2.5-0.5B-Instruct", "a" * 40),
-        ),
-        core_pair=model_pair(
-            _role("teacher", "Qwen/Qwen2.5-7B-Instruct", "c" * 40),
-            core_student,
-        ),
-        plus_pair=model_pair(
-            _role("teacher", "Qwen/Qwen2.5-14B-Instruct", "e" * 40),
-            _role("student", "Qwen/Qwen2.5-3B-Instruct", "d" * 40),
-        ),
-        g5_pricing=Pricing(
-            instance_type="ml.g5.48xlarge",
-            hourly_microusd=20_360_000,
-            evidence_sha256=H["7"],
-        ),
-        p4de_pricing=Pricing(
-            instance_type="ml.p4de.24xlarge",
-            hourly_microusd=31_564_107,
-            evidence_sha256=H["8"],
-        ),
-        artifact_root="s3://portfolio-test/v2/",
+def test_seed23_replication_binds_new_ids_artifacts_and_protocol(plan) -> None:
+    replication = build_replication_wave(plan=plan, selection=_replication_lock(plan))
+    assert replication.seed == 23
+    assert replication.phase == "replication"
+    assert len(replication.active_slots) == 4
+    screen_ids = {model.model_id for model in plan.models}
+    screen_runs = {model.run_id for model in plan.models}
+    screen_artifacts = {reservation.artifact_id for reservation in plan.artifacts.reservations}
+    assert not screen_ids.intersection(slot.model_id for slot in replication.active_slots)
+    assert not screen_runs.intersection(slot.run_id for slot in replication.active_slots)
+    assert not screen_artifacts.intersection(slot.artifact_id for slot in replication.active_slots)
+    assert all("s23" in slot.model_id for slot in replication.active_slots)
+    assert all(slot.seed == 23 for slot in replication.active_slots)
+    assert all(
+        slot.protocol_sha256 not in {model.protocol_sha256 for model in plan.models}
+        for slot in replication.active_slots
     )
+    assert all(isinstance(slot, NotStartedSlot) for slot in replication.slots[4:])
 
 
-def test_role_specific_reuse_and_tier_metadata(plan) -> None:
+def test_readiness_binds_roles_licenses_output_image_and_memory(plan) -> None:
+    evidence = make_readiness(plan, Tier.CORE)
+    validate_readiness(
+        plan.candidates[1],
+        plan.runtimes[1],
+        plan.gates[1],
+        evidence,
+    )
+    mismatched_payload = evidence.model_dump(
+        mode="python",
+        exclude={"readiness_sha256"},
+    )
+    mismatched_payload["student_role_evidence_sha256"] = H["1"]
+    mismatched_payload["probes"] = evidence.probes
+    mismatched = readiness_evidence(**mismatched_payload)
+    with pytest.raises(ValueError, match="role/license/output/image"):
+        validate_readiness(
+            plan.candidates[1],
+            plan.runtimes[1],
+            plan.gates[1],
+            mismatched,
+        )
+    first = evidence.probes[0]
+    peak = plan.gates[1].capacity_bytes * 86 // 100
+    bad_probe_payload = first.model_dump(mode="python", exclude={"probe_sha256"})
+    bad_probe_payload.update(
+        {
+            "peak_bytes": peak,
+            "headroom_bytes": plan.gates[1].capacity_bytes - peak,
+        }
+    )
+    bad_probe = memory_probe(**bad_probe_payload)
+    bad_evidence_payload = evidence.model_dump(
+        mode="python",
+        exclude={"readiness_sha256"},
+    )
+    bad_evidence_payload["probes"] = (bad_probe, *evidence.probes[1:])
+    bad_evidence = readiness_evidence(**bad_evidence_payload)
+    with pytest.raises(ValueError, match="85%"):
+        validate_readiness(
+            plan.candidates[1],
+            plan.runtimes[1],
+            plan.gates[1],
+            bad_evidence,
+        )
+
+
+def test_pricing_bytes_freshness_and_all_cost_ceilings(plan) -> None:
+    price = plan.pricing[0]
+    source = b'{"instance":"ml.g5.48xlarge","hourly_usd":"20.36"}'
+    price.verify_evidence_bytes(source)
+    with pytest.raises(ValueError, match="hash mismatch"):
+        price.verify_evidence_bytes(b"x" * len(source))
+    expensive = pricing_evidence(
+        source_uri="https://pricing.example.test/expensive.json",
+        region="us-east-1",
+        instance_type="ml.g5.48xlarge",
+        current_hourly_price_microusd=100_000_000,
+        attestor="test",
+        attested_at=NOW,
+        effective_at=NOW - timedelta(hours=1),
+        expires_at=NOW + timedelta(hours=1),
+        evidence_bytes=b"expensive",
+    )
+    with pytest.raises(ValueError, match="per-run|per-wave"):
+        cost(
+            plan.screen_waves[0],
+            expensive,
+            plan.protocol,
+            plan.ceilings,
+        )
+    with pytest.raises(ValidationError, match="ordered"):
+        CostCeilings(
+            per_run_microusd=25_000_000,
+            per_wave_microusd=250_000_000,
+            experiment_microusd=ACCOUNT_CEILING_MICROUSD + 1,
+        )
+    assert plan.costs.aggregate_ceiling_microusd <= plan.ceilings.experiment_microusd
+    assert plan.costs.aggregate_ceiling_microusd <= plan.ceilings.account_microusd
+    assert len(plan.costs.waves) == 6
+    for wave_cost in plan.costs.waves:
+        assert len(wave_cost.slots) == 16
+        assert (
+            sum(slot.allocated_ceiling_microusd for slot in wave_cost.slots)
+            == wave_cost.aggregate_ceiling_microusd
+        )
+
+
+def test_plan_is_deterministic_and_role_reuse_is_role_specific(plan) -> None:
+    rebuilt = make_plan()
+    assert rebuilt.plan_sha256 == plan.plan_sha256
+    assert rebuilt.canonical_bytes() == plan.canonical_bytes()
     nano_teacher = plan.candidates[0].pair.teacher
     core_student = plan.candidates[1].pair.student
     assert (nano_teacher.model_id, nano_teacher.revision) == (
@@ -82,203 +312,5 @@ def test_role_specific_reuse_and_tier_metadata(plan) -> None:
         core_student.revision,
     )
     assert nano_teacher.evidence_sha256 != core_student.evidence_sha256
-    with pytest.raises(ValidationError, match="role-specific"):
-        model_pair(plan.candidates[1].pair.teacher, nano_teacher)
-    assert [item.name for item in plan.candidates] == [
-        "TinyFable Nano",
-        "TinyFable Core",
-        "TinyFable Plus",
-    ]
-    assert all(item.larger_is_better_assumption is False for item in plan.candidates)
-    assert all(item.throughput_tokens_per_second is None for item in plan.candidates)
-
-
-def test_exact_wave1_matrix_and_round_robin(plan) -> None:
-    wave = plan.waves[0]
-    assert wave.tier == Tier.NANO
-    assert wave.instance_type == "ml.g5.48xlarge"
-    assert [(slot.slot, slot.node, slot.gpu) for slot in wave.slots] == [
-        (index, index % 2, index // 2) for index in range(16)
-    ]
-    actual = [
-        (slot.role, slot.arm, tuple(task.value for task in slot.tasks)) for slot in wave.slots
-    ]
-    assert actual == [
-        *[
-            ("generalist", arm, tuple(task.value for task in Task))
-            for arm in ("oracle_sft", "sequence_kd", "logit_kd", "ce_ablation")
-        ],
-        *[
-            ("specialist", arm, (task.value,))
-            for task in Task
-            for arm in ("sequence_kd", "logit_kd", "ce_ablation")
-        ],
-    ]
-
-
-def test_all_tiers_cover_tasks_with_matched_controls(plan) -> None:
-    assert [wave.instance_type for wave in plan.waves] == [
-        "ml.g5.48xlarge",
-        "ml.p4de.24xlarge",
-        "ml.p4de.24xlarge",
-    ]
-    assert {wave.seed for wave in plan.waves} == {17}
-    for wave in plan.waves:
-        assert len(wave.slots) == 16
-        for task in Task:
-            task_slots = [
-                slot for slot in wave.slots if slot.role == "specialist" and slot.tasks == (task,)
-            ]
-            assert {slot.arm for slot in task_slots} == {
-                "sequence_kd",
-                "logit_kd",
-                "ce_ablation",
-            }
-            logit = next(slot for slot in task_slots if slot.arm == "logit_kd")
-            control = next(slot for slot in task_slots if slot.arm == "ce_ablation")
-            assert (logit.seed, logit.recipe) == (control.seed, control.recipe)
-            assert control.matched_control_of == "logit_kd"
-
-
-def test_registry_defaults_to_generalists_without_hidden_routing(plan) -> None:
-    registry = plan.registry
-    assert registry.active_default_tier == Tier.NANO
-    assert registry.silent_task_routing_forbidden
-    assert registry.silent_tier_routing_forbidden
-    by_id = {entry.model_id: entry for entry in registry.entries}
-    assert all(by_id[model_id].role == "generalist" for model_id in registry.tier_default_model_ids)
-    assert all(
-        entry.status == "specialist_backup"
-        for entry in registry.entries
-        if entry.role == "specialist"
-    )
-
-
-def _readiness(plan, tier: Tier) -> ReadinessEvidence:
-    item = plan.candidates[list(Tier).index(tier)]
-    gate = plan.gates[list(Tier).index(tier)]
-    peak = gate.capacity_bytes * 80 // 100
-    return ReadinessEvidence(
-        tier=tier,
-        gate_sha256=gate.gate_sha256,
-        probes=tuple(
-            MemoryProbe(
-                kind=kind,
-                candidate_sha256=item.descriptor_sha256,
-                pair_sha256=item.pair.binding_sha256,
-                gate_sha256=gate.gate_sha256,
-                instance_type=gate.instance_type,
-                device=gate.device,
-                runtime_image_digest=f"sha256:{'f' * 64}",
-                peak_bytes=peak,
-                capacity_bytes=gate.capacity_bytes,
-                headroom_bytes=gate.capacity_bytes - peak,
-                manifest_sha256=H["9"],
-            )
-            for kind in REQUIRED_PROBES
-        ),
-        manifest_sha256=H["9"],
-    )
-
-
-@pytest.mark.parametrize(
-    ("tier", "capacity", "headroom"),
-    [
-        (Tier.NANO, A10G_BYTES, 4 * 1024**3),
-        (Tier.CORE, A100_BYTES, 8 * 1024**3),
-        (Tier.PLUS, A100_BYTES, 8 * 1024**3),
-    ],
-)
-def test_exact_measured_memory_gates(plan, tier, capacity, headroom) -> None:
-    index = list(Tier).index(tier)
-    gate = plan.gates[index]
-    assert (gate.capacity_bytes, gate.min_headroom_bytes) == (capacity, headroom)
-    assert gate.max_peak_basis_points == 8500
-    assert gate.estimates_cannot_pass
-    validate_readiness(plan.candidates[index], gate, _readiness(plan, tier))
-
-
-def test_memory_gate_rejects_over_85_percent(plan) -> None:
-    gate = plan.gates[2]
-    evidence = _readiness(plan, Tier.PLUS)
-    peak = gate.capacity_bytes * 86 // 100
-    bad_probe = evidence.probes[0].model_copy(
-        update={
-            "peak_bytes": peak,
-            "headroom_bytes": gate.capacity_bytes - peak,
-        }
-    )
-    with pytest.raises(ValueError, match="85%"):
-        validate_readiness(
-            plan.candidates[2],
-            gate,
-            evidence.model_copy(update={"probes": (bad_probe, *evidence.probes[1:])}),
-        )
-
-
-def test_artifact_isolation_and_duplicate_rejection(plan) -> None:
-    artifacts = plan.artifacts.artifacts
-    assert len({item.adapter_uri for item in artifacts}) == 48
-    assert len({item.merged_uri_optional for item in artifacts}) == 48
-    assert all(item.mutate_v1_forbidden for item in artifacts)
-    duplicate = artifacts[1].model_copy(update={"adapter_uri": artifacts[0].adapter_uri})
-    with pytest.raises(ValidationError, match="duplicate artifact adapter_uri"):
-        ArtifactPlan(
-            root=plan.artifacts.root,
-            artifacts=(artifacts[0], duplicate, *artifacts[2:]),
-        )
-
-
-def test_specialist_promotion_requires_material_uncertain_gain(plan) -> None:
-    weak = SpecialistEvidence(
-        tier=Tier.NANO,
-        task=Task.MERCHANT_TAGGING,
-        quality_delta=0.04,
-        quality_ci_lower=0.019,
-        quality_ci_upper=0.06,
-        validation_protocol_sha256=H["9"],
-    )
-    strong = weak.model_copy(update={"quality_ci_lower": 0.021})
-    assert specialist_eligible(weak, plan.promotion)[0] is False
-    eligible, reason = specialist_eligible(strong, plan.promotion)
-    assert eligible is True
-    assert "generalist remains default" in reason
-
-
-def test_tier_promotion_uses_quality_throughput_and_cost_not_size(plan) -> None:
-    evidence = TierEvidence(
-        candidate=Tier.CORE,
-        incumbent=Tier.NANO,
-        quality_ci_lower=0.021,
-        quality_ci_upper=0.04,
-        throughput_ratio_ci_lower=0.85,
-        throughput_ratio_ci_upper=0.95,
-        cost_ratio_ci_lower=1.02,
-        cost_ratio_ci_upper=1.20,
-        measurement_protocol_sha256=H["9"],
-    )
-    assert plan.promotion.no_size_prior
-    assert tier_eligible(evidence, plan.promotion)[0] is True
-    too_slow = evidence.model_copy(
-        update={
-            "throughput_ratio_ci_lower": 0.65,
-            "throughput_ratio_ci_upper": 0.75,
-        }
-    )
-    assert tier_eligible(too_slow, plan.promotion)[0] is False
-
-
-def test_costs_sum_exactly_and_plan_is_deterministic(plan) -> None:
-    for item in plan.costs:
-        assert sum(slot.ceiling_microusd for slot in item.slots) == (
-            item.aggregate_ceiling_microusd
-        )
-        for node in (0, 1):
-            assert (
-                sum(slot.ceiling_microusd for slot in item.slots if slot.node == node)
-                == item.parent_ceiling_microusd
-            )
-        assert item.throughput_tokens_per_second is None
-    assert plan.canonical_bytes().endswith(b"}")
-    with pytest.raises(ValidationError):
-        plan.mode = "train"
+    assert all(candidate.throughput_tokens_per_second is None for candidate in plan.candidates)
+    assert all(candidate.cost_per_1k_tokens_microusd is None for candidate in plan.candidates)
