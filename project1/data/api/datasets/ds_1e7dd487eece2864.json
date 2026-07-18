@@ -1,0 +1,33 @@
+{
+  "dataset_id": "ds_1e7dd487eece2864",
+  "schema_version": "finance_world.v1",
+  "sha256": "sha256:742d9ba450032c6209fbcef1aaee9f7fa61d2887f75c68c1f04e3f954b158b3a",
+  "split_sha256": {
+    "test_iid": "sha256:9ee4260ec79df4e0b1055e4abf2febf0125cad9d1e0f7fb9a684685d2c80f014",
+    "test_ood": "sha256:de8fcef29e334a413afc9263517d6a88c137fc0f78ff5f9d81f0f822374e247b",
+    "train": "sha256:8f1e5e304af82b8d541334be318d3b2db40f3d767316d4c95896215b83c31b99",
+    "validation": "sha256:64857a259cb42bba7cca7a0a3e1db2016583addb80e7ccac6882c68a2c39017f"
+  },
+  "counts_by_task": {
+    "transaction_review": 252,
+    "variance_analysis": 252,
+    "cash_reconciliation": 56
+  },
+  "counts_by_split": {
+    "test_iid": 80,
+    "test_ood": 80,
+    "train": 320,
+    "validation": 80
+  },
+  "counts_by_label_source": {
+    "unlabeled": 560
+  },
+  "counts_by_difficulty": {
+    "easy": 338,
+    "medium": 113,
+    "hard": 109
+  },
+  "uri": "store://datasets/ds_1e7dd487eece2864",
+  "created_at": "2026-07-18T16:19:13.765238+00:00",
+  "source": "synthetic:smoke"
+}

@@ -1,0 +1,61 @@
+{
+  "splits": {
+    "train": {
+      "count": 320,
+      "sha256": "sha256:8f1e5e304af82b8d541334be318d3b2db40f3d767316d4c95896215b83c31b99",
+      "by_task": {
+        "transaction_review": 144,
+        "variance_analysis": 144,
+        "cash_reconciliation": 32
+      },
+      "by_difficulty": {
+        "easy": 191,
+        "medium": 65,
+        "hard": 64
+      }
+    },
+    "validation": {
+      "count": 80,
+      "sha256": "sha256:64857a259cb42bba7cca7a0a3e1db2016583addb80e7ccac6882c68a2c39017f",
+      "by_task": {
+        "transaction_review": 36,
+        "variance_analysis": 36,
+        "cash_reconciliation": 8
+      },
+      "by_difficulty": {
+        "easy": 49,
+        "medium": 16,
+        "hard": 15
+      }
+    },
+    "test_iid": {
+      "count": 80,
+      "sha256": "sha256:9ee4260ec79df4e0b1055e4abf2febf0125cad9d1e0f7fb9a684685d2c80f014",
+      "by_task": {
+        "transaction_review": 36,
+        "variance_analysis": 36,
+        "cash_reconciliation": 8
+      },
+      "by_difficulty": {
+        "easy": 49,
+        "medium": 16,
+        "hard": 15
+      }
+    },
+    "test_ood": {
+      "count": 80,
+      "sha256": "sha256:de8fcef29e334a413afc9263517d6a88c137fc0f78ff5f9d81f0f822374e247b",
+      "by_task": {
+        "transaction_review": 36,
+        "variance_analysis": 36,
+        "cash_reconciliation": 8
+      },
+      "by_difficulty": {
+        "easy": 49,
+        "medium": 16,
+        "hard": 15
+      }
+    }
+  },
+  "generator_revision": "finance-world-gen-v1"
+}
