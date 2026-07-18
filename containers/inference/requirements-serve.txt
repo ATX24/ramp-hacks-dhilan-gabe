@@ -1,0 +1,2 @@
+# Pinned serving-only deps installed into the inference image after uv sync.
+uvicorn==0.32.1

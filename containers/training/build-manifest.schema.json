@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://distillery.local/schemas/distillery.training.image.build-manifest.v2.json",
+  "title": "DistilleryTrainingImageBuildManifest",
+  "description": "Build provenance. Only registry.verified=true permits registry.digest_uri downstream.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "image_name",
+    "repository_name",
+    "source",
+    "package_lock_sha256",
+    "base",
+    "ml_compatibility",
+    "tag",
+    "local",
+    "registry",
+    "dry_run",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "distillery.training.image.v2"
+    },
+    "image_name": {
+      "const": "distillery-training"
+    },
+    "repository_name": {
+      "const": "distillery-training"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit_sha",
+        "reviewed_commit_sha",
+        "tree_sha256",
+        "clean",
+        "commit_bound"
+      ],
+      "properties": {
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "reviewed_commit_sha": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "tree_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "clean": {
+          "type": "boolean"
+        },
+        "commit_bound": {
+          "type": "boolean"
+        }
+      }
+    },
+    "package_lock_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "digest",
+        "torch_version",
+        "cuda_version",
+        "cudnn_major"
+      ],
+      "properties": {
+        "reference": {
+          "const": "pytorch/pytorch@sha256:0a3b9fedefe1f61ac4d5a9de9015c0863db27ca0fde2d4e37e6268147980b726"
+        },
+        "digest": {
+          "const": "sha256:0a3b9fedefe1f61ac4d5a9de9015c0863db27ca0fde2d4e37e6268147980b726"
+        },
+        "torch_version": {
+          "const": "2.4.1"
+        },
+        "cuda_version": {
+          "const": "12.4"
+        },
+        "cudnn_major": {
+          "const": 9
+        }
+      }
+    },
+    "ml_compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "expected", "actual", "reasons"],
+      "properties": {
+        "status": {
+          "enum": ["compatible", "blocked"]
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "torch_version",
+            "torch_cuda_version",
+            "cudnn_major",
+            "bitsandbytes_version",
+            "base_provided_packages"
+          ],
+          "properties": {
+            "torch_version": {
+              "const": "2.4.1"
+            },
+            "torch_cuda_version": {
+              "const": "12.4"
+            },
+            "cudnn_major": {
+              "const": 9
+            },
+            "bitsandbytes_version": {
+              "const": "0.44.1"
+            },
+            "base_provided_packages": {
+              "const": [
+                "nvidia-cublas-cu12",
+                "nvidia-cuda-cupti-cu12",
+                "nvidia-cuda-nvrtc-cu12",
+                "nvidia-cuda-runtime-cu12",
+                "nvidia-cudnn-cu12",
+                "nvidia-cufft-cu12",
+                "nvidia-curand-cu12",
+                "nvidia-cusolver-cu12",
+                "nvidia-cusparse-cu12",
+                "nvidia-nccl-cu12",
+                "nvidia-nvjitlink-cu12",
+                "nvidia-nvtx-cu12",
+                "torch",
+                "triton"
+              ]
+            }
+          }
+        },
+        "actual": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "torch_version",
+            "bitsandbytes_version",
+            "forbidden_packages",
+            "base_provided_packages",
+            "unexpected_accelerator_packages"
+          ],
+          "properties": {
+            "torch_version": {
+              "type": ["string", "null"]
+            },
+            "bitsandbytes_version": {
+              "type": ["string", "null"]
+            },
+            "forbidden_packages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "base_provided_packages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "unexpected_accelerator_packages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "tag": {
+      "type": "string",
+      "not": {
+        "const": "latest"
+      },
+      "pattern": "^pinned-training-[0-9a-f]{12}-[0-9a-f]{12}$"
+    },
+    "local": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_id"],
+      "properties": {
+        "config_id": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_uri",
+        "image_digest",
+        "digest_uri",
+        "verified",
+        "verified_at",
+        "scan_status",
+        "critical_findings",
+        "high_findings"
+      ],
+      "properties": {
+        "repository_uri": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{12}\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/distillery-training$"
+        },
+        "image_digest": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "digest_uri": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{12}\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/distillery-training@sha256:[0-9a-f]{64}$"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "verified_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "scan_status": {
+          "enum": [null, "COMPLETE"]
+        },
+        "critical_findings": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "high_findings": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verified": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "repository_uri": {
+                "type": "string"
+              },
+              "image_digest": {
+                "type": "string"
+              },
+              "digest_uri": {
+                "type": "string"
+              },
+              "verified_at": {
+                "type": "string"
+              },
+              "scan_status": {
+                "const": "COMPLETE"
+              },
+              "critical_findings": {
+                "type": "integer"
+              },
+              "high_findings": {
+                "type": "integer"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "repository_uri": {
+                "const": null
+              },
+              "image_digest": {
+                "const": null
+              },
+              "digest_uri": {
+                "const": null
+              },
+              "verified_at": {
+                "const": null
+              },
+              "scan_status": {
+                "const": null
+              },
+              "critical_findings": {
+                "const": null
+              },
+              "high_findings": {
+                "const": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "ecr_image": null,
+  "memory_probe": null,
+  "review_packet_sha256": [],
+  "schema_version": "distillery.qwen72b_fallback.execution_bindings.v1",
+  "training_role_arn": "arn:aws:iam::225989358036:role/distillery-sagemaker-training",
+  "transfer_ami_id": null,
+  "transfer_instance_profile_arn": null,
+  "transfer_security_group_id": null,
+  "transfer_subnet_id": null
+}

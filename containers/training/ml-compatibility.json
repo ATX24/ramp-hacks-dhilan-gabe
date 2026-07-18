@@ -1,0 +1,29 @@
+{
+  "schema_version": "distillery.training.ml-compatibility.v1",
+  "base_image": "pytorch/pytorch@sha256:0a3b9fedefe1f61ac4d5a9de9015c0863db27ca0fde2d4e37e6268147980b726",
+  "python_version": "3.11",
+  "torch_version": "2.4.1",
+  "torch_cuda_version": "12.4",
+  "cudnn_major": 9,
+  "bitsandbytes_version": "0.44.1",
+  "base_provided_packages": [
+    "nvidia-cublas-cu12",
+    "nvidia-cuda-cupti-cu12",
+    "nvidia-cuda-nvrtc-cu12",
+    "nvidia-cuda-runtime-cu12",
+    "nvidia-cudnn-cu12",
+    "nvidia-cufft-cu12",
+    "nvidia-curand-cu12",
+    "nvidia-cusolver-cu12",
+    "nvidia-cusparse-cu12",
+    "nvidia-nccl-cu12",
+    "nvidia-nvjitlink-cu12",
+    "nvidia-nvtx-cu12",
+    "torch",
+    "triton"
+  ],
+  "forbidden_lock_package_patterns": [
+    "^nvidia-.*-cu13$",
+    "^cuda-toolkit$"
+  ]
+}
