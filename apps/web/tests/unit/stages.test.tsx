@@ -11,6 +11,11 @@ import { isRunCancellable } from "@/lib/runPresentation";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/curate",
+  useRouter: () => ({
+    replace: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams("mode=default"),
 }));
 
 vi.mock("next/link", () => ({
@@ -192,12 +197,13 @@ describe("stage components", () => {
 });
 
 describe("stage navigation contract", () => {
-  it("exposes exactly four stage routes", () => {
+  it("exposes exactly five stage routes", () => {
     expect(STAGE_ROUTES).toEqual([
       "/curate",
       "/synthesize",
       "/train",
       "/prove",
+      "/demo",
     ]);
   });
 
@@ -219,6 +225,10 @@ describe("stage navigation contract", () => {
     expect(screen.getByTestId("stage-link-prove")).toHaveAttribute(
       "href",
       "/prove?mode=default&run=run_fixture_tinyfable_001",
+    );
+    expect(screen.getByTestId("stage-link-demo")).toHaveAttribute(
+      "href",
+      "/demo?mode=default&run=run_fixture_tinyfable_001",
     );
   });
 });

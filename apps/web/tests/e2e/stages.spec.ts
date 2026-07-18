@@ -2,19 +2,20 @@ import { test, expect } from "@playwright/test";
 
 const RESTORED_RUN_ID = "run_fixture_tinyfable_restored_002";
 
-test.describe("four-stage Distillery UI", () => {
+test.describe("five-stage Distillery UI", () => {
   test("root redirects to Curate", async ({ page }) => {
     await page.goto("/?mode=failed_quality");
     await expect(page).toHaveURL(/\/curate\?mode=failed_quality/);
     await expect(page.getByRole("heading", { name: "Curate" })).toBeVisible();
   });
 
-  test("renders exactly four routes", async ({ page }) => {
+  test("renders exactly five routes", async ({ page }) => {
     for (const [route, heading] of [
       ["/curate", "Curate"],
       ["/synthesize", "Synthesize"],
       ["/train", "Train"],
       ["/prove", "Prove"],
+      ["/demo", "Demo"],
     ] as const) {
       await page.goto(`${route}?mode=default`);
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();

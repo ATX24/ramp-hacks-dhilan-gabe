@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { StageStateBoundary } from "@/components/StageStateBoundary";
 import { CurateStage } from "@/components/stages/CurateStage";
+import { DemoStage } from "@/components/stages/DemoStage";
 import { ProveStage } from "@/components/stages/ProveStage";
 import { SynthesizeStage } from "@/components/stages/SynthesizeStage";
 import { TrainStage } from "@/components/stages/TrainStage";
@@ -12,6 +13,7 @@ const STAGE_NAMES: Record<StageId, string> = {
   synthesize: "Synthesize",
   train: "Train",
   prove: "Prove",
+  demo: "Demo",
 };
 
 export function StageRouteContent({
@@ -60,6 +62,20 @@ export function StageRouteContent({
 
     case "prove":
       content = <ProveStage proof={bundle.proof} error={bundle.error} />;
+      break;
+
+    case "demo":
+      content = (
+        <Suspense
+          fallback={
+            <p data-testid="demo-suspense" role="status">
+              Loading Demo / Playground…
+            </p>
+          }
+        >
+          <DemoStage bundle={bundle} />
+        </Suspense>
+      );
       break;
 
     default: {

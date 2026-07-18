@@ -1,8 +1,11 @@
 # Distillery web UI
 
-Four-stage Next.js app for Distillery / TinyFable: **Curate → Synthesize → Train → Prove**.
+Five-stage Next.js app for Distillery / TinyFable:
+**Curate → Synthesize → Train → Prove → Demo**.
 
-Fixture-backed only. No live API calls or active jobs.
+Fixture-backed by default. The Demo / Playground can call a typed live inference
+gateway when `NEXT_PUBLIC_DISTILLERY_INFERENCE_URL` is set; otherwise live mode
+surfaces an explicit unavailable state and never fabricates inference.
 
 ## Commands
 
@@ -32,3 +35,13 @@ Append `?mode=` with one of:
 
 Run references persist per validated mode under `distillery.run_ref.<mode>`. A validated
 explicit `run` query parameter wins over local storage.
+
+## Demo / Playground URL state
+
+On `/demo`, shareable query params include:
+
+- `task` — `transaction_review` | `variance_analysis` | `cash_reconciliation`
+- `models` — comma-separated registry `model_id` values
+- `example` — prepopulated example id
+- `runMode` — `single` | `compare`
+- `infer` — `fixture_preview` | `live`

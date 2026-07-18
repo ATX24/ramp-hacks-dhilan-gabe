@@ -14,6 +14,11 @@ import {
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/curate",
+  useRouter: () => ({
+    replace: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams("mode=default"),
 }));
 
 vi.mock("next/link", () => ({
@@ -36,9 +41,15 @@ afterEach(() => {
   cleanup();
 });
 
-describe("four-stage navigation", () => {
-  it("exposes exactly four stage routes", () => {
-    expect(STAGE_ROUTES).toEqual(["/curate", "/synthesize", "/train", "/prove"]);
+describe("five-stage navigation", () => {
+  it("exposes exactly five stage routes", () => {
+    expect(STAGE_ROUTES).toEqual([
+      "/curate",
+      "/synthesize",
+      "/train",
+      "/prove",
+      "/demo",
+    ]);
   });
 
   it.each(UI_MODES)("preserves validated %s mode across all stage links", (mode) => {

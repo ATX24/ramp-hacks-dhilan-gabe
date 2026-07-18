@@ -16,7 +16,8 @@ const sourceSans = Source_Sans_3({
 
 export const metadata: Metadata = {
   title: "Distillery · TinyFable",
-  description: "Smaller models. Proven economics. Curate → Synthesize → Train → Prove.",
+  description:
+    "Smaller models. Proven economics. Curate → Synthesize → Train → Prove → Demo.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -8,3 +8,6 @@ test-results
 *.log
 .DS_Store
 .env*.local
+
+# Repo-root Python .gitignore matches any path segment named lib/.
+# Keep apps/web/src/lib tracked with: git add -f apps/web/src/lib
