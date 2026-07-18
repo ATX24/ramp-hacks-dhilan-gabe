@@ -1,7 +1,8 @@
-"""Version-aware Dataset task-count compatibility and invariants."""
+"""Dataset task-set compatibility and versioned construction invariants."""
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -13,7 +14,22 @@ from distillery.contracts.tasks import Difficulty, TaskId
 HEX_A = "a" * 64
 HEX_B = "b" * 64
 V1_RESOURCE_HASH = "71b8e27253d00207e67d4cb934b165602921ad59ce0a32783c1ef703e0435e09"
-
+FROZEN_DATASET_V1_JSON = (
+    '{"schema_version":"distillery.dataset.v1",'
+    '"dataset_id":"ds_finance_world_v1",'
+    '"content_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
+    '"split_sha256":{'
+    '"train":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
+    '"validation":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",'
+    '"test":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
+    '"iid_test":null,"ood_test":null},'
+    '"uri":"s3://bucket/datasets/ds_finance_world_v1/",'
+    '"provenance_summary":"synthetic finance_world.v1",'
+    '"task_difficulty_counts":{"by_task":{'
+    '"transaction_review":5,"variance_analysis":5,"cash_reconciliation":2},'
+    '"by_difficulty":{"easy":3,"medium":5,"hard":4}},'
+    '"example_count":12,"created_at":"2026-07-18T12:00:00Z","metadata":{}}'
+)
 V1_BY_TASK = {
     TaskId.TRANSACTION_REVIEW: 5,
     TaskId.VARIANCE_ANALYSIS: 5,
@@ -32,10 +48,9 @@ BY_DIFFICULTY = {
 }
 
 
-def _counts(version: str) -> TaskDifficultyCounts:
+def _counts(by_task: dict[TaskId, int]) -> TaskDifficultyCounts:
     return TaskDifficultyCounts(
-        task_set_version=version,
-        by_task=V1_BY_TASK if version == "finance_world.v1" else V2_BY_TASK,
+        by_task=by_task,
         by_difficulty=BY_DIFFICULTY,
     )
 
@@ -58,75 +73,40 @@ def _dataset(
     )
 
 
-def test_v1_roundtrip_wire_and_resource_hash_are_unchanged() -> None:
-    dataset = _dataset(_counts("finance_world.v1"))
-    wire = dataset.model_dump(mode="json")
+def test_frozen_v1_json_roundtrip_and_resource_hash_are_unchanged() -> None:
+    dataset = Dataset.model_validate_json(FROZEN_DATASET_V1_JSON)
 
-    assert wire["task_difficulty_counts"] == {
-        "by_task": {
-            "transaction_review": 5,
-            "variance_analysis": 5,
-            "cash_reconciliation": 2,
-        },
-        "by_difficulty": {"easy": 3, "medium": 5, "hard": 4},
-    }
-    assert "task_set_version" not in wire["task_difficulty_counts"]
-    assert Dataset.model_validate(wire) == dataset
+    assert dataset.model_dump_json() == FROZEN_DATASET_V1_JSON
     assert dataset.resource_hash() == V1_RESOURCE_HASH
+    assert "task_set_version" not in TaskDifficultyCounts.model_fields
 
 
-def test_v2_requires_all_four_tasks_and_roundtrips_version() -> None:
-    counts = _counts("finance_world.v2")
+def test_v2_complete_task_set_roundtrips_without_a_version_field() -> None:
+    counts = _counts(V2_BY_TASK)
     wire = counts.model_dump(mode="json")
 
     assert set(counts.by_task) == set(TaskId)
-    assert wire["task_set_version"] == "finance_world.v2"
-    assert set(wire["by_task"]) == {task.value for task in TaskId}
+    assert set(wire) == {"by_task", "by_difficulty"}
     assert TaskDifficultyCounts.model_validate(wire) == counts
-
-
-def test_unversioned_four_task_wire_is_inferred_as_v2() -> None:
-    counts = TaskDifficultyCounts(
-        by_task=V2_BY_TASK,
-        by_difficulty=BY_DIFFICULTY,
-    )
-
-    assert counts.task_set_version == "finance_world.v2"
-    assert counts.model_dump(mode="json")["task_set_version"] == "finance_world.v2"
+    counts.require_finance_world("finance_world.v2")
 
 
 @pytest.mark.parametrize(
-    ("version", "by_task", "missing", "extra"),
+    "by_task",
     [
-        (
-            "finance_world.v1",
-            {TaskId.TRANSACTION_REVIEW: 1, TaskId.VARIANCE_ANALYSIS: 1},
-            "cash_reconciliation",
-            None,
-        ),
-        (
-            "finance_world.v1",
-            {task: 1 for task in TaskId},
-            None,
-            "merchant_tagging",
-        ),
-        (
-            "finance_world.v2",
-            V1_BY_TASK,
-            "merchant_tagging",
-            None,
-        ),
+        {TaskId.TRANSACTION_REVIEW: 1},
+        {
+            TaskId.TRANSACTION_REVIEW: 1,
+            TaskId.VARIANCE_ANALYSIS: 1,
+            TaskId.MERCHANT_TAGGING: 1,
+        },
     ],
 )
-def test_versioned_task_sets_reject_missing_and_extra_tasks(
-    version: str,
+def test_arbitrary_and_mixed_task_subsets_are_rejected(
     by_task: dict[TaskId, int],
-    missing: str | None,
-    extra: str | None,
 ) -> None:
-    with pytest.raises(ValidationError) as exc_info:
+    with pytest.raises(ValidationError, match="complete supported task set"):
         TaskDifficultyCounts(
-            task_set_version=version,
             by_task=by_task,
             by_difficulty={
                 Difficulty.EASY: sum(by_task.values()),
@@ -135,20 +115,41 @@ def test_versioned_task_sets_reject_missing_and_extra_tasks(
             },
         )
 
-    message = str(exc_info.value)
-    assert version in message
-    if missing is not None:
-        assert f"missing=['{missing}']" in message
-    if extra is not None:
-        assert f"extra=['{extra}']" in message
+
+def test_unknown_extra_task_is_rejected() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        TaskDifficultyCounts.model_validate(
+            {
+                "by_task": {
+                    "transaction_review": 4,
+                    "variance_analysis": 4,
+                    "merchant_tagging": 2,
+                    "cash_reconciliation": 2,
+                    "not_a_task": 0,
+                },
+                "by_difficulty": {"easy": 3, "medium": 5, "hard": 4},
+            }
+        )
+
+    assert "not_a_task" in str(exc_info.value)
 
 
-@pytest.mark.parametrize("version", ["finance_world.v1", "finance_world.v2"])
-def test_each_version_enforces_task_and_difficulty_total_equality(version: str) -> None:
-    by_task = V1_BY_TASK if version == "finance_world.v1" else V2_BY_TASK
+def test_v2_explicit_seam_rejects_missing_merchant() -> None:
+    with pytest.raises(ValueError, match=r"missing=\['merchant_tagging'\]"):
+        _counts(V1_BY_TASK).require_finance_world("finance_world.v2")
+
+
+def test_v1_explicit_seam_rejects_extra_merchant() -> None:
+    with pytest.raises(ValueError, match=r"extra=\['merchant_tagging'\]"):
+        _counts(V2_BY_TASK).require_finance_world("finance_world.v1")
+
+
+@pytest.mark.parametrize("by_task", [V1_BY_TASK, V2_BY_TASK])
+def test_each_supported_task_set_enforces_total_equality(
+    by_task: dict[TaskId, int],
+) -> None:
     with pytest.raises(ValidationError, match="task and difficulty count totals must match"):
         TaskDifficultyCounts(
-            task_set_version=version,
             by_task=by_task,
             by_difficulty={
                 Difficulty.EASY: 3,
@@ -158,17 +159,19 @@ def test_each_version_enforces_task_and_difficulty_total_equality(version: str) 
         )
 
 
-@pytest.mark.parametrize("version", ["finance_world.v1", "finance_world.v2"])
-def test_each_version_enforces_dataset_example_count_total(version: str) -> None:
+@pytest.mark.parametrize("by_task", [V1_BY_TASK, V2_BY_TASK])
+def test_each_supported_task_set_enforces_dataset_example_count_total(
+    by_task: dict[TaskId, int],
+) -> None:
     with pytest.raises(
         ValidationError,
         match="example_count must equal both task and difficulty count totals",
     ):
-        _dataset(_counts(version), example_count=13)
+        _dataset(_counts(by_task), example_count=13)
 
 
-def test_invalid_timestamp_error_precedes_dataset_total_validator() -> None:
-    payload = _dataset(_counts("finance_world.v1")).model_dump(mode="json")
+def test_legacy_v1_timestamp_error_precedes_dataset_total_validator() -> None:
+    payload = json.loads(FROZEN_DATASET_V1_JSON)
     payload["created_at"] = 1_721_321_600
     payload["example_count"] = 13
 
@@ -177,4 +180,5 @@ def test_invalid_timestamp_error_precedes_dataset_total_validator() -> None:
 
     message = str(exc_info.value)
     assert "RFC 3339" in message
+    assert "complete supported task set" not in message
     assert "example_count must equal" not in message

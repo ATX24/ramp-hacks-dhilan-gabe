@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from dataclasses import replace
 
 import pytest
 from pydantic import ValidationError
@@ -30,7 +31,9 @@ from distillery.data.generate import (
 )
 from distillery.data.hard_negatives import MERCHANT_HARD_NEGATIVES
 from distillery.data.mixture import (
+    TASK_MIXTURE,
     TASK_MIXTURE_V2,
+    TASK_ORDER,
     TASK_ORDER_V2,
     mixture_plan,
     task_counts,
@@ -232,6 +235,31 @@ def test_v1_smoke_hashes_still_generate_and_exclude_merchant() -> None:
         "variance_analysis": 0.45,
         "cash_reconciliation": 0.10,
     }
+
+
+def test_corpus_specs_enforce_versioned_task_sets() -> None:
+    with pytest.raises(ValueError, match="finance_world.v2 task set"):
+        replace(
+            CORPUS_SMOKE_V2,
+            task_mixture=TASK_MIXTURE,
+            task_order=TASK_ORDER,
+        )
+    with pytest.raises(ValueError, match="finance_world.v1 task set"):
+        replace(
+            CORPUS_SMOKE,
+            task_mixture=TASK_MIXTURE_V2,
+            task_order=TASK_ORDER_V2,
+        )
+
+
+def test_v2_campaign_rejects_v1_corpus(smoke_corpus) -> None:
+    with pytest.raises(ValueError, match="does not match campaign world"):
+        build_campaign_manifest(
+            world="finance_world.v2",
+            corpus="smoke",
+            campaign_id="camp_wrong_world",
+            generated=smoke_corpus,
+        )
 
 
 def test_same_artifact_no_specialist_routing_in_campaign_manifest() -> None:
