@@ -1,0 +1,38 @@
+{
+  "schema_version": "distillery.benchmark.jobmeta.v1",
+  "job_name": "dist-bench-g52xlarge-20260718-182705",
+  "status": "Completed",
+  "instance_type": "ml.g5.2xlarge",
+  "hardware": "NVIDIA-A10G-24GB",
+  "runtime_family": "transformers",
+  "runtime": "transformers-4.46.3/torch-2.4.1/cuda-12.4",
+  "vllm_tested": false,
+  "dtype": "bf16",
+  "max_new_tokens": 128,
+  "warmups": 20,
+  "timed": 200,
+  "batch_sizes": [
+    1,
+    8
+  ],
+  "artifact_label": "base_model_proxy_until_trained_adapters",
+  "image": "225989358036.dkr.ecr.us-east-1.amazonaws.com/distillery-training@sha256:4c57acb71354f5eec8392783a337334120106fa932e8e6adbc297d61afb8abbe",
+  "models_uri": "s3://distillery-225989358036-us-east-1/models/Qwen/",
+  "output_s3": "s3://distillery-225989358036-us-east-1/benchmarks/dist-bench-g52xlarge-20260718-182705/sagemaker-output/",
+  "billable_time_seconds": 1688,
+  "hourly_usd": 1.515,
+  "billed_cost_usd": 0.7103666666666666,
+  "prior_failed_upload_job": {
+    "job_name": "dist-bench-g52xlarge-20260718-175601",
+    "note": "compute succeeded; failed only on S3 upload IAM; batch8 token accounting bug fixed before rerun",
+    "billable_time_seconds": 1703,
+    "billed_cost_usd": 0.7166791666666665
+  },
+  "p4de_attempt": {
+    "job_name": "dist-bench-p4de-20260718-185741",
+    "status": "Stopped",
+    "reason": "capacity_pending_gt_18m_stopped_to_avoid_unattended_billing",
+    "instance_type": "ml.p4de.24xlarge"
+  },
+  "schedule_final_artifact_rerun": "after trained LoRA adapters exist"
+}

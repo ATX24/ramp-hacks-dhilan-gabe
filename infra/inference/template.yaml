@@ -1,0 +1,366 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Distillery Demo/Playground SageMaker real-time inference stack.
+  Creates Model, EndpointConfig, Endpoint, and a bounded auto-delete schedule.
+  Default deploy helpers are plan-only/dry-run; this template does not launch
+  training jobs.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: hackathon
+    AllowedPattern: ^[a-z0-9-]{2,20}$
+
+  EndpointName:
+    Type: String
+    Default: distillery-demo-inference
+    AllowedPattern: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$
+
+  InstanceType:
+    Type: String
+    Default: ml.g5.xlarge
+    AllowedValues:
+      - ml.g5.xlarge
+      - ml.g5.2xlarge
+      - ml.g4dn.xlarge
+      - ml.m5.xlarge
+    Description: Configurable inference instance type.
+
+  ImageUri:
+    Type: String
+    Description: >
+      Digest-pinned inference image URI, for example
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/distillery-inference@sha256:...
+    AllowedPattern: ^.+\@sha256:[0-9a-f]{64}$
+
+  ModelDataUrl:
+    Type: String
+    Description: >
+      S3 URI of the sealed immutable model bundle (serving_registry.json +
+      base + adapters + integrity/SHA256SUMS).
+    AllowedPattern: ^s3://[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]/.+$
+
+  ArtifactBucketName:
+    Type: String
+    Description: Existing encrypted artifact bucket containing ModelDataUrl.
+    MinLength: 3
+    MaxLength: 63
+
+  ModelDataPrefix:
+    Type: String
+    Description: >
+      Read-only key prefix for the sealed model bundle inside ArtifactBucketName.
+    AllowedPattern: '^(?!.*//)(?!.*\.\.)(?!.*/\.)[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$'
+
+  EcrRepositoryArn:
+    Type: String
+    Description: ARN of the ECR repository holding the inference image.
+    AllowedPattern: "^arn:[^:]+:ecr:[a-z0-9-]+:[0-9]{12}:repository/[a-z0-9._/-]+$"
+
+  KmsKeyArn:
+    Type: String
+    Description: KMS key for the model bundle and endpoint storage.
+    AllowedPattern: "^arn:[^:]+:kms:[a-z0-9-]+:[0-9]{12}:key/[0-9a-f-]{36}$"
+
+  AutoDeleteAtUtc:
+    Type: String
+    Description: One-time UTC endpoint deletion deadline, without a trailing Z.
+    AllowedPattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$'
+
+  MaxEndpointCostUsd:
+    Type: Number
+    Default: 4.224
+    MinValue: 0.01
+    MaxValue: 25
+
+  VolumeSizeInGB:
+    Type: Number
+    Default: 50
+    MinValue: 20
+    MaxValue: 200
+
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+
+  ProjectTag:
+    Type: String
+    Default: RampHackathon
+
+  OwnerTag:
+    Type: String
+    Default: Dhilan
+
+  TtlTag:
+    Type: String
+    Default: "2026-07-20"
+
+Resources:
+  InferenceLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/aws/sagemaker/Endpoints/${EndpointName}"
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: TTL
+          Value: !Ref TtlTag
+        - Key: Component
+          Value: distillery-inference
+
+  InferenceExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "distillery-inference-${EnvironmentName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DistilleryInferenceLeastPrivilege
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ModelBundleList
+                Effect: Allow
+                Action: [s3:ListBucket]
+                Resource: !Sub "arn:aws:s3:::${ArtifactBucketName}"
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - !Sub "${ModelDataPrefix}"
+                      - !Sub "${ModelDataPrefix}/*"
+              - Sid: ModelBundleRead
+                Effect: Allow
+                Action: [s3:GetObject]
+                Resource: !Sub "arn:aws:s3:::${ArtifactBucketName}/${ModelDataPrefix}/*"
+              - Sid: ModelBundleDecrypt
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                Resource: !Ref KmsKeyArn
+              - Sid: DenyModelBundleMutation
+                Effect: Deny
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:DeleteObjectVersion
+                Resource: !Sub "arn:aws:s3:::${ArtifactBucketName}/${ModelDataPrefix}/*"
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/sagemaker/Endpoints/*"
+              - Sid: ECRAuthorization
+                Effect: Allow
+                Action: [ecr:GetAuthorizationToken]
+                Resource: "*"
+              - Sid: ECRPullRepository
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Resource: !Ref EcrRepositoryArn
+              - Sid: DenyTrainingAndNotebooks
+                Effect: Deny
+                Action:
+                  - sagemaker:CreateTrainingJob
+                  - sagemaker:CreateNotebookInstance
+                  - sagemaker:CreateProcessingJob
+                  - sagemaker:CreateTransformJob
+                Resource: "*"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: TTL
+          Value: !Ref TtlTag
+        - Key: Component
+          Value: distillery-inference
+
+  InferenceModel:
+    Type: AWS::SageMaker::Model
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ModelName: !Sub "${EndpointName}-model"
+      ExecutionRoleArn: !GetAtt InferenceExecutionRole.Arn
+      EnableNetworkIsolation: true
+      PrimaryContainer:
+        Image: !Ref ImageUri
+        ModelDataUrl: !Ref ModelDataUrl
+        Mode: SingleModel
+        Environment:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          HF_DATASETS_OFFLINE: "1"
+          DISTILLERY_INFERENCE_REQUIRE_OFFLINE: "1"
+          DISTILLERY_INFERENCE_RUNTIME: "torch"
+          DISTILLERY_INFERENCE_ENDPOINT_ID: !Ref EndpointName
+          SM_MODEL_DIR: /opt/ml/model
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: TTL
+          Value: !Ref TtlTag
+        - Key: Component
+          Value: distillery-inference
+        - Key: AutoDeleteAtUtc
+          Value: !Ref AutoDeleteAtUtc
+        - Key: MaxEndpointCostUsd
+          Value: !Ref MaxEndpointCostUsd
+        - Key: CostCenter
+          Value: ramp-hackathon-demo
+
+  InferenceEndpointConfig:
+    Type: AWS::SageMaker::EndpointConfig
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      EndpointConfigName: !Sub "${EndpointName}-config"
+      KmsKeyId: !Ref KmsKeyArn
+      ProductionVariants:
+        - VariantName: AllTraffic
+          ModelName: !GetAtt InferenceModel.ModelName
+          InitialInstanceCount: 1
+          InstanceType: !Ref InstanceType
+          InitialVariantWeight: 1.0
+          VolumeSizeInGB: !Ref VolumeSizeInGB
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: TTL
+          Value: !Ref TtlTag
+        - Key: Component
+          Value: distillery-inference
+        - Key: AutoDeleteAtUtc
+          Value: !Ref AutoDeleteAtUtc
+        - Key: MaxEndpointCostUsd
+          Value: !Ref MaxEndpointCostUsd
+        - Key: CostCenter
+          Value: ramp-hackathon-demo
+
+  InferenceEndpoint:
+    Type: AWS::SageMaker::Endpoint
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      EndpointName: !Ref EndpointName
+      EndpointConfigName: !GetAtt InferenceEndpointConfig.EndpointConfigName
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: TTL
+          Value: !Ref TtlTag
+        - Key: Component
+          Value: distillery-inference
+        - Key: AutoDeleteAtUtc
+          Value: !Ref AutoDeleteAtUtc
+        - Key: MaxEndpointCostUsd
+          Value: !Ref MaxEndpointCostUsd
+        - Key: CostCenter
+          Value: ramp-hackathon-demo
+
+  InferenceAutoDeleteRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "distillery-inference-cleanup-${EnvironmentName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DeleteOnlyBoundInferenceEndpoint
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: sagemaker:DeleteEndpoint
+                Resource: !Sub >-
+                  arn:${AWS::Partition}:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint/${EndpointName}
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: TTL
+          Value: !Ref TtlTag
+        - Key: Component
+          Value: distillery-inference-cleanup
+
+  InferenceAutoDeleteSchedule:
+    Type: AWS::Scheduler::Schedule
+    DependsOn: InferenceEndpoint
+    Properties:
+      Name: !Sub "${EndpointName}-auto-delete"
+      Description: Deletes the bounded hackathon GPU endpoint at its cost deadline.
+      State: ENABLED
+      ActionAfterCompletion: DELETE
+      ScheduleExpression: !Sub "at(${AutoDeleteAtUtc})"
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:sagemaker:deleteEndpoint
+        RoleArn: !GetAtt InferenceAutoDeleteRole.Arn
+        Input: !Sub '{"EndpointName":"${EndpointName}"}'
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 3600
+          MaximumRetryAttempts: 3
+
+Outputs:
+  EndpointNameOut:
+    Description: SageMaker endpoint name for Runtime InvokeEndpoint.
+    Value: !GetAtt InferenceEndpoint.EndpointName
+    Export:
+      Name: !Sub "${AWS::StackName}-EndpointName"
+
+  EndpointArn:
+    Description: SageMaker endpoint ARN.
+    Value: !Ref InferenceEndpoint
+    Export:
+      Name: !Sub "${AWS::StackName}-EndpointArn"
+
+  ModelNameOut:
+    Description: Retained SageMaker model name.
+    Value: !GetAtt InferenceModel.ModelName
+
+  ExecutionRoleArn:
+    Description: Scoped inference execution role ARN.
+    Value: !GetAtt InferenceExecutionRole.Arn
+
+  LogGroupName:
+    Description: Retained CloudWatch log group for the endpoint.
+    Value: !Ref InferenceLogGroup
+
+  AutoDeleteScheduleName:
+    Description: One-time scheduler enforcing the endpoint cost bound.
+    Value: !Ref InferenceAutoDeleteSchedule
+
+  AutoDeleteAtUtcOut:
+    Description: UTC deadline for endpoint deletion.
+    Value: !Ref AutoDeleteAtUtc

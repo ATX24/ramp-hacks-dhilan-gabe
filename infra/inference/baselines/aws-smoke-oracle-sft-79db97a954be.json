@@ -1,0 +1,95 @@
+{
+  "schema_version": "distillery.real_baseline.v1",
+  "training_job_name": "aws-smoke-oracle-sft-79db97a954be",
+  "run_id": "run_awssmoke-oracle-sft",
+  "dataset_id": "ds_awssmoke01",
+  "dataset": {
+    "content_sha256": "5c22d86930e8585b15f5f5d1cd593ebc4e79081cf42d3c4544ce34361882fd54",
+    "train_sha256": "5359969de6420604fa7c0751775785501e1de9180d89a58be2dd44448d68a0e7",
+    "validation_sha256": "412241c81915cf0b28f7d0534b6669c38fc716c128a39192dc110da8e6f36465"
+  },
+  "endpoint_id": "distillery-demo-inference",
+  "source": {
+    "prefix": "s3://distillery-225989358036-us-east-1/campaigns/emergency-smoke-20260718T174258Z/runs/run_awssmoke-oracle-sft/sagemaker-output/aws-smoke-oracle-sft-79db97a954be/output/",
+    "model_tar_uri": "s3://distillery-225989358036-us-east-1/campaigns/emergency-smoke-20260718T174258Z/runs/run_awssmoke-oracle-sft/sagemaker-output/aws-smoke-oracle-sft-79db97a954be/output/model.tar.gz",
+    "model_tar_sha256": "1dc5de2793bf7c4fb9cda3cc23ed13c6871cc06505c3b29d2b2f858ef73b3a87",
+    "output_tar_uri": "s3://distillery-225989358036-us-east-1/campaigns/emergency-smoke-20260718T174258Z/runs/run_awssmoke-oracle-sft/sagemaker-output/aws-smoke-oracle-sft-79db97a954be/output/output.tar.gz",
+    "output_tar_sha256": "5a872ab384a72b1a3f5e7104bc5b08426ec710afbc93da03a44b956b45c5c099"
+  },
+  "manifest": {
+    "seal_sha256": "79db97a954be7bd3395cf6856ad2d1b74e3038d022d3aa0e8ff7a5f6b357edaf",
+    "file_sha256": "5412f37c88c9e80b209632eb579997374f7b4116ad3fc589a674eb416ce1166e",
+    "source_revision": "3e8310f7904361082fc07d6af4248a0186db989a",
+    "training_image_digest": "sha256:fce8fe86d50f994ad7b38e443f55d0a675abb3793f23f5423c073bdb910f1976"
+  },
+  "base": {
+    "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "serving_model_id": "model_student_base",
+    "artifact_id": "artifact_qwen25_05b_7ae557604adf",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "tokenizer_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "source_uri": "s3://distillery-225989358036-us-east-1/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/",
+    "snapshot_manifest_sha256": "30f061579bad07c215c943bcf5e04aa01bf2842a572df695e497111e42e38bc8",
+    "weights_sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+    "parameter_count": 494032768
+  },
+  "adapter": {
+    "serving_model_id": "model_oracle_sft",
+    "artifact_id": "artifact_oracle_sft_0021b7d6cdfd",
+    "weights_sha256": "0021b7d6cdfd86e6a255e9367bc53607055937f2cc249a418f030d3935b13bfc",
+    "config_sha256": "7f8537c3f1fe8ccb9c0075a72dbb72cc09f1fe22bff5d7120218ff8eaacf171d",
+    "parameter_count": 4399104,
+    "completed_steps": 8,
+    "training_duration_seconds": 226.84726726499997,
+    "training_cost_usd": 0.08872248675253332,
+    "proof_status": "insufficient_evidence",
+    "promotion_status": "not_promoted"
+  },
+  "validation": {
+    "scope": "sealed_validation_only",
+    "split_sha256": "412241c81915cf0b28f7d0534b6669c38fc716c128a39192dc110da8e6f36465",
+    "examples": 16,
+    "seed": 17,
+    "generation": "greedy",
+    "max_new_tokens": 128,
+    "comparison_sha256": "d232c4650be5578aa6e10201fe2a74a44ae642a2ce15bc393bbd170bdfff3193",
+    "base_predictions_sha256": "1f3e64f85fc4df1803312fa883503ddc5fecaed88c9c22c38fc32e2f00bd9e09",
+    "adapter_predictions_sha256": "2e53542c2202ff13abb7e1028e075fd026a18734ca25349e0d20d53ba9d59c75",
+    "base": {
+      "primary_index": 0.0,
+      "json_parse_rate": 0.0,
+      "json_schema_validity": 0.0,
+      "mean_latency_ms": 4768.073349065162,
+      "p50_latency_ms": 4113.830375499674,
+      "p95_latency_ms": 7398.6632080050185
+    },
+    "adapter": {
+      "primary_index": 0.0,
+      "json_parse_rate": 0.125,
+      "json_schema_validity": 0.0,
+      "mean_latency_ms": 6204.091283994785,
+      "p50_latency_ms": 6197.915479497169,
+      "p95_latency_ms": 8949.7803330014
+    },
+    "primary_index_delta": 0.0,
+    "improvement_claimed": false,
+    "limitations": [
+      "emergency smoke validation has no transaction_review examples",
+      "single seed",
+      "local MPS hardware differs from SageMaker training and serving hardware",
+      "no bootstrap confidence interval"
+    ]
+  },
+  "serving": {
+    "bundle_uri": "s3://distillery-225989358036-us-east-1/inference/baselines/aws-smoke-oracle-sft-79db97a954be/model.tar.gz",
+    "bundle_sha256": "4e9a6ba8299c4ad7ddc4c1e215e513e15f7d52b2129e3fb61e03ea179118cab1",
+    "supported_tasks": [
+      "variance_analysis",
+      "cash_reconciliation"
+    ],
+    "instance_type": "ml.g5.xlarge",
+    "hourly_usd": 1.408,
+    "auto_delete_after_hours": 3,
+    "max_endpoint_cost_usd": 4.224
+  }
+}

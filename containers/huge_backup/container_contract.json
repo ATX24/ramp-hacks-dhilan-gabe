@@ -1,0 +1,22 @@
+{
+  "schema_version": "distillery.huge_backup.container_contract.v1",
+  "base_image_line": "pytorch/pytorch CUDA 12.4 torch 2.4.1",
+  "python": "3.11",
+  "entrypoint_module": "experiments.huge_backup.train",
+  "torchrun": "torchrun --standalone --nnodes=1 --nproc_per_node=8 -m experiments.huge_backup.train --mode warm",
+  "required_packages": [
+    "torch==2.4.1",
+    "transformers==4.46.3",
+    "peft==0.13.2",
+    "accelerate==1.1.1",
+    "safetensors==0.4.5"
+  ],
+  "optional_flash_attn": "flash-attn (attestation-gated)",
+  "distributed_strategy": "ddp",
+  "instance_type": "ml.p4de.24xlarge",
+  "network_isolation": true,
+  "downloads_at_runtime": false,
+  "aws_calls_from_contract_builder": false,
+  "objective": "offline_sequence_distillation",
+  "not_exact_logit_kd": true
+}

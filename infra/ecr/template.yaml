@@ -1,0 +1,250 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Retained, encrypted, scan-on-push immutable ECR repository for the Distillery training image. Creates no training resources.",
+  "Parameters": {
+    "RepositoryName": {
+      "Type": "String",
+      "Default": "distillery-training",
+      "AllowedValues": [
+        "distillery-training"
+      ],
+      "Description": "Allowlisted ECR repository name."
+    },
+    "CandidateRetentionDays": {
+      "Type": "Number",
+      "Default": 30,
+      "MinValue": 14,
+      "MaxValue": 365,
+      "Description": "Expire only candidate-* and untagged images. Manifest-pinned tags are retained."
+    },
+    "ProjectTag": {
+      "Type": "String",
+      "Default": "RampHackathon"
+    },
+    "OwnerTag": {
+      "Type": "String",
+      "Default": "Dhilan"
+    },
+    "TtlTag": {
+      "Type": "String",
+      "Default": "2026-08-31"
+    }
+  },
+  "Resources": {
+    "TrainingRepository": {
+      "Type": "AWS::ECR::Repository",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "RepositoryName": {
+          "Ref": "RepositoryName"
+        },
+        "ImageTagMutability": "IMMUTABLE",
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "EncryptionConfiguration": {
+          "EncryptionType": "AES256"
+        },
+        "LifecyclePolicy": {
+          "LifecyclePolicyText": {
+            "Fn::Sub": "{\"rules\":[{\"rulePriority\":1,\"description\":\"Expire untagged images after the hackathon horizon\",\"selection\":{\"tagStatus\":\"untagged\",\"countType\":\"sinceImagePushed\",\"countUnit\":\"days\",\"countNumber\":${CandidateRetentionDays}},\"action\":{\"type\":\"expire\"}},{\"rulePriority\":2,\"description\":\"Expire disposable candidate tags only\",\"selection\":{\"tagStatus\":\"tagged\",\"tagPrefixList\":[\"candidate-\"],\"countType\":\"sinceImagePushed\",\"countUnit\":\"days\",\"countNumber\":${CandidateRetentionDays}},\"action\":{\"type\":\"expire\"}}]}"
+          }
+        },
+        "RepositoryPolicyText": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowSageMakerPullSameAccount",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "sagemaker.amazonaws.com"
+              },
+              "Action": [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:BatchCheckLayerAvailability"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:sagemaker:${AWS::Region}:${AWS::AccountId}:training-job/distillery-*"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectTag"
+            }
+          },
+          {
+            "Key": "Owner",
+            "Value": {
+              "Ref": "OwnerTag"
+            }
+          },
+          {
+            "Key": "TTL",
+            "Value": {
+              "Ref": "TtlTag"
+            }
+          },
+          {
+            "Key": "Component",
+            "Value": "training-image"
+          }
+        ]
+      }
+    },
+    "TrainingImagePushPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Least-privilege push and verification for the Distillery training repository.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AuthToken",
+              "Effect": "Allow",
+              "Action": [
+                "ecr:GetAuthorizationToken"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "PushVerifyThisRepo",
+              "Effect": "Allow",
+              "Action": [
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:DescribeImageScanFindings",
+                "ecr:DescribeImages",
+                "ecr:DescribeRepositories",
+                "ecr:ListImages",
+                "ecr:InitiateLayerUpload",
+                "ecr:UploadLayerPart",
+                "ecr:CompleteLayerUpload",
+                "ecr:PutImage"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TrainingRepository",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "TrainingImagePullPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Least-privilege pull policy for SageMaker execution roles.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AuthToken",
+              "Effect": "Allow",
+              "Action": [
+                "ecr:GetAuthorizationToken"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "PullThisRepo",
+              "Effect": "Allow",
+              "Action": [
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:DescribeImages"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TrainingRepository",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "RepositoryNameOut": {
+      "Description": "Allowlisted ECR repository name.",
+      "Value": {
+        "Ref": "TrainingRepository"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-RepositoryName"
+        }
+      }
+    },
+    "RepositoryUri": {
+      "Description": "Repository URI without a tag. Downstream appends only a verified @sha256 digest.",
+      "Value": {
+        "Fn::GetAtt": [
+          "TrainingRepository",
+          "RepositoryUri"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-RepositoryUri"
+        }
+      }
+    },
+    "RepositoryArn": {
+      "Description": "Repository ARN for IAM wiring.",
+      "Value": {
+        "Fn::GetAtt": [
+          "TrainingRepository",
+          "Arn"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-RepositoryArn"
+        }
+      }
+    },
+    "PushPolicyArn": {
+      "Description": "Least-privilege publisher policy ARN.",
+      "Value": {
+        "Ref": "TrainingImagePushPolicy"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-PushPolicyArn"
+        }
+      }
+    },
+    "PullPolicyArn": {
+      "Description": "Least-privilege SageMaker pull policy ARN.",
+      "Value": {
+        "Ref": "TrainingImagePullPolicy"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-PullPolicyArn"
+        }
+      }
+    }
+  }
+}

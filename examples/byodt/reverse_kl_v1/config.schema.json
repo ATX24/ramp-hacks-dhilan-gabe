@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["max_length", "max_completion", "seed", "temperature", "reverse_kl_weight"],
+  "properties": {
+    "max_length": { "type": "integer", "minimum": 2 },
+    "max_completion": { "type": "integer", "minimum": 1 },
+    "seed": { "type": "integer", "minimum": 0 },
+    "temperature": { "type": "number", "exclusiveMinimum": 0 },
+    "reverse_kl_weight": { "type": "number", "minimum": 0, "maximum": 1 },
+    "student_model_id": { "type": "string", "minLength": 1 },
+    "student_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "teacher_model_id": { "type": "string", "minLength": 1 },
+    "teacher_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+  }
+}
