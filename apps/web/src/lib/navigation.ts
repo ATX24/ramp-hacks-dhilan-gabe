@@ -1,5 +1,6 @@
 import { isResourceId } from "@/lib/ids";
 import { isUiMode, parseUiMode } from "@/lib/modes";
+import { STAGE_PLAIN } from "@/lib/plainLanguage";
 import type { StageId, UiMode } from "@/lib/types";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
@@ -10,16 +11,47 @@ export type RunSelection =
   | { kind: "invalid"; rawValue: string | string[] };
 
 export const STAGES = [
-  { id: "curate", href: "/curate", index: "01", name: "Curate" },
-  { id: "synthesize", href: "/synthesize", index: "02", name: "Synthesize" },
-  { id: "train", href: "/train", index: "03", name: "Train" },
-  { id: "prove", href: "/prove", index: "04", name: "Prove" },
-  { id: "demo", href: "/demo", index: "05", name: "Demo" },
+  {
+    id: "curate",
+    href: "/curate",
+    index: "01",
+    name: "Curate",
+    plain: STAGE_PLAIN.curate.plain,
+  },
+  {
+    id: "synthesize",
+    href: "/synthesize",
+    index: "02",
+    name: "Synthesize",
+    plain: STAGE_PLAIN.synthesize.plain,
+  },
+  {
+    id: "train",
+    href: "/train",
+    index: "03",
+    name: "Train",
+    plain: STAGE_PLAIN.train.plain,
+  },
+  {
+    id: "prove",
+    href: "/prove",
+    index: "04",
+    name: "Prove",
+    plain: STAGE_PLAIN.prove.plain,
+  },
+  {
+    id: "demo",
+    href: "/demo",
+    index: "05",
+    name: "Demo",
+    plain: STAGE_PLAIN.demo.plain,
+  },
 ] as const satisfies ReadonlyArray<{
   id: StageId;
   href: `/${StageId}`;
   index: string;
   name: string;
+  plain: string;
 }>;
 
 export type StageRoute = (typeof STAGES)[number]["href"];
@@ -59,18 +91,19 @@ export function buildStageHref(
   return `${route}?${params.toString()}`;
 }
 
+/** Playground-first entry: land judges on Demo, then reveal the journey. */
 export function buildRootRedirect(searchParams: SearchParams | undefined): string {
   const rawMode = singleModeParam(searchParams);
   const runSelection = parseRunSelection(searchParams);
-  if (rawMode !== undefined && !isUiMode(rawMode)) return "/curate";
+  if (rawMode !== undefined && !isUiMode(rawMode)) return "/demo";
   const mode = isUiMode(rawMode) ? rawMode : "default";
   if (runSelection.kind === "invalid") {
-    return rawMode === undefined ? "/curate" : buildStageHref("/curate", mode);
+    return rawMode === undefined ? "/demo" : buildStageHref("/demo", mode);
   }
   if (runSelection.kind === "valid") {
-    return buildStageHref("/curate", mode, runSelection.runId);
+    return buildStageHref("/demo", mode, runSelection.runId);
   }
-  return rawMode === undefined ? "/curate" : buildStageHref("/curate", mode);
+  return rawMode === undefined ? "/demo" : buildStageHref("/demo", mode);
 }
 
 export function isStageRoute(pathname: string): pathname is StageRoute {
@@ -78,5 +111,5 @@ export function isStageRoute(pathname: string): pathname is StageRoute {
 }
 
 export function buildModeHref(pathname: string, mode: UiMode): string {
-  return buildStageHref(isStageRoute(pathname) ? pathname : "/curate", mode);
+  return buildStageHref(isStageRoute(pathname) ? pathname : "/demo", mode);
 }

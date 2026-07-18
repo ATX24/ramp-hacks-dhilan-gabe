@@ -1,0 +1,20 @@
+{
+  "hasDemoHeading": true,
+  "hasLiveTrainingCard": true,
+  "hasJourney": true,
+  "consoleErrors": [],
+  "screenshots": [
+    "desktop-curate-default.png",
+    "desktop-demo-default.png",
+    "desktop-demo-first-viewport.png",
+    "desktop-demo-proved.png",
+    "desktop-prove-proved.png",
+    "desktop-train-proved.png",
+    "mobile-curate-default.png",
+    "mobile-demo-default.png",
+    "mobile-demo-first-viewport.png",
+    "mobile-demo-proved.png",
+    "mobile-prove-proved.png",
+    "mobile-train-proved.png"
+  ]
+}

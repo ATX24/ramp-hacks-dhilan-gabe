@@ -1,5 +1,6 @@
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatusBadge, proofTone } from "@/components/StatusBadge";
+import { STAGE_PLAIN } from "@/lib/plainLanguage";
 import type { ErrorPayload, ProofReportView } from "@/lib/types";
 
 function formatIndex(value: number | null): string {
@@ -17,6 +18,7 @@ export function ProveStage({
     return (
       <section aria-labelledby="prove-heading">
         <div className="panel">
+          <p className="text-kicker">Check the result</p>
           <h2 id="prove-heading">Prove</h2>
           <ErrorBanner error={error} />
           <p data-testid="prove-empty">
@@ -38,10 +40,12 @@ export function ProveStage({
   return (
     <section aria-labelledby="prove-heading">
       <div className="panel">
+        <p className="text-kicker">{STAGE_PLAIN.prove.plain}</p>
         <h2 id="prove-heading">Prove</h2>
-        <p>
-          Compare arms under a frozen protocol. Confidence intervals, OOD retention,
-          systems metrics, and economics decide whether distillation is justified.
+        <p>{STAGE_PLAIN.prove.description}</p>
+        <p className="text-sm text-muted-foreground">
+          Why this matters: {STAGE_PLAIN.prove.why} Advanced confidence intervals,
+          OOD retention, systems metrics, and economics stay available below.
         </p>
         <ErrorBanner error={error} />
         <div className="meta-row">

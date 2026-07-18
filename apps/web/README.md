@@ -1,11 +1,11 @@
-# Distillery web UI
+# Distillery web UI (Best-of-N candidate C)
 
-Five-stage Next.js app for Distillery / TinyFable:
-**Curate → Synthesize → Train → Prove → Demo**.
+Playground-first Distillery experience for lay judges:
+**Demo (before/after) → Curate → Synthesize → Train → Prove**.
 
-Fixture-backed by default. The Demo / Playground can call a typed live inference
-gateway when `NEXT_PUBLIC_DISTILLERY_INFERENCE_URL` is set; otherwise live mode
-surfaces an explicit unavailable state and never fabricates inference.
+Built with shadcn/ui and official shadcn AI Elements. Root entry redirects to `/demo`.
+Fixture-backed by default with explicit fixture/live labeling and an honest training
+event adapter for the at-a-glance teaching card.
 
 ## Commands
 
@@ -25,16 +25,11 @@ Playwright definitions are separate from Vitest and require preinstalled browser
 pnpm test:e2e
 ```
 
-Do not install browser binaries as part of routine fixture verification.
-
 ## Fixture modes
 
 Append `?mode=` with one of:
 
 `default` · `no_training_yet` · `skipped_synthesis` · `precomputed` · `proved` · `do_not_distill` · `failed_quality` · `failed_economics` · `insufficient_evidence` · `error` · `unavailable` · `loading` · `fetch_failure`
-
-Run references persist per validated mode under `distillery.run_ref.<mode>`. A validated
-explicit `run` query parameter wins over local storage.
 
 ## Demo / Playground URL state
 

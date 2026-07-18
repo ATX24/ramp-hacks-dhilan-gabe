@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { GateList } from "@/components/GateList";
+import { LiveTrainingCard } from "@/components/LiveTrainingCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TrainingTelemetryPanel } from "@/components/TrainingTelemetryPanel";
 import { createApiClient } from "@/lib/api";
+import { STAGE_PLAIN } from "@/lib/plainLanguage";
 import {
   deriveTrainPresentation,
   isRunCancellable,
@@ -47,13 +49,15 @@ export function TrainStage({
         : "banner-info";
 
   return (
-    <section aria-labelledby="train-heading">
+    <section aria-labelledby="train-heading" className="grid gap-4">
       <div className="panel">
+        <p className="text-kicker">{STAGE_PLAIN.train.plain}</p>
         <h2 id="train-heading">Train</h2>
-        <p>
-          Preflight resolves recipe, tokenizer, memory, and license gates. A finite
-          one-job plan is shown with a cost ceiling. All views are read-only fixture
-          representations.
+        <p>{STAGE_PLAIN.train.description}</p>
+        <p className="text-sm text-muted-foreground">
+          Why this matters: {STAGE_PLAIN.train.why} Technical preflight still
+          covers recipe, tokenizer, memory, and license gates under Advanced
+          details below.
         </p>
         <ErrorBanner error={error} />
         <div
@@ -91,9 +95,20 @@ export function TrainStage({
         </div>
       </div>
 
+      <LiveTrainingCard
+        run={run}
+        plan={plan}
+        telemetry={telemetry}
+        artifact={artifact}
+      />
+
       <TrainingTelemetryPanel telemetry={telemetry} />
 
-      <div className="panel">
+      <details className="panel">
+        <summary className="cursor-pointer font-serif text-lg">
+          Advanced · recipe, gates, and job plan
+        </summary>
+      <div className="panel" style={{ marginTop: "1rem", boxShadow: "none" }}>
         <h3>Recipe resolution</h3>
         <div className="meta-row">
           <span>
@@ -267,6 +282,7 @@ export function TrainStage({
           </p>
         )}
       </div>
+      </details>
     </section>
   );
 }

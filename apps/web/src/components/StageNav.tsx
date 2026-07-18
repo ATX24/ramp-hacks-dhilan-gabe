@@ -20,10 +20,11 @@ export function StageNav({ mode, runId }: { mode: UiMode; runId?: string }) {
             href={buildStageHref(stage.href, mode, runId)}
             className="stage-link"
             aria-current={current ? "page" : undefined}
-            data-testid={`stage-link-${stage.name.toLowerCase()}`}
+            data-testid={`stage-link-${stage.id}`}
           >
             <span className="stage-index">{stage.index}</span>
-            <span className="stage-name">{stage.name}</span>
+            <span className="stage-plain">{stage.plain}</span>
+            <span className="stage-canonical">{stage.name}</span>
           </Link>
         );
       })}

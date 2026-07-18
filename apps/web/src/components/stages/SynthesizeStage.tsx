@@ -1,5 +1,6 @@
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatusBadge } from "@/components/StatusBadge";
+import { STAGE_PLAIN } from "@/lib/plainLanguage";
 import type { ErrorPayload, SynthesisSummary } from "@/lib/types";
 
 export function SynthesizeStage({
@@ -14,10 +15,11 @@ export function SynthesizeStage({
   return (
     <section aria-labelledby="synthesize-heading">
       <div className="panel">
+        <p className="text-kicker">{STAGE_PLAIN.synthesize.plain}</p>
         <h2 id="synthesize-heading">Synthesize</h2>
-        <p>
-          Teacher calls fill missing or rejected labels only. Valid imported responses
-          can skip synthesis entirely with an explicit reason.
+        <p>{STAGE_PLAIN.synthesize.description}</p>
+        <p className="text-sm text-muted-foreground">
+          Why this matters: {STAGE_PLAIN.synthesize.why}
         </p>
         {priorRun ? (
           <div className="banner banner-info" role="status" data-testid="prior-synthesis">

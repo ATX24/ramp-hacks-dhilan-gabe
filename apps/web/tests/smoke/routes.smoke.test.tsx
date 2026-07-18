@@ -64,10 +64,10 @@ describe("five-stage navigation", () => {
 
   it("preserves only a supported mode in the root redirect", () => {
     expect(buildRootRedirect({ mode: "precomputed", unsafe: "discard-me" })).toBe(
-      "/curate?mode=precomputed",
+      "/demo?mode=precomputed",
     );
-    expect(buildRootRedirect({ mode: "default" })).toBe("/curate?mode=default");
-    expect(buildRootRedirect({ unsafe: "discard-me" })).toBe("/curate");
+    expect(buildRootRedirect({ mode: "default" })).toBe("/demo?mode=default");
+    expect(buildRootRedirect({ unsafe: "discard-me" })).toBe("/demo");
     expect(
       buildRootRedirect({
         mode: "default",
@@ -75,13 +75,13 @@ describe("five-stage navigation", () => {
         unsafe: "discard-me",
       }),
     ).toBe(
-      "/curate?mode=default&run=run_fixture_tinyfable_restored_002",
+      "/demo?mode=default&run=run_fixture_tinyfable_restored_002",
     );
   });
 
   it("drops malformed and repeated mode parameters", () => {
-    expect(buildRootRedirect({ mode: "not-a-mode" })).toBe("/curate");
-    expect(buildRootRedirect({ mode: ["precomputed", "error"] })).toBe("/curate");
+    expect(buildRootRedirect({ mode: "not-a-mode" })).toBe("/demo");
+    expect(buildRootRedirect({ mode: ["precomputed", "error"] })).toBe("/demo");
     expect(resolveModeFromSearch({ mode: "not-a-mode" })).toBe("default");
     expect(resolveModeFromSearch({ mode: ["precomputed", "error"] })).toBe("default");
   });

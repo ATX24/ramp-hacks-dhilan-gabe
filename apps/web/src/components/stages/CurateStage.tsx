@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buildStageHref } from "@/lib/navigation";
+import { STAGE_PLAIN } from "@/lib/plainLanguage";
 import type { Dataset, ErrorPayload, UiMode } from "@/lib/types";
 
 function pct(value: number): string {
@@ -22,10 +23,11 @@ export function CurateStage({
   return (
     <section aria-labelledby="curate-heading">
       <div className="panel">
+        <p className="text-kicker">{STAGE_PLAIN.curate.plain}</p>
         <h2 id="curate-heading">Curate</h2>
-        <p>
-          Select and freeze a synthetic finance dataset. Show mixture, schema issues,
-          split/world hashes, and leakage checks before any synthesis or training.
+        <p>{STAGE_PLAIN.curate.description}</p>
+        <p className="text-sm text-muted-foreground">
+          Why this matters: {STAGE_PLAIN.curate.why}
         </p>
         <ErrorBanner error={error} />
         <div className="meta-row">
