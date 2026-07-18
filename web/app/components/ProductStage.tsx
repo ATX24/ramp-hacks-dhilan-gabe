@@ -15,12 +15,12 @@ import {
 
 function CodePanel() {
   return (
-    <div className="overflow-hidden rounded-2xl bg-[#141413] text-[#faf9f5] shadow-2xl shadow-black/20">
+    <div className="min-w-0 w-full overflow-hidden rounded-2xl bg-[#141413] text-[#faf9f5] shadow-2xl shadow-black/20">
       <div className="flex items-center justify-between border-b border-white/15 px-5 py-3 font-mono text-[11px] text-white/55">
         <span>distill.py</span>
         <span className="text-[#d8ff8f]">● ready</span>
       </div>
-      <pre className="overflow-x-auto p-5 font-mono text-[12px] leading-7 md:p-7 md:text-[14px]">
+      <pre className="max-w-full overflow-x-auto p-5 font-mono text-[12px] leading-7 md:p-7 md:text-[14px]">
         <code>{`distillery = Distillery(api_key=os.environ["DISTILLERY_API_KEY"])
 dataset = distillery.datasets.create("./finance_world.jsonl")
 run = distillery.distill(dataset, recipe="auto").wait()`}</code>
@@ -89,7 +89,7 @@ export function ProductStage() {
           </CarouselItem>
 
           <CarouselItem className="pl-0">
-            <article className="grid min-h-[620px] gap-10 bg-[#d65f45] p-8 text-[#141413] md:grid-cols-[0.85fr_1.15fr] md:p-14 lg:p-20">
+            <article className="grid min-h-[620px] gap-10 bg-[#d65f45] p-8 text-[#141413] md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:p-14 lg:p-20">
               <div className="flex flex-col justify-between">
                 <div className="font-mono text-[10px] uppercase tracking-[0.13em]">Distillation product · available now</div>
                 <div>
@@ -100,7 +100,7 @@ export function ProductStage() {
                   <Link href="/distillery">Open Distillery <ArrowUpRight /></Link>
                 </Button>
               </div>
-              <div className="flex items-center"><CodePanel /></div>
+              <div className="flex min-w-0 items-center"><CodePanel /></div>
             </article>
           </CarouselItem>
         </CarouselContent>
