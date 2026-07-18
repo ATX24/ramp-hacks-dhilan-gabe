@@ -309,22 +309,12 @@ def load_and_verify_tokenizers(
         manifest.models.student.id,
         manifest.models.student.revision,
     )
-    teacher_snapshot = require_local_snapshot(
-        models_dir,
-        manifest.models.teacher.id,
-        manifest.models.teacher.revision,
-    )
     config = manifest_emergency_config(manifest)
     verify_model_config_sha256(
         student_snapshot,
         str(config["student_model_config_sha256"]),
     )
-    verify_model_config_sha256(
-        teacher_snapshot,
-        str(config["teacher_model_config_sha256"]),
-    )
     student_tokenizer = load_tokenizer(snapshot_dir=student_snapshot)
-    teacher_tokenizer = load_tokenizer(snapshot_dir=teacher_snapshot)
     capability = manifest.training.qlora.capability_evidence
     if capability is None or capability.special_token_maps is None:
         raise ValueError("manifest lacks typed special-token map capability evidence")
@@ -336,14 +326,39 @@ def load_and_verify_tokenizers(
         expected_chat_template_sha256=manifest.models.student.chat_template_sha256,
         expected_special_token_map=dict(special_maps.student),
     )
-    teacher_evidence = verify_tokenizer_runtime_evidence(
-        snapshot_dir=teacher_snapshot,
-        tokenizer=teacher_tokenizer,
-        expected_tokenizer_sha256=manifest.models.teacher.tokenizer_sha256,
-        expected_chat_template_sha256=manifest.models.teacher.chat_template_sha256,
-        expected_special_token_map=dict(special_maps.teacher),
-    )
-    assert_loaded_tokenizers_compatible(teacher_evidence, student_evidence)
+    if manifest_arm(manifest) == "logit_kd":
+        teacher_snapshot = require_local_snapshot(
+            models_dir,
+            manifest.models.teacher.id,
+            manifest.models.teacher.revision,
+        )
+        verify_model_config_sha256(
+            teacher_snapshot,
+            str(config["teacher_model_config_sha256"]),
+        )
+        teacher_tokenizer = load_tokenizer(snapshot_dir=teacher_snapshot)
+        teacher_evidence = verify_tokenizer_runtime_evidence(
+            snapshot_dir=teacher_snapshot,
+            tokenizer=teacher_tokenizer,
+            expected_tokenizer_sha256=manifest.models.teacher.tokenizer_sha256,
+            expected_chat_template_sha256=manifest.models.teacher.chat_template_sha256,
+            expected_special_token_map=dict(special_maps.teacher),
+        )
+        assert_loaded_tokenizers_compatible(teacher_evidence, student_evidence)
+    else:
+        if (
+            manifest.models.teacher.tokenizer_sha256
+            != manifest.models.student.tokenizer_sha256
+            or manifest.models.teacher.chat_template_sha256
+            != manifest.models.student.chat_template_sha256
+            or dict(special_maps.teacher) != dict(special_maps.student)
+        ):
+            raise ValueError(
+                "student-only execution requires sealed teacher/student "
+                "tokenizer compatibility evidence"
+            )
+        teacher_snapshot = student_snapshot
+        teacher_evidence = student_evidence
     return (
         student_tokenizer,
         student_evidence,
