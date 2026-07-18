@@ -8,19 +8,20 @@ from pathlib import Path
 
 import pytest
 
-from distillery.techniques import (
-    ArtifactContract,
-    CompatibilityContext,
-    CostModel,
+from distillery.techniques import CompatibilityContext, TechniqueRegistry
+from distillery.techniques.capabilities import (
     EvidenceRequirement,
+    TechniqueCapability,
+)
+from distillery.techniques.descriptor import (
+    ArtifactContract,
+    CostModel,
     ExecutionKind,
     HardwareRequirements,
     PluginImageBinding,
     ReviewedSourceBinding,
     TeacherSignal,
-    TechniqueCapability,
     TechniqueDescriptor,
-    TechniqueRegistry,
     TokenizerConstraint,
 )
 
@@ -50,6 +51,8 @@ def sequence_context() -> CompatibilityContext:
         backend_kind="local",
         student_model_id="Qwen/Qwen2.5-0.5B",
         student_revision=REVISION_A,
+        tokenizer_sha256_student=DIGEST,
+        chat_template_sha256_student=DIGEST_T,
         usable_responses=True,
         network_isolation=True,
         instance_type="ml.g5.xlarge",
@@ -69,12 +72,60 @@ def logit_context() -> CompatibilityContext:
         chat_template_sha256_student=DIGEST_T,
         chat_template_sha256_teacher=DIGEST_T,
         special_token_map_match=True,
+        full_logits_available=True,
         local_white_box=True,
         memory_dry_run_ok=True,
         usable_responses=True,
         network_isolation=True,
         instance_type="ml.g5.xlarge",
     )
+
+
+@pytest.fixture
+def sequence_config() -> dict:
+    return {
+        "max_length": 512,
+        "max_completion": 160,
+        "seed": 17,
+        "student_model_id": "Qwen/Qwen2.5-0.5B",
+        "student_revision": REVISION_A,
+        "student_tokenizer_sha256": DIGEST,
+        "student_chat_template_sha256": DIGEST_T,
+        "require_nonempty_response": True,
+        "require_json_object_response": True,
+        "pad_token_id": None,
+    }
+
+
+@pytest.fixture
+def logit_config() -> dict:
+    return {
+        "max_length": 512,
+        "max_completion": 160,
+        "seed": 17,
+        "temperature": 2.0,
+        "kd_weight": 0.7,
+        "hard_ce_weight": 0.3,
+        "vocab_chunk_size": 4096,
+        "student_model_id": "Qwen/Qwen2.5-0.5B",
+        "student_revision": REVISION_A,
+        "student_tokenizer_sha256": DIGEST,
+        "student_chat_template_sha256": DIGEST_T,
+        "teacher_model_id": "Qwen/Qwen2.5-1.5B",
+        "teacher_revision": REVISION_B,
+        "teacher_tokenizer_sha256": DIGEST,
+        "teacher_chat_template_sha256": DIGEST_T,
+    }
+
+
+@pytest.fixture
+def external_config() -> dict:
+    return {
+        "max_length": 512,
+        "max_completion": 160,
+        "seed": 17,
+        "temperature": 2.0,
+    }
 
 
 @pytest.fixture
@@ -111,9 +162,8 @@ def external_descriptor() -> TechniqueDescriptor:
             EvidenceRequirement.TOKENIZER_FINGERPRINT_MATCH.value,
             EvidenceRequirement.SPECIAL_TOKEN_MAP_MATCH.value,
             EvidenceRequirement.CHAT_TEMPLATE_COMPATIBLE.value,
+            EvidenceRequirement.FULL_LOGITS_AVAILABLE.value,
             EvidenceRequirement.LOCAL_WHITE_BOX.value,
-            EvidenceRequirement.PLUGIN_IMAGE_DIGEST.value,
-            EvidenceRequirement.REVIEWED_SOURCE_BINDING.value,
             EvidenceRequirement.NETWORK_ISOLATION.value,
         ),
         config_schema=schema,

@@ -210,6 +210,7 @@ dependencies = [
     { name = "boto3" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "jsonschema" },
     { name = "mangum" },
     { name = "pydantic" },
     { name = "pydantic-core" },
@@ -219,7 +220,6 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "hypothesis" },
-    { name = "jsonschema" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -241,7 +241,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.119,<7" },
-    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.23,<5" },
+    { name = "jsonschema", specifier = ">=4.23,<5" },
     { name = "mangum", specifier = ">=0.19,<1" },
     { name = "peft", marker = "extra == 'ml'", specifier = "==0.13.2" },
     { name = "pydantic", specifier = ">=2.10,<3" },

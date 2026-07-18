@@ -23,15 +23,18 @@ plan = registry.plan(
 ```
 
 Built-in adapters wrap `sequence.v1` / `logit.v1` and yield the existing
-training load plan + loss contract. External adapters yield an
-`ExternalExecutionPlan` plus a network-isolated channel contract. External
-plugin Python is never imported into the control plane.
+training load plan + loss contract. External adapters yield a sealed
+`ExternalExecutionPlan`; the CLI can materialize its content-addressed channel
+envelope. There is no external trainer/backend consumer yet, so this is
+plan-only and does not claim runtime isolation enforcement.
 
 ## What a contributor seals
 
 1. **Technique descriptor** (`distillery.technique.v1`) — immutable, versioned,
    content-hashed (`descriptor_sha256`).
-2. **Config JSON Schema** — `type: object`, `additionalProperties: false`.
+2. **Config JSON Schema** — Draft 2020-12, `type: object`,
+   `additionalProperties: false`, fully inline (no references/retrieval or
+   defaults), and no secret-like fields.
 3. **Capabilities + evidence requirements** — closed vocabulary only.
 4. **Teacher signal, tokenizer constraint, artifact contract, metrics,
    hardware, cost model**.
@@ -44,8 +47,8 @@ plugin Python is never imported into the control plane.
 # Seal / refresh an example descriptor
 uv run python examples/byodt/reverse_kl_v1/build_descriptor.py
 
-# Validate
-uv run python scripts/techniques/byodt_ctl.py validate \
+# Validate the descriptor/schema (not environment compatibility)
+uv run python scripts/techniques/byodt_ctl.py validate-descriptor \
   examples/byodt/reverse_kl_v1/technique.json
 
 # Register into a local descriptor store
@@ -77,6 +80,8 @@ MVP integration is intentionally staged (this stream does not patch live API/UI)
 Until that wiring lands, hackathon demos use `byodt_ctl.py plan` and the
 Python seam above. Built-ins already expose parity with `sequence.v1` /
 `logit.v1` objective fields through the same `registry.plan(...)` path.
+`plan` is the only compatibility preflight; descriptor validation alone makes
+no claim about model, tokenizer, hardware, or backend compatibility.
 
 ## Non-goals (enforced)
 
@@ -85,3 +90,4 @@ Python seam above. Built-ins already expose parity with `sequence.v1` /
 - No tag-based plugin images
 - No in-process import of external technique code
 - No training launch from the BYODT CLI
+- No claim that channel isolation is enforced before backend wiring exists

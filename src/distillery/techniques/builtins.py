@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from distillery.backends.cost import APPROVED_INSTANCE_TYPES
 from distillery.techniques.capabilities import EvidenceRequirement, TechniqueCapability
 from distillery.techniques.descriptor import (
     ArtifactContract,
@@ -21,7 +20,7 @@ _DEFAULT_ARTIFACT = ArtifactContract(
 
 _DEFAULT_HARDWARE = HardwareRequirements(
     min_gpu_memory_gib=16,
-    approved_instance_types=tuple(sorted(APPROVED_INSTANCE_TYPES)),
+    approved_instance_types=("ml.g5.2xlarge", "ml.g5.xlarge"),
     requires_network_isolation=True,
 )
 
@@ -33,7 +32,18 @@ _DEFAULT_COST = CostModel(
 SEQUENCE_CONFIG_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["max_length", "max_completion", "seed"],
+    "required": [
+        "max_length",
+        "max_completion",
+        "seed",
+        "student_model_id",
+        "student_revision",
+        "student_tokenizer_sha256",
+        "student_chat_template_sha256",
+        "require_nonempty_response",
+        "require_json_object_response",
+        "pad_token_id",
+    ],
     "properties": {
         "max_length": {"type": "integer", "minimum": 2},
         "max_completion": {"type": "integer", "minimum": 1},
@@ -43,7 +53,17 @@ SEQUENCE_CONFIG_SCHEMA: dict = {
             "type": "string",
             "pattern": "^[0-9a-f]{40}$",
         },
+        "student_tokenizer_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+        },
+        "student_chat_template_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+        },
+        "require_nonempty_response": {"type": "boolean"},
         "require_json_object_response": {"type": "boolean"},
+        "pad_token_id": {"type": ["integer", "null"], "minimum": 0},
     },
 }
 
@@ -57,6 +77,15 @@ LOGIT_CONFIG_SCHEMA: dict = {
         "temperature",
         "kd_weight",
         "hard_ce_weight",
+        "vocab_chunk_size",
+        "student_model_id",
+        "student_revision",
+        "student_tokenizer_sha256",
+        "student_chat_template_sha256",
+        "teacher_model_id",
+        "teacher_revision",
+        "teacher_tokenizer_sha256",
+        "teacher_chat_template_sha256",
     ],
     "properties": {
         "max_length": {"type": "integer", "minimum": 2},
@@ -65,15 +94,32 @@ LOGIT_CONFIG_SCHEMA: dict = {
         "temperature": {"type": "number", "exclusiveMinimum": 0},
         "kd_weight": {"type": "number", "minimum": 0, "maximum": 1},
         "hard_ce_weight": {"type": "number", "minimum": 0, "maximum": 1},
+        "vocab_chunk_size": {"type": "integer", "minimum": 1},
         "student_model_id": {"type": "string", "minLength": 1},
         "student_revision": {
             "type": "string",
             "pattern": "^[0-9a-f]{40}$",
         },
+        "student_tokenizer_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+        },
+        "student_chat_template_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+        },
         "teacher_model_id": {"type": "string", "minLength": 1},
         "teacher_revision": {
             "type": "string",
             "pattern": "^[0-9a-f]{40}$",
+        },
+        "teacher_tokenizer_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+        },
+        "teacher_chat_template_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
         },
     },
 }
@@ -135,6 +181,7 @@ def logit_v1_descriptor() -> TechniqueDescriptor:
             EvidenceRequirement.TOKENIZER_FINGERPRINT_MATCH.value,
             EvidenceRequirement.SPECIAL_TOKEN_MAP_MATCH.value,
             EvidenceRequirement.CHAT_TEMPLATE_COMPATIBLE.value,
+            EvidenceRequirement.FULL_LOGITS_AVAILABLE.value,
             EvidenceRequirement.LOCAL_WHITE_BOX.value,
             EvidenceRequirement.MEMORY_DRY_RUN_OK.value,
         ),

@@ -1,159 +1,212 @@
-"""Network-isolated channel contract for external technique containers."""
+"""Content-addressed external plan channel for future backend integration."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, Self
 
-from pydantic import Field, StrictStr
+from pydantic import Field, StrictStr, ValidationInfo, model_validator
 
-from distillery.backends.safety import (
-    NETWORK_ISOLATION_TAG,
-    parse_digest_pinned_ecr_image,
-)
 from distillery.contracts.base import FrozenJsonObject, FrozenModel
 from distillery.contracts.hashing import PrefixedSha256, content_sha256
-from distillery.techniques.descriptor import PluginImageBinding, TechniqueDescriptor
-from distillery.techniques.errors import TechniqueErrorCode, raise_technique_error
+from distillery.techniques.errors import TechniqueError, TechniqueErrorCode, raise_technique_error
+from distillery.techniques.protocol import verify_protocol_hash
+from distillery.techniques.runtime import TechniquePlan
 
 TECHNIQUE_PLAN_FILENAME = "technique_plan.json"
-CHANNEL_SCHEMA_VERSION: Literal["distillery.technique.channel.v1"] = (
-    "distillery.technique.channel.v1"
+CHANNEL_SCHEMA_VERSION: Literal["distillery.technique.channel.v2"] = (
+    "distillery.technique.channel.v2"
 )
 
 
 class TechniqueChannelContract(FrozenModel):
-    """
-    Standard channel layout for external techniques.
+    """Exact identity a future backend must enforce before execution."""
 
-    External code executes only inside the digest-pinned container referenced
-    here. The control plane never imports plugin Python modules.
-    """
-
-    schema_version: Literal["distillery.technique.channel.v1"] = CHANNEL_SCHEMA_VERSION
+    schema_version: Literal["distillery.technique.channel.v2"] = CHANNEL_SCHEMA_VERSION
     technique_id: StrictStr
     version: StrictStr
     plan_filename: Literal["technique_plan.json"] = TECHNIQUE_PLAN_FILENAME
     image_uri: StrictStr = Field(min_length=1)
     image_digest: PrefixedSha256
-    enable_network_isolation: Literal[True] = True
-    network_isolation_tag: Literal["EnableNetworkIsolation"] = NETWORK_ISOLATION_TAG
+    network_isolation_required: Literal[True] = True
+    reviewed_source_repository: StrictStr
     reviewed_source_commit: StrictStr = Field(pattern=r"^[0-9a-f]{40}$")
     reviewed_source_tree_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
+    reviewed_source_review_record_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
     descriptor_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
     config_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
     protocol_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
-    extras: FrozenJsonObject = Field(default_factory=dict)
-
-    def channel_hash(self) -> str:
-        return content_sha256(self.model_dump(mode="json"))
+    environment_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
+    artifact_contract_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-def build_channel_contract(
-    *,
-    descriptor: TechniqueDescriptor,
-    config_sha256: str,
-    protocol_sha256: str,
-) -> TechniqueChannelContract:
-    if descriptor.plugin_image is None or descriptor.reviewed_source is None:
-        raise_technique_error(
-            TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
-            "channel contract requires sealed plugin image and reviewed source",
-            details={
-                "technique_id": descriptor.technique_id,
-                "version": descriptor.version,
+class TechniqueChannelEnvelope(FrozenModel):
+    """One strict content-addressed channel payload."""
+
+    schema_version: Literal["distillery.technique.channel_envelope.v2"] = (
+        "distillery.technique.channel_envelope.v2"
+    )
+    contract: TechniqueChannelContract
+    plan: TechniquePlan
+    config: FrozenJsonObject
+    envelope_sha256: StrictStr = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def _exact_identity(self, info: ValidationInfo) -> Self:
+        plan = self.plan
+        external = plan.external_execution
+        if external is None or plan.training_load_plan is not None:
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
+                "channel plan must contain exactly one external execution plan",
+            )
+        verify_protocol_hash(plan)
+        expected = {
+            "technique_id": plan.technique_id,
+            "version": plan.version,
+            "image_uri": external.image_uri,
+            "image_digest": external.image_digest,
+            "reviewed_source_repository": external.reviewed_source_repository,
+            "reviewed_source_commit": external.reviewed_source_commit,
+            "reviewed_source_tree_sha256": external.reviewed_source_tree_sha256,
+            "reviewed_source_review_record_sha256": (external.reviewed_source_review_record_sha256),
+            "descriptor_sha256": plan.descriptor_sha256,
+            "config_sha256": plan.config_sha256,
+            "protocol_sha256": plan.protocol_sha256,
+            "environment_sha256": plan.compatibility.environment_sha256,
+            "artifact_contract_sha256": content_sha256(
+                plan.artifact_contract.model_dump(mode="json")
+            ),
+        }
+        actual = self.contract.model_dump(
+            mode="json",
+            exclude={
+                "schema_version",
+                "plan_filename",
+                "network_isolation_required",
             },
         )
-    _assert_plugin_image(descriptor.plugin_image)
+        if actual != expected:
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
+                "channel contract identity does not exactly match sealed plan",
+                details={
+                    "expected_contract_identity": expected,
+                    "actual_contract_identity": actual,
+                },
+            )
+        config = dict(self.config)
+        if config != dict(plan.resolved_config) or content_sha256(config) != plan.config_sha256:
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
+                "channel config does not match sealed plan/config_sha256",
+            )
+        if not info.context or not info.context.get("skip_envelope_hash_validation", False):
+            self.assert_integrity()
+        return self
+
+    def canonical_payload(self) -> dict[str, Any]:
+        return self.model_dump(mode="json", exclude={"envelope_sha256"})
+
+    def assert_integrity(self) -> None:
+        expected = content_sha256(self.canonical_payload())
+        if self.envelope_sha256 != expected:
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
+                "channel envelope_sha256 does not match envelope content",
+                details={"expected": expected, "actual": self.envelope_sha256},
+            )
+
+    @classmethod
+    def seal(
+        cls,
+        *,
+        contract: TechniqueChannelContract,
+        plan: TechniquePlan,
+    ) -> TechniqueChannelEnvelope:
+        provisional = cls.model_validate(
+            {
+                "contract": contract,
+                "plan": plan,
+                "config": plan.resolved_config,
+                "envelope_sha256": "0" * 64,
+            },
+            context={"skip_envelope_hash_validation": True},
+        )
+        payload = provisional.canonical_payload()
+        return cls.model_validate({**payload, "envelope_sha256": content_sha256(payload)})
+
+
+def build_channel_contract(*, plan: TechniquePlan) -> TechniqueChannelContract:
+    external = plan.external_execution
+    if external is None or plan.training_load_plan is not None:
+        raise_technique_error(
+            TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
+            "channel contract requires an external-only TechniquePlan",
+        )
     return TechniqueChannelContract(
-        technique_id=descriptor.technique_id,
-        version=descriptor.version,
-        image_uri=descriptor.plugin_image.image_uri,
-        image_digest=descriptor.plugin_image.image_digest,
-        reviewed_source_commit=descriptor.reviewed_source.commit_sha,
-        reviewed_source_tree_sha256=descriptor.reviewed_source.source_tree_sha256,
-        descriptor_sha256=descriptor.descriptor_sha256,
-        config_sha256=config_sha256,
-        protocol_sha256=protocol_sha256,
+        technique_id=plan.technique_id,
+        version=plan.version,
+        image_uri=external.image_uri,
+        image_digest=external.image_digest,
+        reviewed_source_repository=external.reviewed_source_repository,
+        reviewed_source_commit=external.reviewed_source_commit,
+        reviewed_source_tree_sha256=external.reviewed_source_tree_sha256,
+        reviewed_source_review_record_sha256=(external.reviewed_source_review_record_sha256),
+        descriptor_sha256=plan.descriptor_sha256,
+        config_sha256=plan.config_sha256,
+        protocol_sha256=plan.protocol_sha256,
+        environment_sha256=plan.compatibility.environment_sha256,
+        artifact_contract_sha256=content_sha256(plan.artifact_contract.model_dump(mode="json")),
     )
 
 
-def write_channel_plan(
-    channel_dir: Path,
-    *,
-    contract: TechniqueChannelContract,
-    plan_payload: dict,
-) -> Path:
-    """Materialize the canonical technique plan file into a channel directory."""
+def write_channel_plan(channel_dir: Path, *, plan: TechniquePlan) -> Path:
+    """Write one verified envelope. Existing entries are never overwritten."""
     channel_dir.mkdir(parents=True, exist_ok=True)
-    path = channel_dir / TECHNIQUE_PLAN_FILENAME
-    existing = sorted(p.name for p in channel_dir.iterdir() if p.suffix == ".json")
-    if existing and existing != [TECHNIQUE_PLAN_FILENAME]:
+    existing = sorted(path.name for path in channel_dir.iterdir())
+    if existing:
         raise_technique_error(
             TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
-            "technique channel must contain only the canonical plan JSON",
+            "technique channel directory must be empty before materialization",
             details={"found": existing},
         )
-    envelope = {
-        "contract": contract.model_dump(mode="json"),
-        "plan": plan_payload,
-    }
-    path.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    envelope = TechniqueChannelEnvelope.seal(
+        contract=build_channel_contract(plan=plan),
+        plan=plan,
+    )
+    path = channel_dir / TECHNIQUE_PLAN_FILENAME
+    path.write_text(
+        json.dumps(envelope.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return path
 
 
-def load_channel_plan(channel_dir: Path) -> tuple[TechniqueChannelContract, dict]:
+def load_channel_plan(channel_dir: Path) -> TechniqueChannelEnvelope:
+    if not channel_dir.is_dir():
+        raise_technique_error(
+            TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
+            "technique channel directory is missing",
+        )
     path = channel_dir / TECHNIQUE_PLAN_FILENAME
-    json_files = sorted(p.name for p in channel_dir.iterdir() if p.suffix == ".json")
-    if json_files != [TECHNIQUE_PLAN_FILENAME] or not path.is_file():
+    entries = sorted(item.name for item in channel_dir.iterdir())
+    if entries != [TECHNIQUE_PLAN_FILENAME] or not path.is_file():
         raise_technique_error(
             TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
-            "technique channel must contain exactly technique_plan.json",
-            details={"found": json_files},
+            "technique channel must contain exactly one file: technique_plan.json",
+            details={"found": entries},
         )
-    envelope = json.loads(path.read_text(encoding="utf-8"))
-    contract = TechniqueChannelContract.model_validate(envelope["contract"])
-    plan = envelope["plan"]
-    if not isinstance(plan, dict):
-        raise_technique_error(
-            TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
-            "technique channel plan payload must be an object",
-        )
-    return contract, plan
-
-
-def forbid_control_plane_import(module_name: str) -> None:
-    """Hard gate: external technique modules must not be imported in-process."""
-    raise_technique_error(
-        TechniqueErrorCode.TECHNIQUE_EXTERNAL_IMPORT_FORBIDDEN,
-        "external technique code cannot be imported into the control plane",
-        details={
-            "module_name": module_name,
-            "execution": "external_container",
-            "required_path": "digest-pinned network-isolated container channel",
-        },
-    )
-
-
-def _assert_plugin_image(binding: PluginImageBinding) -> None:
     try:
-        identity = parse_digest_pinned_ecr_image(binding.image_uri)
-    except Exception as exc:
+        return TechniqueChannelEnvelope.model_validate(json.loads(path.read_text(encoding="utf-8")))
+    except TechniqueError:
+        raise
+    except (TypeError, ValueError) as exc:
         raise_technique_error(
-            TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID,
-            "plugin image URI must be a digest-pinned private ECR image",
-            details={"image_uri": binding.image_uri, "error": str(exc)},
-        )
-        return
-    if identity.digest != binding.image_digest:
-        raise_technique_error(
-            TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID,
-            "channel image digest mismatch",
-            details={
-                "image_uri_digest": identity.digest,
-                "image_digest": binding.image_digest,
-            },
+            TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID,
+            "technique channel envelope is malformed",
+            details={"error": str(exc)},
         )
 
 
@@ -161,8 +214,8 @@ __all__ = [
     "CHANNEL_SCHEMA_VERSION",
     "TECHNIQUE_PLAN_FILENAME",
     "TechniqueChannelContract",
+    "TechniqueChannelEnvelope",
     "build_channel_contract",
-    "forbid_control_plane_import",
     "load_channel_plan",
     "write_channel_plan",
 ]

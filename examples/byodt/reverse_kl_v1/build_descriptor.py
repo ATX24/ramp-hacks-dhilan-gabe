@@ -6,16 +6,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from distillery.techniques import (
+from distillery.techniques.capabilities import (
+    EvidenceRequirement,
+    TechniqueCapability,
+)
+from distillery.techniques.descriptor import (
     ArtifactContract,
     CostModel,
-    EvidenceRequirement,
     ExecutionKind,
     HardwareRequirements,
     PluginImageBinding,
     ReviewedSourceBinding,
     TeacherSignal,
-    TechniqueCapability,
     TechniqueDescriptor,
     TokenizerConstraint,
 )
@@ -34,8 +36,8 @@ def build() -> TechniqueDescriptor:
         version="1.0.0",
         display_name="Hackathon reverse KL v1",
         summary=(
-            "Example Bring-Your-Own technique: reverse KL distillation executed "
-            "only inside a digest-pinned network-isolated container."
+            "Example Bring-Your-Own technique: a plan-only reverse KL contract "
+            "for future network-isolated backend integration."
         ),
         execution=ExecutionKind.EXTERNAL_CONTAINER,
         teacher_signal=TeacherSignal.FULL_LOGITS,
@@ -53,9 +55,8 @@ def build() -> TechniqueDescriptor:
             EvidenceRequirement.TOKENIZER_FINGERPRINT_MATCH.value,
             EvidenceRequirement.SPECIAL_TOKEN_MAP_MATCH.value,
             EvidenceRequirement.CHAT_TEMPLATE_COMPATIBLE.value,
+            EvidenceRequirement.FULL_LOGITS_AVAILABLE.value,
             EvidenceRequirement.LOCAL_WHITE_BOX.value,
-            EvidenceRequirement.PLUGIN_IMAGE_DIGEST.value,
-            EvidenceRequirement.REVIEWED_SOURCE_BINDING.value,
             EvidenceRequirement.NETWORK_ISOLATION.value,
         ),
         config_schema=schema,

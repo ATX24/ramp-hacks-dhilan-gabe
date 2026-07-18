@@ -1,103 +1,33 @@
-"""Bring Your Own Distillation Technique (BYODT) deep module.
+"""Plan-only Bring Your Own Distillation Technique (BYODT) deep module.
 
-Public seam for callers and tests:
+Public seam:
 
-* ``TechniqueRegistry.with_builtins()`` — resolve built-in + external techniques
-* ``TechniqueRequest`` / ``CompatibilityContext`` — plan inputs
-* ``registry.plan(request, context)`` — deterministic ``TechniquePlan``
+* ``TechniqueRegistry.with_builtins()`` resolves built-ins and descriptors.
+* ``TechniqueRequest`` / ``CompatibilityContext`` are complete plan inputs.
+* ``registry.plan(request, context)`` returns one sealed ``TechniquePlan``.
+* ``recompute_protocol_hash(plan)`` independently verifies plan identity.
 
-External plugin code executes only inside its digest-pinned, network-isolated
-container channel. The control plane never imports plugin modules.
+External techniques remain plan-only until trainer/backend consumption is
+wired. Plans bind the image/source identity and isolation requirement a future
+backend must enforce; this package does not claim present runtime enforcement.
 """
 
 from __future__ import annotations
 
-from distillery.techniques.builtins import (
-    builtin_descriptors,
-    logit_v1_descriptor,
-    sequence_v1_descriptor,
-)
-from distillery.techniques.capabilities import (
-    EvidenceRequirement,
-    TechniqueCapability,
-)
-from distillery.techniques.channel import (
-    TechniqueChannelContract,
-    forbid_control_plane_import,
-    load_channel_plan,
-    write_channel_plan,
-)
-from distillery.techniques.compatibility import (
-    CompatibilityContext,
-    CompatibilityDecision,
-    negotiate_compatibility,
-)
-from distillery.techniques.descriptor import (
-    ArtifactContract,
-    CostModel,
-    ExecutionKind,
-    HardwareRequirements,
-    PluginImageBinding,
-    ReviewedSourceBinding,
-    TeacherSignal,
-    TechniqueDescriptor,
-    TokenizerConstraint,
-)
-from distillery.techniques.errors import (
-    TechniqueError,
-    TechniqueErrorCode,
-    TechniqueErrorPayload,
-)
-from distillery.techniques.lifecycle import TechniqueLifecycle, advance_lifecycle
-from distillery.techniques.protocol import compute_protocol_hash
-from distillery.techniques.registry import (
-    TechniqueRegistry,
-    TechniqueRequest,
-    load_registry,
-)
-from distillery.techniques.runtime import (
-    ExternalExecutionPlan,
-    LossContract,
-    RuntimeAdapter,
-    TechniquePlan,
-)
-from distillery.techniques.schema import canonical_config_hash, validate_config_against_schema
+from distillery.techniques.compatibility import CompatibilityContext
+from distillery.techniques.descriptor import TechniqueDescriptor
+from distillery.techniques.errors import TechniqueError, TechniqueErrorCode
+from distillery.techniques.protocol import recompute_protocol_hash
+from distillery.techniques.registry import TechniqueRegistry, TechniqueRequest
+from distillery.techniques.runtime import TechniquePlan
 
 __all__ = [
-    "ArtifactContract",
     "CompatibilityContext",
-    "CompatibilityDecision",
-    "CostModel",
-    "EvidenceRequirement",
-    "ExecutionKind",
-    "ExternalExecutionPlan",
-    "HardwareRequirements",
-    "LossContract",
-    "PluginImageBinding",
-    "ReviewedSourceBinding",
-    "RuntimeAdapter",
-    "TeacherSignal",
-    "TechniqueCapability",
-    "TechniqueChannelContract",
     "TechniqueDescriptor",
     "TechniqueError",
     "TechniqueErrorCode",
-    "TechniqueErrorPayload",
-    "TechniqueLifecycle",
     "TechniquePlan",
     "TechniqueRegistry",
     "TechniqueRequest",
-    "TokenizerConstraint",
-    "advance_lifecycle",
-    "builtin_descriptors",
-    "canonical_config_hash",
-    "compute_protocol_hash",
-    "forbid_control_plane_import",
-    "load_channel_plan",
-    "load_registry",
-    "logit_v1_descriptor",
-    "negotiate_compatibility",
-    "sequence_v1_descriptor",
-    "validate_config_against_schema",
-    "write_channel_plan",
+    "recompute_protocol_hash",
 ]

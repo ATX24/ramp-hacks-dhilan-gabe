@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 from distillery.contracts.hashing import content_sha256
-from distillery.techniques import TechniqueDescriptor, sequence_v1_descriptor
+from distillery.techniques import TechniqueDescriptor
+from distillery.techniques.builtins import sequence_v1_descriptor
 
 
 def test_seal_roundtrip_preserves_hash() -> None:

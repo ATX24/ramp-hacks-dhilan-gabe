@@ -31,10 +31,9 @@ class EvidenceRequirement(StrEnum):
     SPECIAL_TOKEN_MAP_MATCH = "special_token_map_match"
     CHAT_TEMPLATE_COMPATIBLE = "chat_template_compatible"
     MEMORY_DRY_RUN_OK = "memory_dry_run_ok"
+    FULL_LOGITS_AVAILABLE = "full_logits_available"
     LOCAL_WHITE_BOX = "local_white_box"
     USABLE_RESPONSES = "usable_responses"
-    PLUGIN_IMAGE_DIGEST = "plugin_image_digest"
-    REVIEWED_SOURCE_BINDING = "reviewed_source_binding"
     NETWORK_ISOLATION = "network_isolation"
 
 

@@ -6,10 +6,10 @@ import re
 from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any, Literal, Self
+from urllib.parse import urlparse
 
 from pydantic import Field, StrictStr, ValidationInfo, field_validator, model_validator
 
-from distillery.backends.safety import parse_digest_pinned_ecr_image
 from distillery.contracts.base import FrozenJsonObject, FrozenModel
 from distillery.contracts.hashing import (
     GitCommitSha,
@@ -18,16 +18,26 @@ from distillery.contracts.hashing import (
     content_sha256,
 )
 from distillery.techniques.capabilities import (
+    EvidenceRequirement,
+    TechniqueCapability,
     require_known_capabilities,
     require_known_evidence,
 )
 from distillery.techniques.errors import TechniqueErrorCode, raise_technique_error
+from distillery.techniques.schema import validate_schema_definition
 
 TECHNIQUE_ID_PATTERN = re.compile(
     r"^(?:sequence\.v1|logit\.v1|[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)$"
 )
 TECHNIQUE_VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 DESCRIPTOR_SCHEMA_VERSION: Literal["distillery.technique.v1"] = "distillery.technique.v1"
+RESERVED_BUILTIN_IDS = frozenset({"sequence.v1", "logit.v1"})
+_OUTPUT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_ECR_IMAGE_RE = re.compile(
+    r"^[0-9]{12}\.dkr\.ecr(?:-fips)?\.[a-z0-9-]+\.amazonaws\.com"
+    r"(?:\.cn)?/[a-z0-9]+(?:[._/-][a-z0-9]+)*@"
+    r"(?P<digest>sha256:[0-9a-f]{64})$"
+)
 
 
 class TeacherSignal(StrEnum):
@@ -57,6 +67,35 @@ class ArtifactContract(FrozenModel):
     optional_outputs: tuple[StrictStr, ...] = ()
     checksum_manifest: Literal["SHA256SUMS"] = "SHA256SUMS"
 
+    @model_validator(mode="after")
+    def _executable_contract(self) -> Self:
+        required = tuple(self.required_outputs)
+        optional = tuple(self.optional_outputs)
+        if self.checksum_manifest not in required:
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_ARTIFACT_CONTRACT_MISMATCH,
+                "checksum_manifest must be one of artifact_contract.required_outputs",
+                details={"checksum_manifest": self.checksum_manifest},
+            )
+        all_outputs = (*required, *optional)
+        if len(set(all_outputs)) != len(all_outputs):
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_ARTIFACT_CONTRACT_MISMATCH,
+                "artifact output names must be unique and non-overlapping",
+            )
+        invalid = sorted(
+            name
+            for name in all_outputs
+            if _OUTPUT_NAME_PATTERN.fullmatch(name) is None or name in {".", ".."}
+        )
+        if invalid:
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_ARTIFACT_CONTRACT_MISMATCH,
+                "artifact output names must be safe relative names",
+                details={"invalid_outputs": invalid},
+            )
+        return self
+
 
 class HardwareRequirements(FrozenModel):
     min_gpu_memory_gib: int = Field(ge=1, le=1024)
@@ -85,20 +124,19 @@ class PluginImageBinding(FrozenModel):
                 "plugin image URI must be digest-pinned (@sha256:...), never a tag",
                 details={"image_uri": self.image_uri},
             )
-        try:
-            identity = parse_digest_pinned_ecr_image(self.image_uri)
-        except Exception as exc:
+        match = _ECR_IMAGE_RE.fullmatch(self.image_uri)
+        if match is None:
             raise_technique_error(
                 TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID,
                 "plugin image URI must be a digest-pinned private ECR image",
-                details={"image_uri": self.image_uri, "error": str(exc)},
+                details={"image_uri": self.image_uri},
             )
-        if identity.digest != self.image_digest:
+        if match.group("digest") != self.image_digest:
             raise_technique_error(
                 TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID,
                 "plugin image_uri digest does not match image_digest field",
                 details={
-                    "image_uri_digest": identity.digest,
+                    "image_uri_digest": match.group("digest"),
                     "image_digest": self.image_digest,
                 },
             )
@@ -112,6 +150,24 @@ class ReviewedSourceBinding(FrozenModel):
     commit_sha: GitCommitSha
     source_tree_sha256: Sha256Hex
     review_record_sha256: Sha256Hex
+
+    @field_validator("repository_uri")
+    @classmethod
+    def _immutable_repository_uri(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                "repository_uri must be an HTTPS repository URL without "
+                "credentials, query, or fragment"
+            )
+        return value
 
 
 class TechniqueDescriptor(FrozenModel):
@@ -160,12 +216,19 @@ class TechniqueDescriptor(FrozenModel):
         require_known_capabilities(self.capabilities)
         require_known_evidence(self.evidence_requirements)
         _validate_config_schema_shape(self.config_schema)
+        validate_schema_definition(self.config_schema)
         if self.execution is ExecutionKind.BUILTIN:
             if self.plugin_image is not None or self.reviewed_source is not None:
                 raise ValueError("builtin techniques cannot bind plugin/source images")
-            if self.technique_id not in {"sequence.v1", "logit.v1"}:
+            if self.technique_id not in RESERVED_BUILTIN_IDS:
                 raise ValueError("builtin execution is reserved for sequence.v1/logit.v1")
         else:
+            if self.technique_id in RESERVED_BUILTIN_IDS:
+                raise_technique_error(
+                    TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID,
+                    "built-in technique IDs are reserved across all versions",
+                    details={"technique_id": self.technique_id},
+                )
             if self.plugin_image is None or self.reviewed_source is None:
                 raise ValueError(
                     "external_container techniques require plugin_image and reviewed_source"
@@ -176,9 +239,48 @@ class TechniqueDescriptor(FrozenModel):
                 raise ValueError(
                     "external_container techniques must declare network_isolated_plugin"
                 )
+        self._cross_validate_signal_contract()
         if not info.context or not info.context.get("skip_descriptor_hash_validation", False):
             self.assert_integrity()
         return self
+
+    def _cross_validate_signal_contract(self) -> None:
+        capabilities = set(self.capabilities)
+        evidence = set(self.evidence_requirements)
+        if self.teacher_signal is TeacherSignal.FULL_LOGITS:
+            required_capabilities = {
+                TechniqueCapability.FULL_LOGITS.value,
+                TechniqueCapability.LOCAL_WHITE_BOX.value,
+            }
+            required_evidence = {
+                EvidenceRequirement.FULL_LOGITS_AVAILABLE.value,
+                EvidenceRequirement.TOKENIZER_FINGERPRINT_MATCH.value,
+                EvidenceRequirement.LOCAL_WHITE_BOX.value,
+            }
+            if self.tokenizer_constraint is not TokenizerConstraint.EXACT_MATCH:
+                raise_technique_error(
+                    TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID,
+                    "full_logits techniques require tokenizer_constraint=exact_match",
+                )
+            missing_capabilities = sorted(required_capabilities - capabilities)
+            missing_evidence = sorted(required_evidence - evidence)
+            if missing_capabilities or missing_evidence:
+                raise_technique_error(
+                    TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID,
+                    "full_logits technique declarations are internally inconsistent",
+                    details={
+                        "missing_capabilities": missing_capabilities,
+                        "missing_evidence": missing_evidence,
+                    },
+                )
+        if (
+            self.teacher_signal is TeacherSignal.HARD_TARGET_SEQUENCE
+            and TechniqueCapability.HARD_TARGET_SEQUENCE.value not in capabilities
+        ):
+            raise_technique_error(
+                TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID,
+                "hard_target_sequence signal requires matching capability",
+            )
 
     def canonical_payload(self) -> dict[str, Any]:
         return self.model_dump(mode="json", exclude={"descriptor_sha256"})

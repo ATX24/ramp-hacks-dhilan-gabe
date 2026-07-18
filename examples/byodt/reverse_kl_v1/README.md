@@ -12,13 +12,14 @@ This is a plan-only SDK example for Bring Your Own Distillation Technique.
 ## Control-plane contract
 
 External technique code is **not** imported into Distillery. Planning happens in
-the control plane; training executes only inside the digest-pinned plugin image
-through the network-isolated `technique_plan.json` channel.
+the control plane and can produce a content-addressed `technique_plan.json`.
+No trainer/backend consumes that channel yet. Future integration must enforce
+the sealed digest, source identity, artifact contract, and network isolation.
 
 ## Validate / register / plan-only
 
 ```bash
-uv run python scripts/techniques/byodt_ctl.py validate \
+uv run python scripts/techniques/byodt_ctl.py validate-descriptor \
   examples/byodt/reverse_kl_v1/technique.json
 
 uv run python scripts/techniques/byodt_ctl.py register \

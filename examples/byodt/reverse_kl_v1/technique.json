@@ -76,7 +76,7 @@
     "default_max_runtime_seconds": 2700,
     "estimator": "runtime_hours_x_hourly"
   },
-  "descriptor_sha256": "8c52c2986afb91fe76003fa752d016d0fff29e77834dfd81266e5f1b08bc6754",
+  "descriptor_sha256": "983b093d4fc67f7301d8280b200ab9f2c29c2cff51ce866e1efab5615f557cf8",
   "display_name": "Hackathon reverse KL v1",
   "evidence_requirements": [
     "pinned_student_revision",
@@ -84,9 +84,8 @@
     "tokenizer_fingerprint_match",
     "special_token_map_match",
     "chat_template_compatible",
+    "full_logits_available",
     "local_white_box",
-    "plugin_image_digest",
-    "reviewed_source_binding",
     "network_isolation"
   ],
   "execution": "external_container",
@@ -114,7 +113,7 @@
     "source_tree_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
   },
   "schema_version": "distillery.technique.v1",
-  "summary": "Example Bring-Your-Own technique: reverse KL distillation executed only inside a digest-pinned network-isolated container.",
+  "summary": "Example Bring-Your-Own technique: a plan-only reverse KL contract for future network-isolated backend integration.",
   "teacher_signal": "full_logits",
   "technique_id": "hackathon.dhilan.reverse_kl",
   "tokenizer_constraint": "exact_match",

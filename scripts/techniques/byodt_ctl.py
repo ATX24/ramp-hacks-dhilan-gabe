@@ -14,10 +14,8 @@ from distillery.techniques import (
     TechniqueError,
     TechniqueRegistry,
     TechniqueRequest,
-    load_channel_plan,
-    write_channel_plan,
 )
-from distillery.techniques.channel import TechniqueChannelContract
+from distillery.techniques.channel import load_channel_plan, write_channel_plan
 
 
 def _load_json(path: Path) -> dict:
@@ -27,7 +25,7 @@ def _load_json(path: Path) -> dict:
     return payload
 
 
-def cmd_validate(args: argparse.Namespace) -> int:
+def cmd_validate_descriptor(args: argparse.Namespace) -> int:
     payload = _load_json(Path(args.descriptor))
     if "descriptor_sha256" in payload:
         descriptor = TechniqueDescriptor.model_validate(payload)
@@ -84,11 +82,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
         registry.register_from_path(Path(args.descriptor))
     if args.registry_dir:
         for path in sorted(Path(args.registry_dir).glob("*.json")):
-            try:
-                registry.register_from_path(path)
-            except TechniqueError as exc:
-                if exc.code.value != "TECHNIQUE_VERSION_COLLISION":
-                    raise
+            registry.register_from_path(path)
     request = TechniqueRequest(
         technique_id=args.technique_id,
         version=args.version,
@@ -99,13 +93,12 @@ def cmd_plan(args: argparse.Namespace) -> int:
     payload = plan.model_dump(mode="json")
     if args.channel_dir:
         channel_dir = Path(args.channel_dir)
-        if plan.channel_contract is None:
-            raise SystemExit("plan has no channel_contract (builtin techniques)")
-        contract = TechniqueChannelContract.model_validate(dict(plan.channel_contract))
-        write_channel_plan(channel_dir, contract=contract, plan_payload=payload)
-        loaded_contract, _loaded_plan = load_channel_plan(channel_dir)
+        if plan.external_execution is None:
+            raise SystemExit("plan has no external execution channel")
+        write_channel_plan(channel_dir, plan=plan)
+        envelope = load_channel_plan(channel_dir)
         payload["channel_written"] = str(channel_dir)
-        payload["channel_hash"] = loaded_contract.channel_hash()
+        payload["channel_hash"] = envelope.envelope_sha256
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
@@ -117,9 +110,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    validate = sub.add_parser("validate", help="Validate a technique descriptor")
+    validate = sub.add_parser(
+        "validate-descriptor",
+        help="Validate descriptor/schema only (use plan for compatibility preflight)",
+    )
     validate.add_argument("descriptor", help="Path to technique JSON")
-    validate.set_defaults(func=cmd_validate)
+    validate.set_defaults(func=cmd_validate_descriptor)
 
     register = sub.add_parser("register", help="Register a sealed external descriptor")
     register.add_argument("descriptor", help="Path to technique JSON")

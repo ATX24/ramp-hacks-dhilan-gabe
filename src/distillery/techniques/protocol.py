@@ -1,91 +1,59 @@
-"""Deterministic protocol hashing for planned techniques."""
+"""Canonical recomputation and verification for sealed technique plans."""
 
 from __future__ import annotations
 
+import hmac
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from distillery.contracts.hashing import content_sha256
-from distillery.techniques.compatibility import CompatibilityDecision
-from distillery.techniques.descriptor import TechniqueDescriptor
 from distillery.techniques.errors import TechniqueErrorCode, raise_technique_error
 
-PROTOCOL_SCHEMA_VERSION = "distillery.technique.protocol.v1"
+if TYPE_CHECKING:
+    from distillery.techniques.runtime import TechniquePlan
+
+PROTOCOL_SCHEMA_VERSION = "distillery.technique.protocol.v2"
 
 
-def protocol_payload(
-    *,
-    descriptor: TechniqueDescriptor,
-    config_sha256: str,
-    compatibility: CompatibilityDecision,
-    channel_contract: Mapping[str, Any] | None,
+def canonical_protocol_payload(
+    plan: TechniquePlan | Mapping[str, Any],
 ) -> dict[str, Any]:
+    if hasattr(plan, "model_dump"):
+        payload = plan.model_dump(mode="json")
+    else:
+        payload = dict(plan)
+    payload.pop("protocol_sha256", None)
     return {
         "schema_version": PROTOCOL_SCHEMA_VERSION,
-        "technique_id": descriptor.technique_id,
-        "version": descriptor.version,
-        "descriptor_sha256": descriptor.descriptor_sha256,
-        "config_sha256": config_sha256,
-        "compatibility": compatibility.model_dump(mode="json"),
-        "channel_contract": dict(channel_contract) if channel_contract is not None else None,
+        "resolved_plan": payload,
     }
 
 
-def compute_protocol_hash(
-    *,
-    descriptor: TechniqueDescriptor,
-    config_sha256: str,
-    compatibility: CompatibilityDecision,
-    channel_contract: Mapping[str, Any] | None = None,
+def recompute_protocol_hash(
+    plan: TechniquePlan | Mapping[str, Any],
 ) -> str:
-    """Content-addressed hash of the sealed planning protocol."""
-    return content_sha256(
-        protocol_payload(
-            descriptor=descriptor,
-            config_sha256=config_sha256,
-            compatibility=compatibility,
-            channel_contract=channel_contract,
-        )
-    )
+    """Recompute the hash from the complete resolved plan identity."""
+    return content_sha256(canonical_protocol_payload(plan))
 
 
-def assert_protocol_deterministic(
-    *,
-    descriptor: TechniqueDescriptor,
-    config_sha256: str,
-    compatibility: CompatibilityDecision,
-    channel_contract: Mapping[str, Any] | None = None,
-) -> str:
-    """Compute the protocol hash twice; diverge fails loud."""
-    first = compute_protocol_hash(
-        descriptor=descriptor,
-        config_sha256=config_sha256,
-        compatibility=compatibility,
-        channel_contract=channel_contract,
-    )
-    second = compute_protocol_hash(
-        descriptor=descriptor,
-        config_sha256=config_sha256,
-        compatibility=compatibility,
-        channel_contract=channel_contract,
-    )
-    if first != second:
+def verify_protocol_hash(plan: TechniquePlan) -> None:
+    expected = recompute_protocol_hash(plan)
+    if not hmac.compare_digest(plan.protocol_sha256, expected):
         raise_technique_error(
             TechniqueErrorCode.TECHNIQUE_NONDETERMINISTIC,
-            "technique protocol hash is non-deterministic",
+            "protocol_sha256 does not match the complete resolved plan identity",
             details={
-                "technique_id": descriptor.technique_id,
-                "version": descriptor.version,
-                "first": first,
-                "second": second,
+                "technique_id": plan.technique_id,
+                "version": plan.version,
+                "expected": expected,
+                "actual": plan.protocol_sha256,
             },
         )
-    return first
 
 
 __all__ = [
     "PROTOCOL_SCHEMA_VERSION",
-    "assert_protocol_deterministic",
-    "compute_protocol_hash",
-    "protocol_payload",
+    "canonical_protocol_payload",
+    "recompute_protocol_hash",
+    "verify_protocol_hash",
 ]

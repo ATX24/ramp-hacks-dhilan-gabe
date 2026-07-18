@@ -35,7 +35,7 @@ class TechniqueErrorCode(StrEnum):
 # crossing the existing API/SDK error seam. Local codes remain authoritative
 # inside the techniques module.
 _DISTILLERY_CODE_MAP: dict[TechniqueErrorCode, DistilleryErrorCode] = {
-    TechniqueErrorCode.TECHNIQUE_UNKNOWN: DistilleryErrorCode.RECIPE_NOT_IMPLEMENTED,
+    TechniqueErrorCode.TECHNIQUE_UNKNOWN: DistilleryErrorCode.TECHNIQUE_UNKNOWN,
     TechniqueErrorCode.TECHNIQUE_VERSION_COLLISION: DistilleryErrorCode.SCHEMA_MISMATCH,
     TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID: DistilleryErrorCode.SCHEMA_MISMATCH,
     TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_MUTABLE: DistilleryErrorCode.ARTIFACT_INTEGRITY_FAILED,
@@ -47,9 +47,9 @@ _DISTILLERY_CODE_MAP: dict[TechniqueErrorCode, DistilleryErrorCode] = {
     TechniqueErrorCode.TECHNIQUE_ARTIFACT_CONTRACT_MISMATCH: (
         DistilleryErrorCode.ARTIFACT_INTEGRITY_FAILED
     ),
-    TechniqueErrorCode.TECHNIQUE_NONDETERMINISTIC: DistilleryErrorCode.SCHEMA_MISMATCH,
+    TechniqueErrorCode.TECHNIQUE_NONDETERMINISTIC: (DistilleryErrorCode.TECHNIQUE_NONDETERMINISTIC),
     TechniqueErrorCode.TECHNIQUE_EXTERNAL_IMPORT_FORBIDDEN: (
-        DistilleryErrorCode.CAPABILITY_UNAVAILABLE
+        DistilleryErrorCode.TECHNIQUE_EXTERNAL_IMPORT_FORBIDDEN
     ),
     TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID: DistilleryErrorCode.AWS_SUBMISSION_FAILED,
     TechniqueErrorCode.TECHNIQUE_LIFECYCLE_INVALID: DistilleryErrorCode.INVALID_TRANSITION,

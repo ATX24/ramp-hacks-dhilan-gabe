@@ -35,7 +35,8 @@ Unsupported catalog methods return `RECIPE_NOT_IMPLEMENTED`. No silent downgrade
 `src/distillery/techniques/` is a deep module at a clean seam: immutable
 versioned technique descriptors, registry resolution without silent fallback,
 and runtime adapters that yield the existing training plan/loss contract.
-External techniques execute only in digest-pinned network-isolated containers.
+External techniques are plan-only: plans bind digest-pinned image/source and
+network-isolation requirements that a future backend must enforce.
 See [byodt.md](./byodt.md).
 
 ## Four UI stages (exactly)

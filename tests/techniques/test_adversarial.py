@@ -1,4 +1,4 @@
-"""Adversarial BYODT tests: fail closed, no silent fallback."""
+"""Adversarial regressions through the public BYODT planning seam."""
 
 from __future__ import annotations
 
@@ -8,40 +8,41 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from distillery.contracts.errors import DistilleryErrorCode
 from distillery.techniques import (
+    CompatibilityContext,
+    TechniqueDescriptor,
+    TechniqueError,
+    TechniqueErrorCode,
+    TechniquePlan,
+    TechniqueRegistry,
+    TechniqueRequest,
+    recompute_protocol_hash,
+)
+from distillery.techniques.capabilities import (
+    EvidenceRequirement,
+    TechniqueCapability,
+)
+from distillery.techniques.descriptor import (
+    DESCRIPTOR_SCHEMA_VERSION,
     ArtifactContract,
     CostModel,
-    EvidenceRequirement,
     ExecutionKind,
     HardwareRequirements,
     PluginImageBinding,
     ReviewedSourceBinding,
     TeacherSignal,
-    TechniqueCapability,
-    TechniqueDescriptor,
-    TechniqueError,
-    TechniqueErrorCode,
-    TechniqueRegistry,
-    TechniqueRequest,
     TokenizerConstraint,
-    forbid_control_plane_import,
 )
-from distillery.techniques.channel import write_channel_plan
-from distillery.techniques.descriptor import DESCRIPTOR_SCHEMA_VERSION
+from distillery.techniques.errors import technique_error
 
 
-def _base_external_kwargs(**overrides):
-    schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["seed"],
-        "properties": {"seed": {"type": "integer", "minimum": 0}},
-    }
+def _external_kwargs(**overrides):
     base = {
         "technique_id": "hackathon.dhilan.reverse_kl",
         "version": "1.0.0",
         "display_name": "reverse KL",
-        "summary": "external technique",
+        "summary": "plan-only external technique",
         "execution": ExecutionKind.EXTERNAL_CONTAINER,
         "teacher_signal": TeacherSignal.FULL_LOGITS,
         "tokenizer_constraint": TokenizerConstraint.EXACT_MATCH,
@@ -54,11 +55,18 @@ def _base_external_kwargs(**overrides):
         ),
         "evidence_requirements": (
             EvidenceRequirement.PINNED_STUDENT_REVISION.value,
-            EvidenceRequirement.PLUGIN_IMAGE_DIGEST.value,
-            EvidenceRequirement.REVIEWED_SOURCE_BINDING.value,
+            EvidenceRequirement.PINNED_TEACHER_REVISION.value,
+            EvidenceRequirement.TOKENIZER_FINGERPRINT_MATCH.value,
+            EvidenceRequirement.FULL_LOGITS_AVAILABLE.value,
+            EvidenceRequirement.LOCAL_WHITE_BOX.value,
             EvidenceRequirement.NETWORK_ISOLATION.value,
         ),
-        "config_schema": schema,
+        "config_schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["seed"],
+            "properties": {"seed": {"type": "integer", "minimum": 0}},
+        },
         "artifact_contract": ArtifactContract(
             required_outputs=("adapter", "tokenizer", "SHA256SUMS"),
         ),
@@ -87,248 +95,357 @@ def _base_external_kwargs(**overrides):
     return base
 
 
-def test_unknown_capability_rejected() -> None:
-    with pytest.raises(TechniqueError) as excinfo:
+def _request(technique_id: str, config: dict) -> TechniqueRequest:
+    return TechniqueRequest(
+        technique_id=technique_id,
+        version="1.0.0",
+        config=config,
+    )
+
+
+def test_unknown_capability_and_impossible_signal_rejected() -> None:
+    with pytest.raises(TechniqueError) as unknown:
         TechniqueDescriptor.seal(
-            **_base_external_kwargs(
+            **_external_kwargs(
                 capabilities=(
                     TechniqueCapability.FULL_LOGITS.value,
-                    "telepathy",
                     TechniqueCapability.NETWORK_ISOLATED_PLUGIN.value,
+                    "telepathy",
                 )
             )
         )
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_CAPABILITY_UNKNOWN
+    assert unknown.value.code is TechniqueErrorCode.TECHNIQUE_CAPABILITY_UNKNOWN
+    with pytest.raises(TechniqueError) as impossible:
+        TechniqueDescriptor.seal(
+            **_external_kwargs(
+                tokenizer_constraint=TokenizerConstraint.STUDENT_ONLY,
+                capabilities=(TechniqueCapability.NETWORK_ISOLATED_PLUGIN.value,),
+                evidence_requirements=(EvidenceRequirement.NETWORK_ISOLATION.value,),
+            )
+        )
+    assert impossible.value.code is TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID
 
 
-def test_schema_config_mismatch(registry, sequence_context) -> None:
+def test_invalid_schema_and_secret_fields_rejected(
+    registry: TechniqueRegistry,
+    logit_context: CompatibilityContext,
+) -> None:
+    with pytest.raises(TechniqueError) as invalid:
+        TechniqueDescriptor.seal(
+            **_external_kwargs(
+                config_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"seed": {"type": 123}},
+                }
+            )
+        )
+    assert invalid.value.code is TechniqueErrorCode.TECHNIQUE_SCHEMA_MISMATCH
+    with pytest.raises(TechniqueError, match="secret-like"):
+        TechniqueDescriptor.seal(
+            **_external_kwargs(
+                config_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"api_key": {"type": "string"}},
+                }
+            )
+        )
+    descriptor = TechniqueDescriptor.seal(
+        **_external_kwargs(
+            config_schema={
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["options"],
+                "properties": {
+                    "options": {
+                        "type": "object",
+                        "additionalProperties": True,
+                    }
+                },
+            }
+        )
+    )
+    registry.register(descriptor)
+    with pytest.raises(TechniqueError, match="secret-like"):
+        registry.plan(
+            _request(
+                descriptor.technique_id,
+                {"options": {"access_token": "must-not-enter-channel"}},
+            ),
+            logit_context,
+        )
+
+
+def test_schema_config_mismatch(
+    registry: TechniqueRegistry,
+    sequence_context: CompatibilityContext,
+) -> None:
     with pytest.raises(TechniqueError) as excinfo:
         registry.plan(
-            TechniqueRequest(
-                technique_id="sequence.v1",
-                version="1.0.0",
-                config={"max_length": 512},  # missing required fields
-            ),
+            _request("sequence.v1", {"max_length": 512}),
             sequence_context,
         )
     assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_CONFIG_MISMATCH
 
 
-def test_mutable_descriptor_hash_tamper_detected() -> None:
-    descriptor = TechniqueDescriptor.seal(**_base_external_kwargs())
-    with pytest.raises(TechniqueError) as excinfo:
-        TechniqueDescriptor.model_validate(
-            {
-                **descriptor.model_dump(mode="json"),
-                "summary": "tampered summary",
-                # keep old hash → integrity failure
-            }
-        )
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID
-
-
-def test_frozen_descriptor_rejects_assignment() -> None:
-    descriptor = TechniqueDescriptor.seal(**_base_external_kwargs())
+def test_descriptor_is_frozen_and_hash_bound() -> None:
+    descriptor = TechniqueDescriptor.seal(**_external_kwargs())
     with pytest.raises(ValidationError):
         descriptor.summary = "mutated"  # type: ignore[misc]
+    with pytest.raises(TechniqueError) as tampered:
+        TechniqueDescriptor.model_validate(
+            {**descriptor.model_dump(mode="json"), "summary": "tampered"}
+        )
+    assert tampered.value.code is TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID
 
 
-def test_digest_tag_confusion_rejected() -> None:
-    with pytest.raises(TechniqueError) as excinfo:
+def test_digest_tag_and_field_confusion_rejected() -> None:
+    with pytest.raises(TechniqueError) as tag:
         PluginImageBinding(
             image_uri="123456789012.dkr.ecr.us-east-1.amazonaws.com/plugin:latest",
             image_digest=f"sha256:{'c' * 64}",
         )
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID
-
-    with pytest.raises(TechniqueError):
-        TechniqueDescriptor.seal(
-            **_base_external_kwargs(
-                plugin_image={
-                    "image_uri": ("123456789012.dkr.ecr.us-east-1.amazonaws.com/plugin:latest"),
-                    "image_digest": f"sha256:{'c' * 64}",
-                }
-            )
-        )
-
-
-def test_digest_field_uri_mismatch() -> None:
-    with pytest.raises(TechniqueError) as excinfo:
+    assert tag.value.code is TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID
+    with pytest.raises(TechniqueError) as mismatch:
         PluginImageBinding(
             image_uri=(f"123456789012.dkr.ecr.us-east-1.amazonaws.com/plugin@sha256:{'c' * 64}"),
             image_digest=f"sha256:{'a' * 64}",
         )
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID
+    assert mismatch.value.code is TechniqueErrorCode.TECHNIQUE_DIGEST_INVALID
 
 
-def test_version_collision(registry, external_descriptor) -> None:
-    registry.register(external_descriptor)
-    with pytest.raises(TechniqueError) as excinfo:
-        registry.register(external_descriptor)
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_VERSION_COLLISION
-
-
-def test_incompatible_tokenizer_for_logit(registry, logit_context) -> None:
-    bad = logit_context.model_copy(update={"tokenizer_sha256_teacher": "9" * 64})
-    with pytest.raises(TechniqueError) as excinfo:
-        registry.plan(
-            TechniqueRequest(
-                technique_id="logit.v1",
-                version="1.0.0",
-                config={
-                    "max_length": 512,
-                    "max_completion": 160,
-                    "seed": 17,
-                    "temperature": 2.0,
-                    "kd_weight": 0.7,
-                    "hard_ce_weight": 0.3,
-                },
-            ),
-            bad,
-        )
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_INCOMPATIBLE
-    assert "tokenizer" in str(excinfo.value.payload.details).lower() or any(
-        "tokenizer" in reason
-        for reason in excinfo.value.payload.details.get("rejected_reasons", [])
-    )
-
-
-def test_incompatible_logit_access(registry, logit_context) -> None:
-    bad = logit_context.model_copy(update={"local_white_box": False})
-    with pytest.raises(TechniqueError) as excinfo:
-        registry.plan(
-            TechniqueRequest(
-                technique_id="logit.v1",
-                version="1.0.0",
-                config={
-                    "max_length": 512,
-                    "max_completion": 160,
-                    "seed": 17,
-                    "temperature": 2.0,
-                    "kd_weight": 0.7,
-                    "hard_ce_weight": 0.3,
-                },
-            ),
-            bad,
-        )
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_INCOMPATIBLE
-
-
-def test_artifact_contract_mismatch_on_seal() -> None:
+def test_reviewed_source_requires_immutable_https_shape() -> None:
     with pytest.raises(ValidationError):
-        ArtifactContract(required_outputs=())
-
-
-def test_external_without_network_isolation_rejected(
-    registry, logit_context, external_descriptor
-) -> None:
-    registry.register(external_descriptor)
-    bad = logit_context.model_copy(update={"network_isolation": False})
-    with pytest.raises(TechniqueError) as excinfo:
-        registry.plan(
-            TechniqueRequest(
-                technique_id="hackathon.dhilan.reverse_kl",
-                version="1.0.0",
-                config={
-                    "max_length": 512,
-                    "max_completion": 160,
-                    "seed": 17,
-                    "temperature": 2.0,
-                },
-            ),
-            bad,
+        ReviewedSourceBinding(
+            repository_uri="https://user:password@example.com/repo?ref=main",
+            commit_sha="d" * 40,
+            source_tree_sha256="e" * 64,
+            review_record_sha256="f" * 64,
         )
+
+
+def test_divergent_collision_and_builtin_squatting(
+    registry: TechniqueRegistry,
+    external_descriptor: TechniqueDescriptor,
+) -> None:
+    first = registry.register(external_descriptor)
+    assert registry.register(external_descriptor) is first
+    payload = external_descriptor.canonical_payload()
+    payload["summary"] = "divergent implementation"
+    divergent = TechniqueDescriptor.seal(**payload)
+    with pytest.raises(TechniqueError) as collision:
+        registry.register(divergent)
+    assert collision.value.code is TechniqueErrorCode.TECHNIQUE_VERSION_COLLISION
+    with pytest.raises(TechniqueError) as squat:
+        TechniqueDescriptor.seal(**_external_kwargs(technique_id="sequence.v1", version="99.0.0"))
+    assert squat.value.code is TechniqueErrorCode.TECHNIQUE_DESCRIPTOR_INVALID
+
+
+def test_missing_instance_type_fails_closed() -> None:
+    with pytest.raises(ValidationError):
+        CompatibilityContext.model_validate(
+            {
+                "backend_kind": "local",
+                "student_model_id": "student",
+                "student_revision": "a" * 40,
+                "tokenizer_sha256_student": "1" * 64,
+                "chat_template_sha256_student": "2" * 64,
+                "network_isolation": True,
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "tokenizer_sha256_teacher",
+        "chat_template_sha256_teacher",
+        "special_token_map_match",
+        "full_logits_available",
+        "local_white_box",
+        "memory_dry_run_ok",
+    ],
+)
+def test_required_logit_claim_absence_fails_closed(
+    field: str,
+    registry: TechniqueRegistry,
+    logit_context: CompatibilityContext,
+    logit_config: dict,
+) -> None:
+    bad = logit_context.model_copy(update={field: None})
+    with pytest.raises(TechniqueError) as excinfo:
+        registry.plan(_request("logit.v1", logit_config), bad)
     assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_INCOMPATIBLE
 
 
-def test_protocol_hash_deterministic(registry, sequence_context) -> None:
-    request = TechniqueRequest(
-        technique_id="sequence.v1",
-        version="1.0.0",
-        config={"max_length": 512, "max_completion": 160, "seed": 17},
-    )
-    first = registry.plan(request, sequence_context)
-    second = registry.plan(request, sequence_context)
-    assert first.protocol_sha256 == second.protocol_sha256
-    assert first.plan_hash() == second.plan_hash()
+def test_config_identity_has_no_ambient_fallback(
+    registry: TechniqueRegistry,
+    sequence_context: CompatibilityContext,
+    sequence_config: dict,
+) -> None:
+    missing = dict(sequence_config)
+    missing.pop("student_model_id")
+    with pytest.raises(TechniqueError) as absent:
+        registry.plan(_request("sequence.v1", missing), sequence_context)
+    assert absent.value.code is TechniqueErrorCode.TECHNIQUE_CONFIG_MISMATCH
+    mismatched = {**sequence_config, "student_model_id": "other/student"}
+    with pytest.raises(TechniqueError) as mismatch:
+        registry.plan(_request("sequence.v1", mismatched), sequence_context)
+    assert mismatch.value.code is TechniqueErrorCode.TECHNIQUE_INCOMPATIBLE
 
 
-def test_config_key_order_does_not_change_hash(registry, sequence_context) -> None:
-    a = registry.plan(
-        TechniqueRequest(
-            technique_id="sequence.v1",
-            version="1.0.0",
-            config={"seed": 17, "max_completion": 160, "max_length": 512},
+def test_every_context_identity_change_changes_protocol_hash(
+    registry: TechniqueRegistry,
+    sequence_context: CompatibilityContext,
+    sequence_config: dict,
+) -> None:
+    base = registry.plan(_request("sequence.v1", sequence_config), sequence_context)
+    variants: list[tuple[dict, CompatibilityContext]] = [
+        (sequence_config, sequence_context.model_copy(update={"run_id": "other"})),
+        (
+            sequence_config,
+            sequence_context.model_copy(update={"backend_kind": "sagemaker"}),
         ),
+        (
+            sequence_config,
+            sequence_context.model_copy(update={"instance_type": "ml.g5.2xlarge"}),
+        ),
+    ]
+    identities = {
+        "student_model_id": ("student_model_id", "other/student"),
+        "student_revision": ("student_revision", "9" * 40),
+        "student_tokenizer_sha256": ("tokenizer_sha256_student", "8" * 64),
+        "student_chat_template_sha256": (
+            "chat_template_sha256_student",
+            "7" * 64,
+        ),
+    }
+    for config_field, (context_field, value) in identities.items():
+        variants.append(
+            (
+                {**sequence_config, config_field: value},
+                sequence_context.model_copy(update={context_field: value}),
+            )
+        )
+    hashes = {
+        registry.plan(_request("sequence.v1", config), context).protocol_sha256
+        for config, context in variants
+    }
+    assert base.protocol_sha256 not in hashes
+    assert len(hashes) == len(variants)
+
+
+def test_teacher_identity_change_changes_protocol_hash(
+    registry: TechniqueRegistry,
+    logit_context: CompatibilityContext,
+    logit_config: dict,
+) -> None:
+    base = registry.plan(_request("logit.v1", logit_config), logit_context)
+    changed = registry.plan(
+        _request(
+            "logit.v1",
+            {**logit_config, "teacher_revision": "8" * 40},
+        ),
+        logit_context.model_copy(update={"teacher_revision": "8" * 40}),
+    )
+    assert changed.protocol_sha256 != base.protocol_sha256
+
+
+def test_recompute_tamper_and_config_order(
+    registry: TechniqueRegistry,
+    sequence_context: CompatibilityContext,
+    sequence_config: dict,
+) -> None:
+    plan = registry.plan(_request("sequence.v1", sequence_config), sequence_context)
+    assert recompute_protocol_hash(plan) == plan.protocol_sha256
+    reordered = registry.plan(
+        _request("sequence.v1", dict(reversed(sequence_config.items()))),
         sequence_context,
     )
-    b = registry.plan(
-        TechniqueRequest(
-            technique_id="sequence.v1",
-            version="1.0.0",
-            config={"max_length": 512, "max_completion": 160, "seed": 17},
-        ),
-        sequence_context,
-    )
-    assert a.config_sha256 == b.config_sha256
-    assert a.protocol_sha256 == b.protocol_sha256
+    assert reordered.protocol_sha256 == plan.protocol_sha256
+    payload = plan.model_dump(mode="json")
+    payload["objective_fields"]["objective"] = "tampered"
+    with pytest.raises(TechniqueError) as tampered:
+        TechniquePlan.model_validate(payload)
+    assert tampered.value.code is TechniqueErrorCode.TECHNIQUE_NONDETERMINISTIC
 
 
-def test_external_import_forbidden(external_descriptor) -> None:
-    from distillery.techniques.adapters.external import ExternalContainerAdapter
-
-    adapter = ExternalContainerAdapter(external_descriptor)
-    with pytest.raises(TechniqueError) as excinfo:
-        adapter.import_plugin("hackathon.dhilan.reverse_kl.train")
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_EXTERNAL_IMPORT_FORBIDDEN
+def test_plan_is_only_complete_preflight_and_lifecycle_is_retained(
+    registry: TechniqueRegistry,
+    sequence_context: CompatibilityContext,
+    sequence_config: dict,
+) -> None:
+    assert not hasattr(registry, "validate")
     with pytest.raises(TechniqueError):
-        forbid_control_plane_import("anything.plugin")
+        registry.plan(
+            _request("sequence.v1", sequence_config),
+            sequence_context.model_copy(update={"usable_responses": None}),
+        )
+    plan = registry.plan(_request("sequence.v1", sequence_config), sequence_context)
+    assert tuple(plan.lifecycle_history) == (
+        "registered",
+        "compatible",
+        "planned",
+    )
+    assert registry.plan(_request("sequence.v1", sequence_config), sequence_context) is plan
 
 
-def test_channel_rejects_extra_json(
-    tmp_path: Path, registry, logit_context, external_descriptor
+def test_artifact_contract_and_exactly_one_execution(
+    registry: TechniqueRegistry,
+    sequence_context: CompatibilityContext,
+    sequence_config: dict,
 ) -> None:
-    registry.register(external_descriptor)
-    plan = registry.plan(
-        TechniqueRequest(
-            technique_id="hackathon.dhilan.reverse_kl",
-            version="1.0.0",
-            config={
-                "max_length": 512,
-                "max_completion": 160,
-                "seed": 17,
-                "temperature": 2.0,
-            },
+    with pytest.raises(TechniqueError) as contract:
+        ArtifactContract(required_outputs=("adapter", "tokenizer"))
+    assert contract.value.code is (TechniqueErrorCode.TECHNIQUE_ARTIFACT_CONTRACT_MISMATCH)
+    plan = registry.plan(_request("sequence.v1", sequence_config), sequence_context)
+    with pytest.raises(TechniqueError) as outputs:
+        plan.validate_artifacts(
+            {
+                "adapter": "a" * 64,
+                "tokenizer": "b" * 64,
+                "chat_template": "c" * 64,
+            }
+        )
+    assert outputs.value.code is (TechniqueErrorCode.TECHNIQUE_ARTIFACT_CONTRACT_MISMATCH)
+    plan.validate_artifacts(
+        {
+            "adapter": "a" * 64,
+            "tokenizer": "b" * 64,
+            "chat_template": "c" * 64,
+            "SHA256SUMS": "d" * 64,
+        }
+    )
+    payload = plan.model_dump(mode="json")
+    payload["training_load_plan"] = None
+    with pytest.raises(TechniqueError, match="exactly one execution plan"):
+        TechniquePlan.model_validate(payload)
+
+
+def test_distillery_error_mapping_preserves_distinct_semantics() -> None:
+    expected = {
+        TechniqueErrorCode.TECHNIQUE_UNKNOWN: DistilleryErrorCode.TECHNIQUE_UNKNOWN,
+        TechniqueErrorCode.TECHNIQUE_EXTERNAL_IMPORT_FORBIDDEN: (
+            DistilleryErrorCode.TECHNIQUE_EXTERNAL_IMPORT_FORBIDDEN
         ),
-        logit_context,
-    )
-    channel_dir = tmp_path / "channel"
-    from distillery.techniques.channel import TechniqueChannelContract
-
-    contract = TechniqueChannelContract.model_validate(dict(plan.channel_contract))
-    write_channel_plan(
-        channel_dir,
-        contract=contract,
-        plan_payload=plan.model_dump(mode="json"),
-    )
-    (channel_dir / "extra.json").write_text("{}", encoding="utf-8")
-    from distillery.techniques.channel import load_channel_plan
-
-    with pytest.raises(TechniqueError) as excinfo:
-        load_channel_plan(channel_dir)
-    assert excinfo.value.code is TechniqueErrorCode.TECHNIQUE_CHANNEL_INVALID
+        TechniqueErrorCode.TECHNIQUE_NONDETERMINISTIC: (
+            DistilleryErrorCode.TECHNIQUE_NONDETERMINISTIC
+        ),
+    }
+    for technique_code, distillery_code in expected.items():
+        assert technique_error(technique_code, "x").as_distillery_error().code is (distillery_code)
 
 
-def test_descriptor_schema_version_locked() -> None:
-    descriptor = TechniqueDescriptor.seal(**_base_external_kwargs())
-    assert descriptor.schema_version == DESCRIPTOR_SCHEMA_VERSION
-
-
-def test_register_from_path_roundtrip(
-    tmp_path: Path, external_descriptor: TechniqueDescriptor
+def test_descriptor_roundtrip_from_path(
+    tmp_path: Path,
+    external_descriptor: TechniqueDescriptor,
 ) -> None:
-    path = tmp_path / "tech.json"
-    path.write_text(json.dumps(external_descriptor.model_dump(mode="json")), encoding="utf-8")
-    registry = TechniqueRegistry.with_builtins()
-    loaded = registry.register_from_path(path)
+    assert external_descriptor.schema_version == DESCRIPTOR_SCHEMA_VERSION
+    path = tmp_path / "technique.json"
+    path.write_text(
+        json.dumps(external_descriptor.model_dump(mode="json")),
+        encoding="utf-8",
+    )
+    loaded = TechniqueRegistry.with_builtins().register_from_path(path)
     assert loaded.descriptor_sha256 == external_descriptor.descriptor_sha256
