@@ -1,0 +1,96 @@
+{
+  "schema_version": "distillery.training.image.downstream.v2",
+  "training_image": {
+    "manifest_path": "registry.digest_uri",
+    "requires_registry_verified": true,
+    "uri_form": "repository_uri@sha256:digest",
+    "forbidden_tags": [
+      "latest"
+    ],
+    "required_uri_pattern": "^[0-9]{12}\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/distillery-training@sha256:[0-9a-f]{64}$"
+  },
+  "sagemaker_backend": {
+    "ContainerEntrypoint": [
+      "python",
+      "/opt/distillery/container_entrypoint.py"
+    ],
+    "validate_invocation": {
+      "ContainerArguments": [
+        "--manifest",
+        "/opt/ml/input/data/manifest/manifest.json",
+        "--responses",
+        "/opt/ml/input/data/responses/responses.jsonl",
+        "--output-dir",
+        "/opt/ml/model/validation",
+        "--validate-only"
+      ]
+    },
+    "execute_invocation": {
+      "ContainerArguments": [
+        "--manifest",
+        "/opt/ml/input/data/manifest/manifest.json",
+        "--responses",
+        "/opt/ml/input/data/responses/responses.jsonl",
+        "--output-dir",
+        "/opt/ml/model",
+        "--execute",
+        "--execute-acknowledgement",
+        "I_ACKNOWLEDGE_TRAINING_EXECUTION"
+      ]
+    },
+    "required_channels": {
+      "manifest": {
+        "path": "/opt/ml/input/data/manifest/manifest.json",
+        "input_mode": "File"
+      },
+      "responses": {
+        "path": "/opt/ml/input/data/responses/responses.jsonl",
+        "input_mode": "File"
+      },
+      "dataset": {
+        "path": "/opt/ml/input/data/dataset",
+        "input_mode": "File"
+      },
+      "models": {
+        "path": "/opt/ml/input/data/models",
+        "input_mode": "File",
+        "contains": "revision-pinned snapshots only"
+      }
+    },
+    "capability_evidence": {
+      "transport": "embedded_manifest",
+      "json_path": "training.qlora.capability_evidence",
+      "schema_version": "distillery.training_capabilities.v1",
+      "required_for_auto": [
+        "auto_resolver_input"
+      ],
+      "required_for_logit": [
+        "special_token_maps",
+        "memory_dry_run"
+      ],
+      "parser_note": "The actual trainer parser has no separate capability-evidence CLI argument."
+    },
+    "failure_channel": "/opt/ml/output/failure",
+    "model_output": "/opt/ml/model",
+    "runtime_uid": 1000,
+    "root_init_only": true
+  },
+  "local_backend": {
+    "trainer_module": [
+      "python",
+      "-m",
+      "distillery.training.entrypoint"
+    ],
+    "parity": "same validated arguments, sealed manifest, responses, and capability evidence"
+  },
+  "model_materialization": {
+    "hf_home": "/opt/distillery/hf-cache",
+    "model_cache": "/opt/distillery/models",
+    "sagemaker_channel": "models",
+    "sagemaker_input": "/opt/ml/input/data/models",
+    "layout": "<model_cache>/<org>/<name>/<git_revision>/",
+    "offline_default": true,
+    "require_pinned_revision": true,
+    "image_contains_model_weights": false
+  }
+}
