@@ -1,211 +1,91 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
-import { HeroCarousel } from "./components/HeroCarousel";
+import { ArrowRight } from "lucide-react";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { ProductStage } from "./components/ProductStage";
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
-import { Button } from "./components/ui/Button";
 
 export const metadata: Metadata = {
-  title: "Anthropic 2 | TinyFable",
-  description:
-    "TinyFable is a smaller, portable finance-generalist model trained with Distillery.",
+  title: "Anthropic 2 | AI research and products",
+  description: "Anthropic 2 builds smaller models and the systems that make them worth deploying.",
 };
 
-const papers = [
+const releases = [
   {
-    index: "01 / Model report",
-    title: "TinyFable: distilling a finance generalist",
-    href: "/papers/tinyfable-systems.pdf",
+    eyebrow: "Model release",
+    title: "Introducing TinyFable",
+    copy: "A 0.5B finance generalist trained with Distillery and evaluated against its teacher.",
+    href: "/tinyfable",
+    date: "July 2026",
   },
   {
-    index: "02 / Systems",
-    title: "Distillery: transparent method selection for smaller models",
-    href: "/papers/durable-promises.pdf",
+    eyebrow: "Product",
+    title: "Distillery",
+    copy: "Turn an evaluation dataset into a smaller, portable model with one resolved recipe.",
+    href: "/distillery",
+    date: "July 2026",
   },
   {
-    index: "03 / Evaluation",
-    title: "Evaluating TinyFable: quality, systems, and economics",
-    href: "/papers/evaluation-economics.pdf",
+    eyebrow: "Research",
+    title: "When should a model be smaller?",
+    copy: "A systems-and-economics evaluation of distillation as a deployment decision.",
+    href: "/papers",
+    date: "July 2026",
   },
-];
+] as const;
 
 export default function Home() {
   return (
     <>
       <SiteHeader />
       <main>
-        <div id="tinyfable">
-          <HeroCarousel />
-        </div>
-
-        <section className="model-feature" id="announcement">
-          <div className="feature-meta">
-            <span>Announcing TinyFable</span>
-            <span>July 2026</span>
-          </div>
-          <div className="feature-layout">
-            <div className="feature-copy">
-              <p className="section-kicker">One model, two finance jobs</p>
-              <h2>A small model that cleared the bar.</h2>
-              <p>
-                TinyFable is a 0.5B-class model built to handle transaction
-                review and variance analysis with the same set of weights. It
-                learns from a deterministic synthetic finance world, then faces
-                held-out accounting cases it has not seen before.
-              </p>
-              <div className="feature-actions">
-                <Link href="/writing/announcing-tinyfable.md">
-                  Read the announcement <span>↗</span>
-                </Link>
-                <Link href="/papers/tinyfable-systems.pdf">
-                  Read the working paper <span>↗</span>
-                </Link>
-              </div>
-            </div>
-            <div className="transfer-diagram" aria-label="A 1.5 billion parameter teacher transfers finance behavior to the 0.5 billion parameter TinyFable model">
-              <div className="transfer-node transfer-teacher">
-                <span>Source model</span>
-                <strong>Qwen2.5</strong>
-                <em>1.5B teacher</em>
-              </div>
-              <div className="transfer-lane">
-                <span>validated traces</span>
-                <i />
-                <b>sequence.v1</b>
-                <b>logit.v1</b>
-                <i />
-                <span>portable weights</span>
-              </div>
-              <div className="transfer-node transfer-student">
-                <span>Model 001</span>
-                <strong>TinyFable</strong>
-                <em>0.5B student</em>
-              </div>
-              <div className="transfer-tasks">
-                <span>transaction_review</span>
-                <span>variance_analysis</span>
-              </div>
-            </div>
-          </div>
+        <section className="mx-auto grid min-h-[530px] max-w-[1600px] items-center gap-16 px-6 py-20 md:grid-cols-2 md:px-10 lg:px-14">
+          <h1 className="max-w-3xl text-[clamp(48px,5.7vw,90px)] font-semibold leading-[1.02] tracking-[-0.055em]">
+            AI <Link className="underline decoration-2 underline-offset-[10px]" href="/research">research</Link> and <Link className="underline decoration-2 underline-offset-[10px]" href="/distillery">products</Link> that make smaller models worth building
+          </h1>
+          <p className="max-w-2xl font-serif text-[clamp(24px,2.15vw,35px)] leading-[1.32] tracking-[-0.015em] md:justify-self-end">
+            Anthropic 2 is an independent research lab building compact models and the infrastructure to decide—honestly—when they beat the alternatives.
+          </p>
         </section>
 
-        <section className="research-section" id="research">
-          <div className="section-heading">
-            <span>01</span>
-            <div>
-              <p>Research</p>
-              <h2>Training is not a result.</h2>
-            </div>
-          </div>
-          <div className="research-copy-grid">
-            <p>
-              A smaller model only matters if it keeps enough quality and has a
-              credible economic reason to exist. So we start with the decision,
-              not the training run.
-            </p>
-            <p>
-              Distillery turns traces and synthetic finance examples into a
-              sealed experiment. Its final answer can be approved, failed quality,
-              failed economics, insufficient evidence, or do not distill.
-            </p>
-          </div>
+        <ProductStage />
 
-          <div className="simple-method four-up">
-            <article>
-              <span>1</span>
-              <h3>Curate</h3>
-              <p>Reuse valid traces. Freeze splits, provenance, and hashes.</p>
-            </article>
-            <article>
-              <span>2</span>
-              <h3>Synthesize</h3>
-              <p>Generate only missing labels and preserve where each answer came from.</p>
-            </article>
-            <article>
-              <span>3</span>
-              <h3>Train</h3>
-              <p>Resolve the recipe openly and run one finite, sealed job.</p>
-            </article>
-            <article>
-              <span>4</span>
-              <h3>Prove</h3>
-              <p>Compare quality, uncertainty, systems behavior, and break-even.</p>
-            </article>
+        <section className="mx-auto max-w-[1600px] px-6 py-28 md:px-10 lg:px-14">
+          <div className="mb-10 flex items-end justify-between">
+            <h2 className="text-[clamp(38px,4vw,62px)] font-semibold tracking-[-0.045em]">Latest releases</h2>
+            <Link href="/papers" className="hidden items-center gap-2 text-sm underline underline-offset-8 md:flex">View all research <ArrowRight className="size-4" /></Link>
           </div>
-        </section>
-
-        <section className="benchmark-section">
-          <div className="benchmark-intro">
-            <p className="section-kicker">TinyFable evaluation</p>
-            <h2>The chart arrives with the evidence.</h2>
-            <p>
-              TinyFable cleared the joint quality and economic release gates.
-              Every number in the full report comes from immutable predictions,
-              manifests, cost records, and matched two-seed comparisons.
-            </p>
-          </div>
-          <div className="benchmark-placeholder" aria-label="TinyFable evaluation report summary">
-            <div className="benchmark-topline">
-              <span>SEALED EVALUATION REPORT</span>
-              <b>APPROVED</b>
-            </div>
-            <div className="benchmark-row">
-              <span>Task quality</span><i /><em>passed</em>
-            </div>
-            <div className="benchmark-row">
-              <span>OOD and uncertainty</span><i /><em>passed</em>
-            </div>
-            <div className="benchmark-row">
-              <span>Latency and VRAM</span><i /><em>measured</em>
-            </div>
-            <div className="benchmark-row">
-              <span>Break-even</span><i /><em>positive</em>
-            </div>
-            <p>Release status: APPROVED. Exact values are read from the frozen evaluation artifact.</p>
-          </div>
-        </section>
-
-        <section className="papers-section" id="papers">
-          <div className="section-heading">
-            <span>02</span>
-            <div>
-              <p>Working papers</p>
-              <h2>Publish the method before the victory lap.</h2>
-            </div>
-          </div>
-          <div className="paper-list">
-            {papers.map((paper) => (
-              <a key={paper.index} href={paper.href}>
-                <span>{paper.index}</span>
-                <h3>{paper.title}</h3>
-                <em>PDF ↗</em>
-              </a>
+          <div className="grid gap-4 md:grid-cols-3">
+            {releases.map((release) => (
+              <Card key={release.title} className="min-h-[390px] justify-between rounded-[22px] border-0 bg-[#e8e4da] py-0 shadow-none ring-0 transition-transform duration-300 hover:-translate-y-1">
+                <CardHeader className="p-7">
+                  <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-black/55">
+                    <span>{release.eyebrow}</span><span>{release.date}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-7">
+                  <h3 className="font-serif text-[38px] leading-[1.05] tracking-[-0.03em]">{release.title}</h3>
+                  <p className="mt-5 max-w-sm text-base leading-6 text-black/65">{release.copy}</p>
+                </CardContent>
+                <CardFooter className="border-0 bg-transparent p-7">
+                  <Link href={release.href} className="flex items-center gap-2 text-sm underline underline-offset-8">Read more <ArrowRight className="size-4" /></Link>
+                </CardFooter>
+              </Card>
             ))}
           </div>
         </section>
 
-        <section className="about-section" id="about">
-          <p className="section-kicker">About Anthropic 2</p>
-          <h2>
-            The world&apos;s second most confusingly named AI research lab.
-          </h2>
-          <div>
-            <p>
-              Anthropic 2 is an independent hackathon research lab studying when
-              a smaller model is actually worth making. We build compact models,
-              publish the methods, and let the evidence constrain the story.
-            </p>
-            <p>
-              This is satire. We are not Anthropic. We do admire the cream, the
-              serif, and the confidence required to give a navigation bar this
-              much breathing room.
-            </p>
+        <section className="mx-auto grid max-w-[1600px] gap-16 border-t border-black/20 px-6 py-28 md:grid-cols-2 md:px-10 lg:px-14">
+          <h2 className="max-w-2xl font-serif text-[clamp(38px,4vw,64px)] leading-[1.08] tracking-[-0.035em]">We build models that earn the right to be smaller.</h2>
+          <div className="divide-y divide-black/20 border-t border-black/20">
+            {[['Models', 'TinyFable is our first portable finance generalist.', '/tinyfable'], ['Systems', 'Distillery makes method selection and evaluation reproducible.', '/distillery'], ['Evaluation', 'Quality, uncertainty, systems behavior, and economics share one release gate.', '/research']].map(([label, copy, href]) => (
+              <Link href={href} key={label} className="grid grid-cols-[120px_1fr_auto] gap-4 py-6 hover:bg-black/[0.025]">
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em]">{label}</span>
+                <span>{copy}</span>
+                <ArrowRight className="size-4" />
+              </Link>
+            ))}
           </div>
-          <Button asChild className="black-link">
-            <Link href="/distillery">
-              Open Distillery <ArrowUpRight size={15} />
-            </Link>
-          </Button>
         </section>
       </main>
       <SiteFooter />
