@@ -91,6 +91,22 @@ export function buildStageHref(
   return `${route}?${params.toString()}`;
 }
 
+export function buildCentralHref(
+  stage: "train" | "demo",
+  searchParams: SearchParams | undefined,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams ?? {})) {
+    if (typeof value === "string") {
+      params.set(key, value);
+    } else if (Array.isArray(value)) {
+      for (const item of value) params.append(key, item);
+    }
+  }
+  params.set("stage", stage);
+  return `/?${params.toString()}`;
+}
+
 /** Playground-first entry: land judges on Demo, then reveal the journey. */
 export function buildRootRedirect(searchParams: SearchParams | undefined): string {
   const rawMode = singleModeParam(searchParams);

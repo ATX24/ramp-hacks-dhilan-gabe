@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { ModeBanner } from "@/components/ModeBanner";
 import {
@@ -7,6 +9,7 @@ import {
   type RunReferenceStatus,
 } from "@/components/RunReferenceBar";
 import { StageNav } from "@/components/StageNav";
+import { Button } from "@/components/ui/button";
 import type { UiMode } from "@/lib/types";
 
 export function AppShell({
@@ -32,38 +35,52 @@ export function AppShell({
       </a>
       <header className="site-header">
         <div className="brand-row">
-          <div className="brand-block">
+          <Link href="/" className="brand-block" aria-label="Distillery home">
+            <p className="text-kicker text-muted-foreground">
+              Distillation workspace
+            </p>
             <div className="brand">
-              Distillery <span>· TinyFable</span>
+              Distillery
             </div>
             <p className="tagline">
-              Bring examples, teach a smaller model, and verify it works.
+              Teach a smaller model. Test it on finance work.
             </p>
-          </div>
-          <div
-            className="rounded-full border border-border bg-card px-3 py-2 text-sm"
-            aria-label="Product model"
-          >
-            Finance generalist <strong className="font-serif">TinyFable</strong>
+          </Link>
+          <div className="flex items-center gap-2">
+            <div
+              className="hidden rounded-full border border-black/15 bg-card px-3 py-2 text-sm sm:block"
+              aria-label="Product model"
+            >
+              Finance model <strong className="font-serif">TinyFable</strong>
+            </div>
+            <form action="/api/auth/logout" method="post">
+              <Button type="submit" variant="outline" size="lg">
+                <LogOut aria-hidden />
+                Sign out
+              </Button>
+            </form>
           </div>
         </div>
       </header>
-      <main id="main">{children}</main>
-      <aside className="mt-6 grid gap-3 border-t border-border pt-4">
-        <StageNav
-          mode={mode}
-          runId={
-            runReferenceStatus === "resolving" || runReferenceStatus === "invalid"
-              ? undefined
-              : runId
-          }
-        />
-        <ModeBanner mode={mode} />
-        <details className="rounded-xl border border-border bg-card/70 px-3 py-2">
+      <main id="main" className="central-main">
+        {children}
+      </main>
+      <aside className="mt-8 border-t border-black/15 pt-4">
+        <details className="rounded-[20px] border border-black/15 bg-card px-4 py-3">
           <summary className="cursor-pointer text-sm font-medium">
-            Session details and run reference
+            More stages and session details
           </summary>
-          <div className="mt-3">
+          <div className="mt-4 grid gap-3">
+            <StageNav
+              mode={mode}
+              runId={
+                runReferenceStatus === "resolving" ||
+                runReferenceStatus === "invalid"
+                  ? undefined
+                  : runId
+              }
+            />
+            <ModeBanner mode={mode} />
             <RunReferenceBar
               runId={runId}
               datasetId={datasetId}
