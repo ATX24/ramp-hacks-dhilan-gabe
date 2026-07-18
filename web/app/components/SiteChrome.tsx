@@ -9,7 +9,7 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 
-export function Brand() {
+export function Brand({ inverse = false }: { inverse?: boolean }) {
   return (
     <span className="inline-flex items-start gap-1">
       <Image
@@ -18,7 +18,7 @@ export function Brand() {
         width={590}
         height={68}
         priority
-        className="h-auto w-[128px]"
+        className={inverse ? "h-auto w-[128px] brightness-0 invert" : "h-auto w-[128px]"}
       />
       <sup
         aria-label="2"
@@ -62,7 +62,7 @@ export function SiteHeader({
             ))}
           </NavigationMenuList>
         </NavigationMenu>
-        <Button asChild size="lg" className="h-11 rounded-xl bg-[#141413] px-4 text-[#faf9f5] hover:bg-[#2b2b28]">
+        <Button asChild size="lg" className="h-11 rounded-xl bg-[#141413] px-4 !text-[#faf9f5] hover:bg-[#2b2b28] hover:!text-white">
           <Link href={ctaHref}>
             {ctaLabel}
             <ArrowUpRight className="size-4" />
@@ -78,7 +78,7 @@ export function SiteFooter() {
     <footer className="mt-28 bg-[#141413] text-[#faf9f5]">
       <div className="mx-auto grid max-w-[1600px] gap-14 px-6 py-16 md:grid-cols-[1.5fr_1fr_1fr] md:px-10 lg:px-14">
         <div>
-          <Brand />
+          <Brand inverse />
           <p className="mt-7 max-w-sm text-sm leading-6 text-white/60">
             An independent research lab studying when smaller models are worth making. Not affiliated with Anthropic.
           </p>
