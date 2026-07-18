@@ -596,6 +596,22 @@ def main() -> int:
         request=request,
     )
 
+    # Final spend gate immediately adjacent to CreateTrainingJob.
+    active_before_create = list_active_distillery_jobs(sm)
+    if active_before_create:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "mode": "duplicate_prevented_at_create",
+                    "active_jobs": active_before_create,
+                },
+                sort_keys=True,
+                indent=2,
+            )
+        )
+        return 0
+
     try:
         sm.create_training_job(**request)
     except Exception as exc:  # noqa: BLE001
