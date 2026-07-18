@@ -71,7 +71,7 @@ export function ProductStage() {
                   <h2 className="text-[clamp(64px,8vw,132px)] font-semibold leading-[0.82] tracking-[-0.07em]">Distillery</h2>
                   <p className="mt-8 max-w-lg font-serif text-3xl leading-tight">From a dataset to a portable model in three lines.</p>
                 </div>
-                <Button asChild className="w-fit rounded-xl bg-[#141413] text-[#faf9f5] hover:bg-black/80">
+                <Button asChild className="w-fit rounded-xl bg-[#141413] !text-[#faf9f5] hover:bg-black/80 hover:!text-white">
                   <Link href="/distillery">Open Distillery <ArrowUpRight /></Link>
                 </Button>
               </div>
@@ -80,8 +80,8 @@ export function ProductStage() {
           </CarouselItem>
         </CarouselContent>
         <div className="absolute bottom-5 right-5 flex gap-2">
-          <CarouselPrevious className="static translate-y-0 border-white/20 bg-[#141413]/80 text-white hover:bg-white hover:text-black" />
-          <CarouselNext className="static translate-y-0 border-white/20 bg-[#141413]/80 text-white hover:bg-white hover:text-black" />
+          <CarouselPrevious className="static translate-y-0 border-white/20 bg-[#141413]/80 !text-white hover:bg-white hover:!text-black" />
+          <CarouselNext className="static translate-y-0 border-white/20 bg-[#141413]/80 !text-white hover:bg-white hover:!text-black" />
         </div>
       </div>
     </Carousel>
